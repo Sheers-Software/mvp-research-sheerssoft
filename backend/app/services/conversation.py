@@ -390,14 +390,41 @@ async def _try_extract_lead(
     estimated_nights = extracted.get("estimated_nights") or 1
     estimated_value = Decimal(str(estimated_nights)) * prop.adr
 
+    # Rule-based Lead Scoring
+    intent = extracted.get("intent", "general")
+    priority = "standard"
+    flag_reason = None
+    
+    # 1. High Value Keywords
+    high_value_keywords = ["wedding", "group", "corporate", "event", "conference"]
+    if any(kw in message_text.lower() for kw in high_value_keywords):
+        priority = "high_value"
+        flag_reason = "Keyword match (Event/Group)"
+        
+    # 2. Stay Duration
+    elif estimated_nights > 5:
+        priority = "high_value"
+        flag_reason = "Long stay (>5 nights)"
+        
+    # 3. Calculated Value
+    elif estimated_value > (prop.adr * 3):
+        # Allow override if value is significantly high even if short stay (e.g. multiple rooms implied? 
+        # For now, simplistic check: if raw estimate is > 3x ADR. 
+        # Actually logic is nights * ADR, so >3 nights is > 3x ADR.
+        # Let's keep it simple: > 3 nights or high value custom quote
+        priority = "high_value"
+        flag_reason = "High estimated value"
+
     lead = Lead(
         conversation_id=conversation.id,
         property_id=conversation.property_id,
         guest_name=guest_name,
         guest_phone=guest_phone,
         guest_email=guest_email,
-        intent=extracted.get("intent", "general"),
+        intent=intent,
         estimated_value=estimated_value,
+        priority=priority,
+        flag_reason=flag_reason,
     )
     db.add(lead)
     conversation.guest_name = guest_name or conversation.guest_name

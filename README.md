@@ -9,45 +9,36 @@ An AI-powered hotel inquiry capture system that recovers revenue lost after hour
 - **LLM:** OpenAI GPT-4o-mini
 - **Channels:** WhatsApp (Meta Cloud API), Web Chat Widget, Email (SendGrid)
 
-## Quick Start
+## Key Features (New)
+- **Lead Flagging & Prioritization:**
+  - Auto-flags "High Value" leads (Weddings, Groups, Long stays).
+  - Identifies "Action Required" conversations (e.g., unhappy guests).
+- **Daily Intelligence:**
+  - Automated daily email report to GM/Reservations.
+  - Highlights revenue opportunities and urgent handoffs.
+- **Sales Demo Construction Kit:**
+  - `scripts/seed_demo_data.py`: Resets DB to a "Golden State" for demos.
+  - `start_demo.ps1`: One-click launcher for the entire stack.
 
-### Prerequisites
-- Docker & Docker Compose
-- OpenAI API key
+## Sales Demo Mode
 
-### 1. Clone and configure
-```bash
-cd backend
-cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
-```
+To run a full local demo for a client:
 
-### 2. Start services
-```bash
-docker compose up -d
-```
+1. **Launch the Stack:**
+   ```powershell
+   .\start_demo.ps1
+   ```
+   This will:
+   - Start Backend & Frontend.
+   - Wipe the DB and seed "Grand Horizon Resort" data.
+   - Populate 30 days of analytics history.
 
-This starts:
-- PostgreSQL 16 with pgvector extension (port 5432)
-- FastAPI backend with hot-reload (port 8000)
+2. **Access the Dashboard:**
+   - URL: http://localhost:3000
+   - Login: `admin` / `password123`
 
-### 3. Seed the pilot property (Vivatel KL)
-```bash
-docker compose exec backend python -m scripts.seed_vivatel
-```
-
-### 4. Test the AI
-```bash
-curl -X POST http://localhost:8000/api/v1/conversations \
-  -H "Content-Type: application/json" \
-  -d '{
-    "property_id": "<property-id-from-seed>",
-    "message": "Hi, do you have rooms available this weekend?"
-  }'
-```
-
-### API Documentation
-Once running, visit: http://localhost:8000/docs
+3. **Follow the Script:**
+   - See `docs/sales_demo_script.md` for the step-by-step presentation flow.
 
 ## Project Structure
 
@@ -65,6 +56,8 @@ Once running, visit: http://localhost:8000/docs
 │   │       ├── conversation.py  # AI conversation engine
 │   │       └── analytics.py     # Daily analytics aggregation
 │   ├── scripts/
+│   │   ├── seed_demo_data.py    # Sales Demo "Golden State" seeder
+│   │   ├── simulate_demo_flow.py# Automated backend verification
 │   │   └── seed_vivatel.py      # Pilot property seed data
 │   ├── alembic/                 # Database migrations
 │   ├── Dockerfile
@@ -79,7 +72,7 @@ Once running, visit: http://localhost:8000/docs
 - [x] **Sprint 1:** AI Conversation Core (The Brain Works)
 - [x] **Sprint 2:** WhatsApp + Web Widget + Email (Guests Can Reach Us)
 - [x] **Sprint 3:** Dashboard + Analytics + Reports (The GM Sees the Money)
-- [/] **Sprint 4:** Polish + Deploy + Pilot (Go Live at Vivatel)
+- [x] **Sprint 4:** Sales Demo Mode + Pilot Hardening (Ready for Show & Tell)
 
 
 

@@ -166,7 +166,7 @@ async def compute_daily_analytics(
         else:
             total_revenue += adr
 
-    estimated_revenue = total_revenue
+    estimated_revenue = total_revenue * Decimal("0.20") # Apply default conversion rate 20%
 
     # 9. Upsert analytics record
     existing = await db.execute(
@@ -307,7 +307,7 @@ async def get_realtime_stats(
         else:
             total_revenue += adr
 
-    estimated_revenue = float(total_revenue)
+    estimated_revenue = float(total_revenue * Decimal("0.20"))
     
     # 6. Response Time
     response_times_result = await db.execute(

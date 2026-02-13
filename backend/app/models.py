@@ -57,6 +57,9 @@ class Property(Base):
     ota_commission_pct: Mapped[Decimal] = mapped_column(
         Numeric(5, 2), default=Decimal("20.00")
     )  # OTA commission % for savings calculations
+    conversion_rate: Mapped[Decimal] = mapped_column(
+        Numeric(5, 2), default=Decimal("0.20"), server_default="0.20"
+    ) # Assumed lead-to-booking conversion rate
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -202,6 +205,10 @@ class Lead(Base):
     )  # "new" | "contacted" | "converted" | "lost"
     estimated_value: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     notes: Mapped[str | None] = mapped_column(Text)
+    priority: Mapped[str] = mapped_column(
+        String(20), default="standard", server_default="standard"
+    ) # "standard" | "high_value"
+    flag_reason: Mapped[str | None] = mapped_column(String(255))
     captured_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

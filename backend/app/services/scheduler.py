@@ -48,14 +48,26 @@ def _format_daily_report_email(prop: Property, stats: AnalyticsDaily) -> str:
             </div>
             
             <div style="padding: 20px;">
+                {(lambda: f"""
+                <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin-bottom: 20px;">
+                    <h3 style="margin: 0 0 5px; color: #b91c1c;">⚠️ Action Required</h3>
+                    <p style="margin: 0; color: #7f1d1d;">
+                        You have <strong>{stats.handoffs} conversation(s)</strong> waiting for staff attention.
+                    </p>
+                </div>
+                """ if stats.handoffs > 0 else "")()}
+
                 <div style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 15px; margin-bottom: 20px;">
                     <h3 style="margin: 0 0 10px; color: #0369a1;">💰 Revenue Recovered</h3>
                     <div style="display: flex; justify-content: space-between; align-items: baseline;">
                         <span style="font-size: 24px; font-weight: bold; color: #0f172a;">{revenue}</span>
                         <span style="font-size: 14px; color: #64748b;">Est. Value (After Hours)</span>
                     </div>
-                     <div style="margin-top: 5px; font-size: 13px; color: #0369a1;">
+                    <div style="margin-top: 5px; font-size: 13px; color: #0369a1;">
                         Saved approx. <strong>{commission_saved}</strong> in OTA commissions
+                    </div>
+                    <div style="margin-top: 5px; font-size: 11px; color: #64748b;">
+                        *Estimated based on 20% lead-to-booking conversion rate
                     </div>
                 </div>
 

@@ -44,6 +44,8 @@ class LeadResponse(BaseModel):
     intent: str
     status: str
     estimated_value: float | None
+    priority: str
+    flag_reason: str | None
     captured_at: datetime
 
     class Config:
