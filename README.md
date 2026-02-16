@@ -5,6 +5,7 @@ An AI-powered hotel inquiry capture system that recovers revenue lost after hour
 ## Architecture
 
 - **Backend:** Python 3.12 + FastAPI (single container)
+- **Frontend:** Next.js 14 + TypeScript + TailwindCSS
 - **Database:** PostgreSQL 16 + pgvector (semantic search)
 - **LLM:** OpenAI GPT-4o-mini
 - **Channels:** WhatsApp (Meta Cloud API), Web Chat Widget, Email (SendGrid)
@@ -19,6 +20,10 @@ An AI-powered hotel inquiry capture system that recovers revenue lost after hour
 - **Sales Demo Construction Kit:**
   - `scripts/seed_demo_data.py`: Resets DB to a "Golden State" for demos.
   - `start_demo.ps1`: One-click launcher for the entire stack.
+- **Enhanced Dashboard:**
+  - Unified inbox for managing WhatsApp conversations.
+  - Real-time lead tracking and status updates.
+  - Full TypeScript migration for improved reliability.
 
 ## Sales Demo Mode
 
