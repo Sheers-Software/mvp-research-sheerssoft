@@ -12,18 +12,124 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
+import structlog
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from openai import AsyncOpenAI
+from google import genai
 
 from app.models import Conversation, Message, Lead, Property
 from app.services import search_knowledge_base
 from app.services.sanitizer import sanitize_guest_message
 from app.config import get_settings
 
+logger = structlog.get_logger()
 settings = get_settings()
-openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
+
+gemini_client = genai.Client(api_key=settings.gemini_api_key) if settings.gemini_api_key else None
+openai_client = AsyncOpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
+
+# Template fallback when all LLMs fail
+FALLBACK_RESPONSE = (
+    "Thank you for your message! Our reservations team has been notified "
+    "and will get back to you shortly. If you need immediate assistance, "
+    "please call our front desk directly."
+)
+FALLBACK_RESPONSE_BM = (
+    "Terima kasih atas mesej anda! Pasukan tempahan kami telah dimaklumkan "
+    "dan akan menghubungi anda tidak lama lagi. Jika anda memerlukan bantuan "
+    "segera, sila hubungi kaunter hadapan kami."
+)
+
+
+async def _call_llm(messages: list[dict], max_tokens: int = 300, temperature: float = 0.7) -> tuple:
+    """
+    Call LLM with automatic fallback.
+    1. Try Gemini
+    2. If Gemini fails, try OpenAI GPT-4o-mini
+    3. If OpenAI fails, try Anthropic Claude Haiku
+    4. If all fail, return template fallback response
+    """
+    # Attempt 1: Gemini
+    if settings.gemini_api_key and gemini_client:
+        try:
+            from google.genai import types
+            system_msg = ""
+            gemini_contents = []
+            
+            for msg in messages:
+                if msg["role"] == "system":
+                    system_msg = msg["content"]
+                else:
+                    # Map roles: 'assistant' -> 'model', 'user' -> 'user'
+                    role = "model" if msg["role"] == "assistant" else "user"
+                    gemini_contents.append(
+                        types.Content(
+                            role=role, 
+                            parts=[types.Part.from_text(text=msg["content"])]
+                        )
+                    )
+            
+            # Since _call_llm is async, we use the async client 'aio'
+            response = await gemini_client.aio.models.generate_content(
+                model=settings.gemini_model,
+                contents=gemini_contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_msg,
+                    temperature=temperature,
+                    max_output_tokens=max_tokens,
+                )
+            )
+            return response.text.strip(), None, settings.gemini_model
+        except Exception as e:
+            logger.warning("Gemini LLM call failed, trying fallback", error=str(e))
+    else:
+        logger.warning("Gemini API key missing, skipping to fallback")
+
+    # Attempt 2: OpenAI
+    if settings.openai_api_key and openai_client:
+        try:
+            response = await openai_client.chat.completions.create(
+                model=settings.openai_model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            return response.choices[0].message.content.strip(), response.usage, settings.openai_model
+        except Exception as e:
+            logger.warning("OpenAI LLM call failed, trying fallback", error=str(e))
+    else:
+        logger.warning("OpenAI API key missing, skipping to fallback")
+
+    # Attempt 2: Anthropic Claude Haiku
+    if settings.anthropic_api_key:
+        try:
+            import anthropic
+            client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+
+            # Convert OpenAI format to Anthropic format
+            system_msg = ""
+            claude_messages = []
+            for msg in messages:
+                if msg["role"] == "system":
+                    system_msg = msg["content"]
+                else:
+                    claude_messages.append(msg)
+
+            response = await client.messages.create(
+                model=settings.anthropic_model,
+                max_tokens=max_tokens,
+                system=system_msg,
+                messages=claude_messages,
+            )
+            return response.content[0].text.strip(), None, settings.anthropic_model
+        except Exception as e:
+            logger.error("Anthropic fallback also failed", error=str(e))
+
+    # Attempt 3: Template fallback
+    logger.error("All LLM providers failed, using template fallback")
+    return FALLBACK_RESPONSE, None, "fallback_template"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -261,22 +367,24 @@ async def process_guest_message(
     elif conversation.ai_mode == "handoff":
         system_prompt += HANDOFF_ADDENDUM
 
-    # 8. Call LLM
+    # 8. Call LLM (with retry + fallback)
     start_time = datetime.now(timezone.utc)
 
-    llm_response = await openai_client.chat.completions.create(
-        model=settings.openai_model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            *history,
-        ],
-        max_tokens=300,  # Concise responses — 1-3 sentences
-        temperature=0.7,
-    )
+    llm_messages = [
+        {"role": "system", "content": system_prompt},
+        *history,
+    ]
+    response_text, usage, model_used = await _call_llm(llm_messages)
 
-    response_text = llm_response.choices[0].message.content.strip()
     end_time = datetime.now(timezone.utc)
     response_time_ms = int((end_time - start_time).total_seconds() * 1000)
+
+    logger.info(
+        "LLM response generated",
+        model=model_used,
+        response_time_ms=response_time_ms,
+        conversation_id=str(conversation.id),
+    )
 
     # 9. Save AI response
     ai_msg = Message(
@@ -285,9 +393,9 @@ async def process_guest_message(
         content=response_text,
         metadata_={
             "response_time_ms": response_time_ms,
-            "llm_tokens_used": llm_response.usage.total_tokens if llm_response.usage else 0,
+            "llm_tokens_used": usage.total_tokens if usage else 0,
             "mode": conversation.ai_mode,
-            "model": settings.openai_model,
+            "model": model_used,
         },
     )
     db.add(ai_msg)
@@ -342,34 +450,66 @@ async def _try_extract_lead(
         f"{msg.role}: {msg.content}" for msg in messages
     )
 
-    extraction_response = await openai_client.chat.completions.create(
-        model=settings.openai_model,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Extract guest info from this hotel inquiry conversation. "
-                    "Return ONLY a JSON object (no markdown) with keys: "
-                    "guest_name (string or null), guest_email (string or null), "
-                    "guest_phone (string or null), intent (one of: room_booking, "
-                    "event, fb_inquiry, general), estimated_nights (number or null). "
-                    "If info is not available, use null."
-                ),
-            },
-            {"role": "user", "content": full_conversation},
-        ],
-        max_tokens=150,
-        temperature=0,
+    system_instruction = (
+        "Extract guest info from this hotel inquiry conversation. "
+        "Return ONLY a JSON object (no markdown) with keys: "
+        "guest_name (string or null), guest_email (string or null), "
+        "guest_phone (string or null), intent (one of: room_booking, "
+        "event, fb_inquiry, general), estimated_nights (number or null). "
+        "If info is not available, use null."
     )
+
+    raw = None
+
+    # Attempt 1: Gemini
+    if settings.gemini_api_key and gemini_client:
+        try:
+            from google.genai import types
+            response = await gemini_client.aio.models.generate_content(
+                model=settings.gemini_model,
+                contents=full_conversation,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    temperature=0,
+                    max_output_tokens=150,
+                )
+            )
+            raw = response.text.strip()
+        except Exception as e:
+            logger.warning("Gemini lead extraction failed, trying fallback", error=str(e))
+
+    # Attempt 2: OpenAI (Fallback)
+    if not raw and settings.openai_api_key and openai_client:
+        try:
+            extraction_response = await openai_client.chat.completions.create(
+                model=settings.openai_model,
+                messages=[
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": full_conversation},
+                ],
+                max_tokens=150,
+                temperature=0,
+            )
+            raw = extraction_response.choices[0].message.content.strip()
+        except Exception as e:
+            logger.warning("OpenAI lead extraction failed", error=str(e))
+
+    if not raw:
+        logger.warning("Lead extraction skipped: No LLM available or both failed")
+        return None
 
     try:
         import json
-        raw = extraction_response.choices[0].message.content.strip()
         # Handle potential markdown code block wrapping
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
+            if raw.startswith("json\n"):
+                raw = raw[5:]
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
         extracted = json.loads(raw)
-    except (json.JSONDecodeError, IndexError):
+    except Exception as e:
+        logger.warning("Lead extraction LLM call failed", error=str(e))
         return None
 
     # Only create lead if we have at least a name or contact

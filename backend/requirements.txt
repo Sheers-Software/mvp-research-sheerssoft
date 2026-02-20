@@ -11,12 +11,15 @@ alembic==1.14.1
 pgvector==0.3.6
 
 # AI / LLM
+google-genai==0.3.0
 openai==1.59.9
+anthropic==0.45.0
 tiktoken==0.8.0
 
 # Auth & Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+cryptography==44.0.0
 pydantic[email]==2.10.5
 pydantic-settings==2.7.1
 
@@ -30,11 +33,16 @@ sendgrid==6.11.0
 # Scheduling
 apscheduler==3.10.4
 
+# Retry / Resilience
+tenacity==9.0.0
+
 # Utilities
 python-dotenv==1.0.1
 structlog==24.4.0
 
+# Rate Limiting
+slowapi==0.1.9
+
 # Testing
 pytest==8.3.4
 pytest-asyncio==0.25.0
-slowapi==0.1.9

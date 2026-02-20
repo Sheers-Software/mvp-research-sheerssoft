@@ -12,16 +12,7 @@ import structlog
 
 from app.config import get_settings
 
-
 settings = get_settings()
-print(f"DEBUG: Loading settings. Environment: {settings.environment}")
-print(f"DEBUG: DATABASE_URL starts with: {settings.database_url.split('://')[0] if '://' in settings.database_url else 'INVALID'}")
-# Mask password
-safe_url = settings.database_url
-if "@" in safe_url:
-    prefix = safe_url.split("@")[1]
-    safe_url = f"redacted@{prefix}"
-print(f"DEBUG: DATABASE_URL value (masked): {safe_url}")
 
 from app.routes import router
 from app.websockets import router as ws_router

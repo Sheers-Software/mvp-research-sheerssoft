@@ -39,7 +39,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sheerssoft}:${POSTGRES_PASSWORD:-sheerssoft_dev_password}@db:5432/${POSTGRES_DB:-sheerssoft}
       REDIS_URL: redis://redis:6379/0
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
       WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-sheerssoft_verify_token}
       WHATSAPP_API_TOKEN: ${WHATSAPP_API_TOKEN:-}
