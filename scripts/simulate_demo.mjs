@@ -80,7 +80,7 @@ async function setupProperty(token) {
 // ─── 100 Conversation Scenarios ────────────────────────────
 
 function getConversations() {
-    const channels = ['web', 'whatsapp', 'email'];
+    const channels = ['whatsapp', 'whatsapp', 'whatsapp'];
     const scenarios = [];
 
     // === Category 1: Room & Rate Inquiries (30) ===

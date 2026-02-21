@@ -135,7 +135,15 @@ async def compute_daily_analytics(
         )
         .group_by(Conversation.channel)
     )
-    channel_breakdown = {row[0]: row[1] for row in channel_result.fetchall()}
+    raw_breakdown = {row[0]: row[1] for row in channel_result.fetchall()}
+    channel_breakdown = {
+        "whatsapp": raw_breakdown.get("whatsapp", 0),
+        "email": raw_breakdown.get("email", 0),
+        "web": raw_breakdown.get("web", 0),
+        "facebook": raw_breakdown.get("facebook", 0),
+        "instagram": raw_breakdown.get("instagram", 0),
+        "tiktok": raw_breakdown.get("tiktok", 0),
+    }
 
     # 8. Estimated revenue recovered
     # Logic: Sum of (Lead.estimated_value OR Property.ADR) for all after-hours leads
@@ -168,6 +176,18 @@ async def compute_daily_analytics(
 
     estimated_revenue = total_revenue * Decimal("0.20") # Apply default conversion rate 20%
 
+    # Calculate AI vs Manual handling
+    inquiries_handled_manually = handoffs
+    inquiries_handled_by_ai = total_inquiries - inquiries_handled_manually
+
+    # Calculate cost savings -> (0.25 hours saved per AI inquiry) * property.hourly_rate
+    prop_result2 = await db.execute(
+        select(Property.hourly_rate).where(Property.id == property_id)
+    )
+    hourly_rate = prop_result2.scalar() or Decimal("25.00")
+    hours_saved = Decimal(str(inquiries_handled_by_ai)) * Decimal("0.25")
+    cost_savings = hours_saved * hourly_rate
+
     # 9. Upsert analytics record
     existing = await db.execute(
         select(AnalyticsDaily).where(
@@ -183,8 +203,11 @@ async def compute_daily_analytics(
         record.after_hours_responded = after_hours_responded
         record.leads_captured = leads_captured
         record.handoffs = handoffs
+        record.inquiries_handled_by_ai = inquiries_handled_by_ai
+        record.inquiries_handled_manually = inquiries_handled_manually
         record.avg_response_time_sec = avg_response_time
         record.estimated_revenue_recovered = estimated_revenue
+        record.cost_savings = cost_savings
         record.channel_breakdown = channel_breakdown
     else:
         record = AnalyticsDaily(
@@ -195,8 +218,11 @@ async def compute_daily_analytics(
             after_hours_responded=after_hours_responded,
             leads_captured=leads_captured,
             handoffs=handoffs,
+            inquiries_handled_by_ai=inquiries_handled_by_ai,
+            inquiries_handled_manually=inquiries_handled_manually,
             avg_response_time_sec=avg_response_time,
             estimated_revenue_recovered=estimated_revenue,
+            cost_savings=cost_savings,
             channel_breakdown=channel_breakdown,
         )
         db.add(record)
@@ -343,6 +369,15 @@ async def get_realtime_stats(
     status_counts = {row[0]: row[1] for row in status_result.fetchall()}
     active_conversations = status_counts.get("active", 0)
     handed_off_conversations = status_counts.get("handed_off", 0)
+
+    inquiries_handled_manually = status_counts.get("handed_off", 0)
+    inquiries_handled_by_ai = total_inquiries - inquiries_handled_manually
+
+    prop_result2 = await db.execute(
+        select(Property.hourly_rate).where(Property.id == property_id)
+    )
+    hourly_rate = prop_result2.scalar() or Decimal("25.00")
+    cost_savings = float(Decimal(str(inquiries_handled_by_ai)) * Decimal("0.25") * hourly_rate)
     
     return {
         "report_date": date.today().isoformat(),
@@ -354,4 +389,7 @@ async def get_realtime_stats(
         "estimated_revenue_recovered": estimated_revenue,
         "active_conversations": active_conversations,
         "handed_off_conversations": handed_off_conversations,
+        "inquiries_handled_by_ai": inquiries_handled_by_ai,
+        "inquiries_handled_manually": inquiries_handled_manually,
+        "cost_savings": cost_savings,
     }

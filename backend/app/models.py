@@ -60,6 +60,13 @@ class Property(Base):
     conversion_rate: Mapped[Decimal] = mapped_column(
         Numeric(5, 2), default=Decimal("0.20"), server_default="0.20"
     ) # Assumed lead-to-booking conversion rate
+    hourly_rate: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), default=Decimal("25.00"), server_default="25.00"
+    )  # Hourly rate for front desk staff (used for cost savings calculations)
+    brand_vocabulary: Mapped[str | None] = mapped_column(Text)
+    # E.g. "We say 'Welcome Home' instead of 'Hello'. We are formal but warm."
+    required_questions: Mapped[list[str] | None] = mapped_column(JSON)
+    # E.g. ["What is your booking reference?", "How many adults are staying?"]
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -277,14 +284,19 @@ class AnalyticsDaily(Base):
     after_hours_responded: Mapped[int] = mapped_column(Integer, default=0)
     leads_captured: Mapped[int] = mapped_column(Integer, default=0)
     handoffs: Mapped[int] = mapped_column(Integer, default=0)
+    inquiries_handled_by_ai: Mapped[int] = mapped_column(Integer, default=0)
+    inquiries_handled_manually: Mapped[int] = mapped_column(Integer, default=0)
     avg_response_time_sec: Mapped[Decimal] = mapped_column(
         Numeric(8, 2), default=Decimal("0")
     )
     estimated_revenue_recovered: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), default=Decimal("0")
     )
+    cost_savings: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=Decimal("0")
+    )
     channel_breakdown: Mapped[dict | None] = mapped_column(JSON)
-    # Example: {"whatsapp": 29, "web": 14, "email": 4}
+    # Example: {"whatsapp": 29, "web": 14, "email": 4, "facebook": 2, "instagram": 1, "tiktok": 0}
 
     # Relationships
     property: Mapped["Property"] = relationship(back_populates="analytics_daily")

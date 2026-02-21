@@ -1,49 +1,38 @@
 # SheersSoft AI Inquiry Capture & Conversion Engine
 
-An AI-powered hotel inquiry capture system that recovers revenue lost after hours.
+An AI-powered hotel inquiry capture system that recovers revenue lost after hours and tracks granular ROI.
 
 ## Architecture
 
-- **Backend:** Python 3.12 + FastAPI (single container)
+- **Backend:** Python 3.12 + FastAPI
 - **Frontend:** Next.js 14 + TypeScript + TailwindCSS
-- **Database:** PostgreSQL 16 + pgvector (semantic search)
-- **LLM:** Google Gemini (Primary), OpenAI GPT-4o-mini & Anthropic (Fallbacks)
+- **Database:** PostgreSQL 16 + pgvector (Semantic AI Search)
+- **LLMs:** Google Gemini (Primary), OpenAI GPT-4o-mini & Anthropic (Fallbacks)
 - **Channels:** WhatsApp (Meta Cloud API), Web Chat Widget, Email (SendGrid)
 
-## Key Features (New)
-- **Lead Flagging & Prioritization:**
-  - Auto-flags "High Value" leads (Weddings, Groups, Long stays).
-  - Identifies "Action Required" conversations (e.g., unhappy guests).
-- **Daily Intelligence:**
-  - Automated daily email report to GM/Reservations.
-  - Highlights revenue opportunities and urgent handoffs.
-- **Sales Demo Construction Kit:**
-  - `scripts/seed_demo_data.py`: Resets DB to a "Golden State" for demos.
-  - `start_demo.ps1`: One-click launcher for the entire stack.
-- **Enhanced Dashboard:**
-  - Unified inbox for managing WhatsApp conversations.
-  - Real-time lead tracking and status updates.
-  - Full TypeScript migration for improved reliability.
+## Key Features
 
-## Sales Demo Mode
+1. **AI Conversation Engine (RAG):** Answers guest inquiries using a knowledge-base, captures leads, and hands off complex issues seamlessly.
+2. **"Paste & Go" Integrations Setup:** Zero code changes required for integrating Meta, SendGrid, and AI credentials. Configured entirely via `.env`.
+3. **Demo Mode Orchestrator:** Fully isolated environment running on simulated channel data with 100+ native conversation scenarios for flawless sales pitches without touching production. 
+4. **Operations Tuning:** Revenue managers can tune AI personas, set required screening questions, and input front desk hourly wages directly via the Dashboard Settings interface.
+5. **Advanced Analytics & Export:** 
+   - Real-time pipeline calculation estimating Gross Revenue Recovered and Ops Cost Savings.
+   - Broad time-scaling filters (Daily, Weekly, Monthly, Quarterly, Yearly, Custom).
+   - Generates CSV tabular spreadsheets and exports Canvas-rendered visual PDF reports in-browser.
 
-To run a full local demo for a client:
+## Getting Started
 
-1. **Launch the Stack:**
+1. **Setup Integrations (Phase 0):** Make a copy of `.env.example` to `.env` and fill in API keys for Gemini, OpenAi, WhatsApp, and SendGrid using the paths detailed in the config comments.
+2. **Launch the Real Application:**
+   ```powershell
+   docker-compose up -d --build
+   ```
+3. **Launch the Isolated Sales Demo Stack:**
    ```powershell
    .\start_demo.ps1
    ```
-   This will:
-   - Start Backend & Frontend.
-   - Wipe the DB and seed "Grand Horizon Resort" data.
-   - Populate 30 days of analytics history.
-
-2. **Access the Dashboard:**
-   - URL: http://localhost:3000
-   - Login: `admin` / `password123`
-
-3. **Follow the Script:**
-   - See `docs/sales_demo_script.md` for the step-by-step presentation flow.
+   *Note: This starts an entirely separate stack (`docker-compose.demo.yml`) with pre-seeded demo properties and mock conversations, accessible at port `3001`.*
 
 ## Project Structure
 
@@ -53,31 +42,37 @@ To run a full local demo for a client:
 │   │   ├── main.py              # FastAPI app entry point
 │   │   ├── config.py            # Environment configuration
 │   │   ├── database.py          # Async SQLAlchemy engine
-│   │   ├── models.py            # Database models (6 entities)
-│   │   ├── schemas.py           # Pydantic request/response schemas
-│   │   ├── routes.py            # All API endpoints
-│   │   └── services/
-│   │       ├── __init__.py      # KB ingestion + RAG search
-│   │       ├── conversation.py  # AI conversation engine
-│   │       └── analytics.py     # Daily analytics aggregation
+│   │   ├── models.py            # Database tables
+│   │   ├── schemas.py           # Pydantic schemas
+│   │   ├── routes/              # Modular API endpoints
+│   │   └── services/            # Core logic, LLMs, integrations, RAG
 │   ├── scripts/
-│   │   ├── seed_demo_data.py    # Sales Demo "Golden State" seeder
-│   │   ├── simulate_demo_flow.py# Automated backend verification
-│   │   └── seed_vivatel.py      # Pilot property seed data
-│   ├── alembic/                 # Database migrations
+│   │   ├── seed_demo_data.py    # Database seeder for demo state
 │   ├── Dockerfile
 │   └── requirements.txt
-├── docs/                        # Research & playbooks
-├── docker-compose.yml
-└── .gitignore
+├── frontend/                    # Next.js 14 Dashboard
+├── scripts/                     # External Powershell & Node workflow scripts
+├── docs/                        # Research & technical playbooks
+├── docker-compose.yml           # Production & Dev Stack
+└── docker-compose.demo.yml      # Isolated Demo Stack
 ```
 
-## Sprint Status
+## Sprint Completion Status
 
-- [x] **Sprint 1:** AI Conversation Core (The Brain Works)
-- [x] **Sprint 2:** WhatsApp + Web Widget + Email (Guests Can Reach Us)
-- [x] **Sprint 3:** Dashboard + Analytics + Reports (The GM Sees the Money)
-- [x] **Sprint 4:** Sales Demo Mode + Pilot Hardening (Ready for Show & Tell)
+Everything from the blueprint has been fully implemented:
+
+- [x] Phase 0: Integration Credential Architecture
+- [x] Phase 1: Backend Hardening
+- [x] Phase 2: Demo Mode Orchestration & Seed Scripting 
+- [x] Phase 3: Staff Dashboard & KPI Construction
+- [x] Phase 4: Web Chat Widget Polish
+- [x] Phase 5: Multi-Channel Live Integrations (WhatsApp, Web, Email)
+- [x] Phase 6: Security & PDPA Governance
+- [x] Phase 7: Production Containerization
+- [x] Phase 8: Multi-Tenant Security Auditing
+- [x] Phase 9: AI Personas, Brand Scripting, Metrics Tracking Additions
+- [x] Phase 10: Live Metric and Operations End-to-End Validation
+- [x] Phase 11: Advanced Analytics Date Filtering, CSV & PDF Reporting
 
 
 

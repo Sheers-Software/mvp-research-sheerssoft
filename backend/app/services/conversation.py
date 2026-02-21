@@ -146,6 +146,9 @@ Your goal is to be helpful, warm, and *efficient*. You want to get the guest key
 4.  **After Hours**: It is currently {after_hours_state}. If it is after hours (late night), be extra reassuring: "Our team is away, but I'm here to take down your details so they can contact you first thing in the morning."
 5.  **Language**: Match the guest's language (English or Bahasa Malaysia).
 
+### BRAND PERSONA & VOCABULARY:
+{brand_vocabulary_context}
+
 ### PROPERTY KNOWLEDGE BASE:
 {knowledge_base_context}
 """
@@ -157,6 +160,8 @@ Don't be passive. politely *guide* them to give you this info:
 1.  **Name**
 2.  **Dates of Stay**
 3.  **Phone/Email** (if not already visible)
+
+{required_questions_context}
 
 Example: "I can definitely check rates for you! What dates are you looking to stay?"
 Example 2: "Perfect. Could I get your name to start a tentative booking?"
@@ -356,14 +361,24 @@ async def process_guest_message(
     if conversation.is_after_hours:
         after_hours_state = f"AFTER HOURS (Operating hours are {operating_hours_str})"
         
+    brand_vocab_str = "Standard hotel professional and helpful."
+    if prop.brand_vocabulary:
+        brand_vocab_str = prop.brand_vocabulary
+        
     system_prompt = SYSTEM_PROMPT_BASE.format(
         property_name=prop.name,
         after_hours_state=after_hours_state,
+        brand_vocabulary_context=brand_vocab_str,
         knowledge_base_context=kb_context,
     )
 
     if conversation.ai_mode == "lead_capture":
-        system_prompt += LEAD_CAPTURE_ADDENDUM
+        required_qs_str = ""
+        if prop.required_questions and len(prop.required_questions) > 0:
+            qs_list = "\n".join(f"- {q}" for q in prop.required_questions)
+            required_qs_str = f"Additionally, ensure you ask these REQUIRED QUESTIONS before passing to reservations:\n{qs_list}"
+            
+        system_prompt += LEAD_CAPTURE_ADDENDUM.format(required_questions_context=required_qs_str)
     elif conversation.ai_mode == "handoff":
         system_prompt += HANDOFF_ADDENDUM
 

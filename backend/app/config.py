@@ -4,6 +4,11 @@ Application configuration loaded from environment variables.
 
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import Optional
+from google.cloud import secretmanager
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -83,6 +88,22 @@ class Settings(BaseSettings):
     def model_post_init(self, __context):
         if self.database_url.startswith("postgresql://"):
             self.database_url = self.database_url.replace("postgresql://", "postgresql+asyncpg://")
+
+        # Fallback to GCP Secret Manager if the Gemini key is not configured locally
+        if not self.gemini_api_key and self.is_production:
+            try:
+                client = secretmanager.SecretManagerServiceClient()
+                # Project nocturn-ai-487207
+                name = "projects/nocturn-ai-487207/secrets/GEMINI_API_KEY/versions/latest"
+                response = client.access_secret_version(request={"name": name})
+                self.gemini_api_key = response.payload.data.decode("UTF-8")
+                logger.info("Successfully loaded GEMINI_API_KEY from GCP Secret Manager.")
+            except Exception as e:
+                logger.warning(
+                    f"Could not load GEMINI_API_KEY from Secret Manager. "
+                    f"If running locally, this is expected unless you have run `gcloud auth application-default login`. "
+                    f"Error: {e}"
+                )
 
     class Config:
         env_file = ".env"

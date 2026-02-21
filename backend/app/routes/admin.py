@@ -112,7 +112,37 @@ async def get_property_settings(
         "timezone": prop.timezone,
         "plan_tier": prop.plan_tier,
         "is_active": prop.is_active,
+        "hourly_rate": float(prop.hourly_rate) if prop.hourly_rate else 25.00,
+        "brand_vocabulary": prop.brand_vocabulary,
+        "required_questions": prop.required_questions,
     }
+
+from app.schemas import PropertySettingsUpdateRequest
+
+@router.put("/properties/{property_id}/settings")
+async def update_property_settings(
+    property_id: str,
+    body: PropertySettingsUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(check_property_access),
+):
+    """Update property configuration via the Settings page."""
+    result = await db.execute(
+        select(Property).where(Property.id == uuid.UUID(property_id))
+    )
+    prop = result.scalar_one_or_none()
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    if body.hourly_rate is not None:
+        prop.hourly_rate = Decimal(str(body.hourly_rate))
+    if body.brand_vocabulary is not None:
+        prop.brand_vocabulary = body.brand_vocabulary
+    if body.required_questions is not None:
+        prop.required_questions = body.required_questions
+
+    await db.flush()
+    return {"status": "success"}
 
 
 @router.put("/properties/{property_id}/knowledge-base", response_model=KBIngestResponse)

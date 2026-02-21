@@ -111,6 +111,9 @@ class PropertyResponse(BaseModel):
     website_url: str | None
     adr: float
     ota_commission_pct: float
+    hourly_rate: float
+    brand_vocabulary: str | None = None
+    required_questions: list[str] | None = None
     created_at: datetime | None = None
     deleted_at: datetime | None = None
 
@@ -128,6 +131,15 @@ class PropertyCreateRequest(BaseModel):
     operating_hours: dict | None = None
     adr: float = 230.00
     ota_commission_pct: float = 20.00
+    hourly_rate: float = 25.00
+    brand_vocabulary: str | None = None
+    required_questions: list[str] | None = None
+
+
+class PropertySettingsUpdateRequest(BaseModel):
+    hourly_rate: float | None = None
+    brand_vocabulary: str | None = None
+    required_questions: list[str] | None = None
 
 
 # ─── Knowledge Base ───
@@ -155,8 +167,11 @@ class AnalyticsSummaryResponse(BaseModel):
     after_hours_responded: int
     leads_captured: int
     handoffs: int
+    inquiries_handled_by_ai: int
+    inquiries_handled_manually: int
     avg_response_time_sec: float
     estimated_revenue_recovered: float
+    cost_savings: float
     channel_breakdown: dict | None
 
 
@@ -183,8 +198,11 @@ class AnalyticsDailyResponse(BaseModel):
     after_hours_inquiries: int
     leads_captured: int
     handoffs: int
+    inquiries_handled_by_ai: int
+    inquiries_handled_manually: int
     avg_response_time_sec: float
     estimated_revenue_recovered: float
+    cost_savings: float
     channel_breakdown: dict | None
 
     class Config:

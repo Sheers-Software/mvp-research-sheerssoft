@@ -56,8 +56,13 @@ async def get_analytics(
         "after_hours_responded": sum(r.after_hours_responded for r in daily_records),
         "leads_captured": sum(r.leads_captured for r in daily_records),
         "handoffs": sum(r.handoffs for r in daily_records),
+        "inquiries_handled_by_ai": sum(r.inquiries_handled_by_ai for r in daily_records),
+        "inquiries_handled_manually": sum(r.inquiries_handled_manually for r in daily_records),
         "estimated_revenue_recovered": float(
             sum(r.estimated_revenue_recovered for r in daily_records)
+        ),
+        "cost_savings": float(
+            sum(r.cost_savings for r in daily_records)
         ),
     }
     total_response_times = [
@@ -78,7 +83,12 @@ async def get_analytics(
             "total_inquiries": r.total_inquiries,
             "after_hours_inquiries": r.after_hours_inquiries,
             "leads_captured": r.leads_captured,
+            "handoffs": r.handoffs,
+            "inquiries_handled_by_ai": r.inquiries_handled_by_ai,
+            "inquiries_handled_manually": r.inquiries_handled_manually,
+            "avg_response_time_sec": float(r.avg_response_time_sec),
             "estimated_revenue_recovered": float(r.estimated_revenue_recovered),
+            "cost_savings": float(r.cost_savings),
             "channel_breakdown": r.channel_breakdown,
         }
         for r in daily_records
@@ -107,18 +117,25 @@ async def get_analytics_live(
 @router.get("/properties/{property_id}/analytics/summary", response_model=AnalyticsSummaryResponse)
 async def get_analytics_summary(
     property_id: str,
+    from_date: date = Query(None),
+    to_date: date = Query(None),
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(check_property_access),
 ):
     """Get aggregated analytics summary (hero stats for Money Slide)."""
     pid = uuid.UUID(property_id)
-    from_date = date.today() - timedelta(days=30)
+    
+    if not from_date:
+        from_date = date.today() - timedelta(days=30)
+    if not to_date:
+        to_date = date.today()
 
     result = await db.execute(
         select(AnalyticsDaily)
         .where(
             AnalyticsDaily.property_id == pid,
-            AnalyticsDaily.report_date >= from_date
+            AnalyticsDaily.report_date >= from_date,
+            AnalyticsDaily.report_date <= to_date
         )
     )
     daily_records = result.scalars().all()
@@ -135,7 +152,10 @@ async def get_analytics_summary(
         after_hours_responded=sum(r.after_hours_responded for r in daily_records),
         leads_captured=sum(r.leads_captured for r in daily_records),
         handoffs=sum(r.handoffs for r in daily_records),
+        inquiries_handled_by_ai=sum(r.inquiries_handled_by_ai for r in daily_records),
+        inquiries_handled_manually=sum(r.inquiries_handled_manually for r in daily_records),
         avg_response_time_sec=avg_resp,
         estimated_revenue_recovered=float(sum(r.estimated_revenue_recovered for r in daily_records)),
+        cost_savings=float(sum(r.cost_savings for r in daily_records)),
         channel_breakdown={}
     )
