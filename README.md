@@ -13,7 +13,7 @@ An AI-powered hotel inquiry capture system that recovers revenue lost after hour
 ## Key Features
 
 1. **AI Conversation Engine (RAG):** Answers guest inquiries using a knowledge-base, captures leads, and hands off complex issues seamlessly.
-2. **"Paste & Go" Integrations Setup:** Zero code changes required for integrating Meta, SendGrid, and AI credentials. Configured entirely via `.env`.
+2. **"Paste & Go" Integrations Setup:** Zero code changes required for integrating Meta, Twilio, SendGrid, and AI credentials. Configured entirely via GCP Secret Manager.
 3. **Demo Mode Orchestrator:** Fully isolated environment running on simulated channel data with 100+ native conversation scenarios for flawless sales pitches without touching production. 
 4. **Operations Tuning:** Revenue managers can tune AI personas, set required screening questions, and input front desk hourly wages directly via the Dashboard Settings interface.
 5. **Advanced Analytics & Export:** 
@@ -23,7 +23,7 @@ An AI-powered hotel inquiry capture system that recovers revenue lost after hour
 
 ## Getting Started
 
-1. **Setup Integrations (Phase 0):** Make a copy of `.env.example` to `.env` and fill in API keys for Gemini, OpenAi, WhatsApp, and SendGrid using the paths detailed in the config comments.
+1. **Setup Integrations (Phase 0):** Push API keys for Gemini, OpenAI, WhatsApp, Twilio, and SendGrid to GCP Secret Manager (project `nocturn-ai-487207`). See `.env.example` for the list of required secret keys.
 2. **Launch the Real Application:**
    ```powershell
    docker-compose up -d --build

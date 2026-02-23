@@ -13,7 +13,7 @@ from app.services.response_formatter import format_response
 
 logger = structlog.get_logger()
 
-GRAPH_API_BASE = "https://graph.facebook.com/v18.0"
+GRAPH_API_BASE = "https://graph.facebook.com/v22.0"
 
 
 async def send_whatsapp_message(to_number: str, message_text: str):
