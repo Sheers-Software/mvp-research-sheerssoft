@@ -17,9 +17,10 @@ from app.schemas import (
 )
 from app.services.conversation import process_guest_message
 from app.services.whatsapp import send_whatsapp_message, normalize_whatsapp_message
+from app.services.twilio_whatsapp import normalize_twilio_webhook, send_twilio_message
 from app.services.email import send_email, notify_staff_handoff, normalize_email_message
 from app.limiter import limiter
-from app.auth import verify_whatsapp_signature, verify_sendgrid_signature
+from app.auth import verify_whatsapp_signature, verify_sendgrid_signature, verify_twilio_signature
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -81,6 +82,10 @@ async def _handle_whatsapp_message_async(
         try:
             await set_db_context(db, str(property_id))
 
+            # Fetch property to verify provider
+            prop_result = await db.execute(select(Property).where(Property.id == property_id))
+            prop = prop_result.scalar_one()
+
             result = await process_guest_message(
                 db=db,
                 property_id=property_id,
@@ -93,7 +98,12 @@ async def _handle_whatsapp_message_async(
             await db.commit()
 
             response_text = result["response"]
-            await send_whatsapp_message(to_number=from_number, message_text=response_text)
+            
+            # Route reply based on property configuration
+            if prop.whatsapp_provider == "twilio":
+                await send_twilio_message(to_number=from_number, message_text=response_text)
+            else:
+                await send_whatsapp_message(to_number=from_number, message_text=response_text)
 
             if result.get("mode") == "handoff":
                 await notify_staff_handoff(
@@ -128,6 +138,45 @@ async def whatsapp_verify(request: Request):
         return int(challenge)
 
     raise HTTPException(status_code=403, detail="Verification failed")
+
+
+@router.post("/webhook/twilio/whatsapp", response_model=None)
+@limiter.limit("3000/minute")
+async def twilio_whatsapp_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(verify_twilio_signature)
+):
+    """
+    Twilio WhatsApp API webhook receiver.
+    """
+    form_data = await request.form()
+    
+    normalized_data = normalize_twilio_webhook(dict(form_data))
+    if not normalized_data:
+        return {"status": "ignored"}
+
+    to_number = normalized_data["metadata"].get("twilio_to_number")
+    # Lookup the property by the Twilio Phone Number
+    prop_result = await db.execute(
+        select(Property).where(Property.twilio_phone_number == to_number)
+    )
+    prop = prop_result.scalar_one_or_none()
+
+    if not prop:
+        logger.warning("Twilio webhook: Property not found", to_number=to_number)
+        return {"status": "property_not_found"}
+
+    background_tasks.add_task(
+        _handle_whatsapp_message_async,
+        property_id=prop.id,
+        from_number=normalized_data["guest_identifier"],
+        text=normalized_data["content"],
+        guest_name=normalized_data["guest_name"]
+    )
+
+    return {"status": "processing"}
 
 
 # ─────────────────────────────────────────────────────────────

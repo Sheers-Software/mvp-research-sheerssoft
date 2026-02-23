@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     whatsapp_phone_number_id: str = ""
     whatsapp_app_secret: str = ""  # For webhook signature verification
 
+    # Twilio
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+
     # Auth
     jwt_secret: str = "dev_jwt_secret_change_in_production"
     jwt_algorithm: str = "HS256"

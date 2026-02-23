@@ -27,6 +27,7 @@ pydantic-settings==2.7.1
 # HTTP & Webhooks
 httpx==0.28.1
 redis==5.0.1
+twilio==9.3.2
 
 # Email
 sendgrid==6.11.0

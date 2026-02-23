@@ -8,7 +8,7 @@ An AI-powered hotel inquiry capture system that recovers revenue lost after hour
 - **Frontend:** Next.js 14 + TypeScript + TailwindCSS
 - **Database:** PostgreSQL 16 + pgvector (Semantic AI Search)
 - **LLMs:** Google Gemini (Primary), OpenAI GPT-4o-mini & Anthropic (Fallbacks)
-- **Channels:** WhatsApp (Meta Cloud API), Web Chat Widget, Email (SendGrid)
+- **Channels:** WhatsApp (Meta Cloud API & Twilio), Web Chat Widget, Email (SendGrid)
 
 ## Key Features
 

@@ -46,6 +46,10 @@ class Property(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     whatsapp_number: Mapped[str | None] = mapped_column(String(20))
+    whatsapp_provider: Mapped[str] = mapped_column(
+        String(20), default="meta", server_default="meta"
+    )  # "meta" | "twilio"
+    twilio_phone_number: Mapped[str | None] = mapped_column(String(20))
     notification_email: Mapped[str | None] = mapped_column(String(255))
     website_url: Mapped[str | None] = mapped_column(String(500))
     operating_hours: Mapped[dict | None] = mapped_column(JSON)

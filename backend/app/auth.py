@@ -183,3 +183,37 @@ async def verify_whatsapp_signature(request: Request):
         logger.warning("Invalid WhatsApp signature", signature=signature)
         raise HTTPException(status_code=403, detail="Invalid signature")
 
+
+async def verify_twilio_signature(request: Request):
+    """
+    Verify Twilio webhook signature using the Twilio Python SDK RequestValidator.
+    """
+    if not settings.twilio_auth_token:
+        # Warn but allow if secret not configured (dev mode helper)
+        if settings.is_production:
+            logger.error("Twilio auth token not configured in production!")
+            raise HTTPException(status_code=500, detail="Server misconfiguration")
+        return
+
+    from twilio.request_validator import RequestValidator
+    validator = RequestValidator(settings.twilio_auth_token)
+
+    # Twilio sends the signature in X-Twilio-Signature
+    signature = request.headers.get("X-Twilio-Signature")
+    if not signature:
+        logger.warning("Missing Twilio signature")
+        raise HTTPException(status_code=403, detail="Missing signature")
+
+    # Use the original URL to handle proxies like Ngrok
+    url_str = str(request.url)
+    forwarded_proto = request.headers.get("X-Forwarded-Proto")
+    if forwarded_proto and url_str.startswith("http://") and forwarded_proto == "https":
+        url_str = url_str.replace("http://", "https://", 1)
+
+    form_data = await request.form()
+    post_vars = dict(form_data)
+
+    if not validator.validate(url_str, post_vars, signature):
+        logger.warning("Invalid Twilio signature", signature=signature, url=url_str)
+        raise HTTPException(status_code=403, detail="Invalid signature")
+
