@@ -38,7 +38,11 @@ An AI-powered hotel inquiry capture system that recovers revenue lost after hour
    ```powershell
    .\start_live_demo.ps1
    ```
-   *Note: Ensure your `.env.demo` has your Twilio Sandbox credentials and AI keys configured. You will need to start Ngrok and configure the Twilio Webhook URL as prompted by the script.*
+   *Prerequisites:*
+   - Push Twilio credentials (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`) to GCP Secret Manager (`nocturn-ai-487207`).
+   - Start a Cloudflare Tunnel: `cloudflared tunnel --url http://localhost:8001`
+   - Configure the Twilio WhatsApp Sender webhook to: `https://<tunnel-url>/api/v1/webhook/twilio/whatsapp`
+   - After seeding, patch the demo property's `twilio_phone_number` in the database if GCP ADC is unavailable inside Docker.
 
 ## Project Structure
 
@@ -79,6 +83,4 @@ Everything from the blueprint has been fully implemented:
 - [x] Phase 9: AI Personas, Brand Scripting, Metrics Tracking Additions
 - [x] Phase 10: Live Metric and Operations End-to-End Validation
 - [x] Phase 11: Advanced Analytics Date Filtering, CSV & PDF Reporting
-
-
-
+- [x] Phase 12: Live WhatsApp Demo via Twilio (Approved Sender + Cloudflare Tunnel)

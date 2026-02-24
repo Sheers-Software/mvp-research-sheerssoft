@@ -41,3 +41,6 @@ logs/
 # Database
 *.sqlite3
 *.db
+
+# Tunnel
+tunnel_url.txt

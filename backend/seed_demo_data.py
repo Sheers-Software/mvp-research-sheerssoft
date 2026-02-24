@@ -35,8 +35,11 @@ async def seed_demo_data():
         # 2. Create Property
         prop_id = uuid.uuid4()
         
+        from app.config import get_settings
+        settings = get_settings()
+        
         # Check if Twilio is configured
-        twilio_number = os.environ.get("TWILIO_PHONE_NUMBER")
+        twilio_number = settings.twilio_phone_number
         provider = "twilio" if twilio_number else "meta"
         
         prop = Property(
