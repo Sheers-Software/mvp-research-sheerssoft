@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     # Twilio
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
+    twilio_phone_number: str = ""
 
     # Auth
     jwt_secret: str = "dev_jwt_secret_change_in_production"
@@ -108,7 +109,11 @@ class Settings(BaseSettings):
                 if not current_val:
                     try:
                         if not client:
-                            client = secretmanager.SecretManagerServiceClient()
+                            try:
+                                client = secretmanager.SecretManagerServiceClient()
+                            except Exception as client_err:
+                                logger.warning(f"Failed to initialize Secret Manager client: {client_err}")
+                                break # Stop trying to fetch secrets if client fails to init
                         
                         name = f"projects/nocturn-ai-487207/secrets/{key}/versions/latest"
                         response = client.access_secret_version(request={"name": name})

@@ -195,6 +195,12 @@ async def verify_twilio_signature(request: Request):
             raise HTTPException(status_code=500, detail="Server misconfiguration")
         return
 
+    # In demo mode, skip signature verification to avoid proxy/tunnel complications.
+    # The demo stack is isolated and not customer-facing.
+    if settings.is_demo:
+        logger.info("Demo mode: skipping Twilio signature verification")
+        return
+
     from twilio.request_validator import RequestValidator
     validator = RequestValidator(settings.twilio_auth_token)
 
@@ -204,11 +210,19 @@ async def verify_twilio_signature(request: Request):
         logger.warning("Missing Twilio signature")
         raise HTTPException(status_code=403, detail="Missing signature")
 
-    # Use the original URL to handle proxies like Ngrok
-    url_str = str(request.url)
-    forwarded_proto = request.headers.get("X-Forwarded-Proto")
-    if forwarded_proto and url_str.startswith("http://") and forwarded_proto == "https":
-        url_str = url_str.replace("http://", "https://", 1)
+    # Use the original URL to handle proxies like Ngrok/localtunnel
+    forwarded_host = request.headers.get("X-Forwarded-Host")
+    forwarded_proto = request.headers.get("X-Forwarded-Proto", "https")
+    
+    if forwarded_host:
+        # Reconstruct the original public URL
+        base_url = f"{forwarded_proto}://{forwarded_host}"
+        path = request.url.path
+        url_str = f"{base_url}{path}"
+    else:
+        url_str = str(request.url)
+        if forwarded_proto and url_str.startswith("http://") and forwarded_proto == "https":
+            url_str = url_str.replace("http://", "https://", 1)
 
     form_data = await request.form()
     post_vars = dict(form_data)

@@ -99,7 +99,12 @@ async def _send_twilio_text(to_number: str, text: str) -> dict:
 
     async with httpx.AsyncClient() as client:
         response = await client.post(url, auth=auth, headers=headers, data=payload, timeout=10.0)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            logger.error("Twilio API Error", status_code=response.status_code, response_body=response.text, error=str(e), payload=payload)
+            raise e
+        
         data = response.json()
         logger.info("Twilio WhatsApp sent", to=to_number, msg_sid=data.get("sid"))
         return data

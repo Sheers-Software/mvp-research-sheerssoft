@@ -34,10 +34,17 @@ async def seed_demo_data():
 
         # 2. Create Property
         prop_id = uuid.uuid4()
+        
+        # Check if Twilio is configured
+        twilio_number = os.environ.get("TWILIO_PHONE_NUMBER")
+        provider = "twilio" if twilio_number else "meta"
+        
         prop = Property(
             id=prop_id,
             name=DEMO_PROPERTY_NAME,
             whatsapp_number=DEMO_PHONE,
+            whatsapp_provider=provider,
+            twilio_phone_number=twilio_number,
             website_url=DEMO_WEBSITE,
             operating_hours={"start": "09:00", "end": "22:00", "timezone": "Asia/Kuala_Lumpur"},
             adr=Decimal("450.00"), # Higher ADR for luxury feel

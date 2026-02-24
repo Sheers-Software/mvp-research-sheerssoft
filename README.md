@@ -28,11 +28,17 @@ An AI-powered hotel inquiry capture system that recovers revenue lost after hour
    ```powershell
    docker-compose up -d --build
    ```
-3. **Launch the Isolated Sales Demo Stack:**
+3. **Launch the Local Simulated Demo Stack:**
    ```powershell
    .\start_demo.ps1
    ```
    *Note: This starts an entirely separate stack (`docker-compose.demo.yml`) with pre-seeded demo properties and mock conversations, accessible at port `3001`.*
+
+4. **Launch the Live Interactive Sales Demo Stack:**
+   ```powershell
+   .\start_live_demo.ps1
+   ```
+   *Note: Ensure your `.env.demo` has your Twilio Sandbox credentials and AI keys configured. You will need to start Ngrok and configure the Twilio Webhook URL as prompted by the script.*
 
 ## Project Structure
 
