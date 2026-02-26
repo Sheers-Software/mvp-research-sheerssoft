@@ -20,8 +20,8 @@ class Settings(BaseSettings):
 
     # Gemini (Default LLM)
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
-    gemini_embedding_model: str = "text-embedding-004"
+    gemini_model: str = "gemini-1.5-flash"
+    gemini_embedding_model: str = "embedding-001"
     embedding_dimensions: int = 768
 
     # OpenAI (Fallback)
@@ -94,38 +94,42 @@ class Settings(BaseSettings):
         if self.database_url.startswith("postgresql://"):
             self.database_url = self.database_url.replace("postgresql://", "postgresql+asyncpg://")
 
-        # Fallback to GCP Secret Manager for missing API keys in both demo and production
-        if self.is_production or self.is_demo:
-            # We check the critical APIs that need to be fetched remotely
-            secrets_to_fetch = [
-                "GEMINI_API_KEY", "OPENAI_API_KEY", "SENDGRID_API_KEY",
-                "WHATSAPP_API_TOKEN", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN",
-                "DATABASE_URL", "JWT_SECRET", "WHATSAPP_VERIFY_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"
-            ]
-            
-            client = None
-            for key in secrets_to_fetch:
-                current_val = getattr(self, key.lower(), "")
-                if not current_val:
-                    try:
-                        if not client:
-                            try:
-                                client = secretmanager.SecretManagerServiceClient()
-                            except Exception as client_err:
-                                logger.warning(f"Failed to initialize Secret Manager client: {client_err}")
-                                break # Stop trying to fetch secrets if client fails to init
-                        
-                        name = f"projects/nocturn-ai-487207/secrets/{key}/versions/latest"
-                        response = client.access_secret_version(request={"name": name})
-                        fetched_val = response.payload.data.decode("UTF-8")
-                        
-                        setattr(self, key.lower(), fetched_val)
-                        logger.info(f"Successfully loaded {key} from GCP Secret Manager.")
-                    except Exception as e:
-                        logger.warning(
-                            f"Could not load {key} from Secret Manager. "
-                            f"Error: {e}"
-                        )
+        # All environments use GCP Secret Manager as the single source of truth for secrets.
+        # Credentials are resolved via Application Default Credentials (ADC):
+        #   - Local dev: run `gcloud auth application-default login`
+        #   - Docker local: set GOOGLE_APPLICATION_CREDENTIALS to a mounted service account key
+        #   - GCP (Cloud Run / GCE): workload identity / attached service account (automatic)
+        secrets_to_fetch = [
+            "GEMINI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY",
+            "SENDGRID_API_KEY", "WHATSAPP_API_TOKEN", "WHATSAPP_APP_SECRET",
+            "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER",
+            "DATABASE_URL", "JWT_SECRET", "WHATSAPP_VERIFY_TOKEN",
+            "WHATSAPP_PHONE_NUMBER_ID", "FERNET_ENCRYPTION_KEY", "ADMIN_PASSWORD",
+        ]
+
+        client = None
+        for key in secrets_to_fetch:
+            current_val = getattr(self, key.lower(), "")
+            if not current_val:
+                try:
+                    if not client:
+                        try:
+                            client = secretmanager.SecretManagerServiceClient()
+                        except Exception as client_err:
+                            logger.warning(f"Failed to initialize Secret Manager client: {client_err}")
+                            break  # Stop trying to fetch secrets if client fails to init
+
+                    name = f"projects/nocturn-ai-487207/secrets/{key}/versions/latest"
+                    response = client.access_secret_version(request={"name": name})
+                    fetched_val = response.payload.data.decode("UTF-8")
+
+                    setattr(self, key.lower(), fetched_val)
+                    logger.info(f"Successfully loaded {key} from GCP Secret Manager.")
+                except Exception as e:
+                    logger.warning(
+                        f"Could not load {key} from Secret Manager. "
+                        f"Error: {e}"
+                    )
 
     class Config:
         env_file = ".env"

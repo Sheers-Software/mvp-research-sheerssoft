@@ -162,8 +162,12 @@ def normalize_whatsapp_message(payload: dict) -> dict:
         if contacts:
             guest_name = contacts[0].get("profile", {}).get("name")
 
-        # Get phone number ID for property lookup
-        phone_number_id = value.get("metadata", {}).get("phone_number_id")
+        # Get both phone number identifiers for property lookup
+        meta = value.get("metadata", {})
+        phone_number_id = meta.get("phone_number_id")
+        # display_phone_number is the human-readable number (e.g. +15557220306)
+        # and is the value stored in Property.whatsapp_number
+        display_phone_number = meta.get("display_phone_number")
 
         if not from_number:
             return None
@@ -179,6 +183,7 @@ def normalize_whatsapp_message(payload: dict) -> dict:
                     "content": None,
                     "metadata": {
                         "phone_number_id": phone_number_id,
+                        "display_phone_number": display_phone_number,
                         "whatsapp_message_id": msg.get("id"),
                         "is_unsupported_media": True,
                         "media_type": msg_type,
@@ -193,6 +198,7 @@ def normalize_whatsapp_message(payload: dict) -> dict:
             "content": text_body,
             "metadata": {
                 "phone_number_id": phone_number_id,
+                "display_phone_number": display_phone_number,
                 "whatsapp_message_id": msg.get("id"),
             },
         }

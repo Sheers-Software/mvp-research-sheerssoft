@@ -587,6 +587,8 @@ async def _try_extract_lead(
         guest_phone=guest_phone,
         guest_email=guest_email,
         intent=intent,
+        source_channel=channel,
+        is_after_hours=conversation.is_after_hours,
         estimated_value=estimated_value,
         priority=priority,
         flag_reason=flag_reason,

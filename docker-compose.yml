@@ -39,12 +39,16 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sheerssoft}:${POSTGRES_PASSWORD:-sheerssoft_dev_password}@db:5432/${POSTGRES_DB:-sheerssoft}
       REDIS_URL: redis://redis:6379/0
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
-      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-sheerssoft_verify_token}
-      WHATSAPP_API_TOKEN: ${WHATSAPP_API_TOKEN:-}
-      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production}
       ENVIRONMENT: ${ENVIRONMENT:-production}
+      # All API secrets are fetched from GCP Secret Manager at startup.
+      # On GCP (Cloud Run / GCE): workload identity handles auth automatically.
+      # Local Docker: mount GCP ADC credentials (see volumes below).
+      GOOGLE_APPLICATION_CREDENTIALS: /gcp/credentials.json
+    volumes:
+      # Mount GCP Application Default Credentials for local development.
+      # Run `gcloud auth application-default login` on the host first.
+      # On GCP deployments, this volume is unused (workload identity takes precedence).
+      - ${GOOGLE_APPLICATION_CREDENTIALS_PATH:-${HOME}/.config/gcloud/application_default_credentials.json}:/gcp/credentials.json:ro
     depends_on:
       db:
         condition: service_healthy

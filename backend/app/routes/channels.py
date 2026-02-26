@@ -54,14 +54,23 @@ async def whatsapp_webhook(
     if not normalized_data:
         return {"status": "ignored"}
 
+    # Prefer display_phone_number (e.g. +15557220306) for property lookup as it
+    # matches the human-readable sender number stored in Property.whatsapp_number.
+    # Fall back to phone_number_id (Meta's internal ID) for backwards compatibility.
+    display_phone_number = normalized_data["metadata"].get("display_phone_number")
     phone_number_id = normalized_data["metadata"].get("phone_number_id")
+    lookup_number = display_phone_number or phone_number_id
     prop_result = await db.execute(
-        select(Property).where(Property.whatsapp_number == phone_number_id)
+        select(Property).where(Property.whatsapp_number == lookup_number)
     )
     prop = prop_result.scalar_one_or_none()
 
     if not prop:
-        logger.warning("WhatsApp webhook: Property not found", phone_id=phone_number_id)
+        logger.warning(
+            "WhatsApp webhook: Property not found",
+            display_phone_number=display_phone_number,
+            phone_number_id=phone_number_id,
+        )
         return {"status": "property_not_found"}
 
     # Non-text messages (images, audio, etc.) — send canned reply, skip AI

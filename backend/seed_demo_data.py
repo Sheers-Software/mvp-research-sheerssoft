@@ -14,7 +14,8 @@ from app.models import Base, Property, KBDocument, Conversation, Message, Lead, 
 
 # Demo Config
 DEMO_PROPERTY_NAME = "Grand Horizon Resort"
-DEMO_PHONE = "601112223333"
+# Display phone number for Meta WhatsApp Sender (used in Property.whatsapp_number for lookup)
+DEMO_META_PHONE = "+15557220306"
 DEMO_WEBSITE = "https://grandhorizon.demo"
 
 async def seed_demo_data():
@@ -42,15 +43,19 @@ async def seed_demo_data():
         twilio_number = settings.twilio_phone_number
         provider = "twilio" if twilio_number else "meta"
         
+        # For Meta: whatsapp_number = display_phone_number (e.g. +15557220306)
+        # For Twilio: whatsapp_number can be the same or a placeholder; Twilio lookup uses twilio_phone_number
+        meta_phone = twilio_number if provider == "twilio" else DEMO_META_PHONE
+
         prop = Property(
             id=prop_id,
             name=DEMO_PROPERTY_NAME,
-            whatsapp_number=DEMO_PHONE,
+            whatsapp_number=meta_phone,
             whatsapp_provider=provider,
             twilio_phone_number=twilio_number,
             website_url=DEMO_WEBSITE,
             operating_hours={"start": "09:00", "end": "22:00", "timezone": "Asia/Kuala_Lumpur"},
-            adr=Decimal("450.00"), # Higher ADR for luxury feel
+            adr=Decimal("450.00"),  # Higher ADR for luxury feel
             ota_commission_pct=Decimal("18.00"),
             conversion_rate=Decimal("0.20")
         )
@@ -82,10 +87,10 @@ async def seed_demo_data():
             message_count=4, is_after_hours=True
         )
         msgs1 = [
-            Message(conversation_id=conv1_id, role="user", content="Hi, I'm looking to book a wedding venue for Dec 2026."),
-            Message(conversation_id=conv1_id, role="assistant", content="Congratulations Sarah! We'd love to host your special day. Approximately how many guests are you expecting?"),
-            Message(conversation_id=conv1_id, role="user", content="Around 150 pax. Do you have a hall?"),
-            Message(conversation_id=conv1_id, role="assistant", content="Yes, our Grand Ballroom fits 200 comfortably. I'll have our events manager contact you with packages. What's your email?"),
+            Message(conversation_id=conv1_id, role="guest", content="Hi, I'm looking to book a wedding venue for Dec 2026."),
+            Message(conversation_id=conv1_id, role="ai", content="Congratulations Sarah! We'd love to host your special day. Approximately how many guests are you expecting?"),
+            Message(conversation_id=conv1_id, role="guest", content="Around 150 pax. Do you have a hall?"),
+            Message(conversation_id=conv1_id, role="ai", content="Yes, our Grand Ballroom fits 200 comfortably. I'll have our events manager contact you with packages. What's your email?"),
         ]
         lead1 = Lead(
             conversation_id=conv1_id, property_id=prop_id,
@@ -106,8 +111,8 @@ async def seed_demo_data():
             message_count=2, is_after_hours=False
         )
         msgs2 = [
-            Message(conversation_id=conv2_id, role="user", content="Pool buka sampai pukul berapa?"),
-            Message(conversation_id=conv2_id, role="assistant", content="Kolam renang infiniti kami dibuka dari jam 7 pagi hingga 10 malam setiap hari."),
+            Message(conversation_id=conv2_id, role="guest", content="Pool buka sampai pukul berapa?"),
+            Message(conversation_id=conv2_id, role="ai", content="Kolam renang infiniti kami dibuka dari jam 7 pagi hingga 10 malam setiap hari."),
         ]
         db.add(conv2)
         db.add_all(msgs2)
@@ -121,8 +126,8 @@ async def seed_demo_data():
             message_count=3, is_after_hours=False
         )
         msgs3 = [
-            Message(conversation_id=conv3_id, role="user", content="My aircond is not working! This is unacceptable."),
-            Message(conversation_id=conv3_id, role="assistant", content="I apologize for the inconvenience. I will alert the duty manager immediately to check on your room."),
+            Message(conversation_id=conv3_id, role="guest", content="My aircond is not working! This is unacceptable."),
+            Message(conversation_id=conv3_id, role="ai", content="I apologize for the inconvenience. I will alert the duty manager immediately to check on your room."),
         ]
         db.add(conv3)
         db.add_all(msgs3)

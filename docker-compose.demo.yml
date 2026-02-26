@@ -37,6 +37,11 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     env_file: .env.demo
+    environment:
+      # All API secrets are fetched from GCP Secret Manager at startup.
+      # On GCP (Cloud Run / GCE): workload identity handles auth automatically.
+      # Local Docker: mount GCP ADC credentials (see volumes below).
+      GOOGLE_APPLICATION_CREDENTIALS: /gcp/credentials.json
     ports:
       - "8001:8000"
     depends_on:
@@ -46,6 +51,10 @@ services:
         condition: service_healthy
     volumes:
       - ./backend/static:/app/static
+      # Mount GCP Application Default Credentials for local development.
+      # Run `gcloud auth application-default login` on the host first.
+      # On GCP deployments, this volume is unused (workload identity takes precedence).
+      - ${GOOGLE_APPLICATION_CREDENTIALS_PATH:-${HOME}/.config/gcloud/application_default_credentials.json}:/gcp/credentials.json:ro
 
   demo-frontend:
     build:

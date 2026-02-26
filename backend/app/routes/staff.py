@@ -4,8 +4,9 @@ Staff routes — Conversation management, handoff, takeover.
 
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -185,17 +186,41 @@ async def takeover_conversation(
 
 @router.get("/analytics/dashboard")
 async def get_dashboard_stats(
+    property_id: Optional[str] = Query(None, description="Property UUID. Defaults to first accessible property."),
     user: dict = Depends(verify_jwt),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    Get real-time dashboard statistics.
-    Includes Money Slide and Operations View.
+    Get real-time dashboard statistics for a specific property.
+    If property_id is not provided, resolves to the first property accessible
+    to the authenticated user (from their JWT property_ids claim).
     """
     from app.models import Property
-    result = await db.execute(select(Property).limit(1))
-    prop = result.scalar_one_or_none()
 
+    if property_id:
+        result = await db.execute(
+            select(Property).where(
+                Property.id == uuid.UUID(property_id),
+                Property.is_active == True,
+            )
+        )
+    else:
+        # Resolve from the user's JWT property list
+        prop_ids = user.get("property_ids", ["*"])
+        if prop_ids and prop_ids[0] != "*":
+            result = await db.execute(
+                select(Property).where(
+                    Property.id == uuid.UUID(prop_ids[0]),
+                    Property.is_active == True,
+                )
+            )
+        else:
+            # Wildcard access — return first active property
+            result = await db.execute(
+                select(Property).where(Property.is_active == True).limit(1)
+            )
+
+    prop = result.scalar_one_or_none()
     if not prop:
         raise HTTPException(status_code=404, detail="No property found")
 
