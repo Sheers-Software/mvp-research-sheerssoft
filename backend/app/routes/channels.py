@@ -101,7 +101,11 @@ async def _handle_whatsapp_message_async(
             
             # Route reply based on property configuration
             if prop.whatsapp_provider == "twilio":
-                await send_twilio_message(to_number=from_number, message_text=response_text)
+                await send_twilio_message(
+                    to_number=from_number,
+                    message_text=response_text,
+                    from_number=prop.twilio_phone_number,
+                )
             else:
                 await send_whatsapp_message(to_number=from_number, message_text=response_text)
 

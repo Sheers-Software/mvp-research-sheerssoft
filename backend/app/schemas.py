@@ -145,7 +145,7 @@ class PropertySettingsUpdateRequest(BaseModel):
 # ─── Knowledge Base ───
 
 class KBDocumentInput(BaseModel):
-    doc_type: str = Field(..., pattern="^(rates|rooms|facilities|faqs|directions|policies|dining)$")
+    doc_type: str = Field(..., pattern="^(rates|rooms|facilities|faqs|directions|policies|dining|spa|activities|transport|accessibility|weddings|events|loyalty|housekeeping|concierge|complaints|safety|business|kids|pets|sustainability|homestay|villa|chalet|inn|self_catering|house_rules|local_area|owner_comms|festive|school_holidays|hari_raya|cny|deepavali|gawai|kaamatan|peak_season|promotions|checkin|utilities|reservations)$")
     title: str = Field(..., min_length=1, max_length=255)
     content: str = Field(..., min_length=1)
 

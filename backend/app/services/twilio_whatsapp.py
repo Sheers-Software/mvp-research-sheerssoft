@@ -17,35 +17,45 @@ logger = structlog.get_logger()
 TWILIO_API_BASE = "https://api.twilio.com/2010-04-01/Accounts"
 
 
-async def send_twilio_message(to_number: str, message_text: str):
+async def send_twilio_message(to_number: str, message_text: str, from_number: str | None = None):
     """
     Sends a WhatsApp message via Twilio with per-channel formatting.
     Includes Live Demo Routing override.
+
+    Args:
+        to_number: The guest's phone number (e.g. "+601112345678").
+        message_text: The plain-text reply to send.
+        from_number: The property's Twilio WhatsApp number. Falls back to
+                     the global TWILIO_PHONE_NUMBER setting if not supplied.
     """
     settings = get_settings()
     formatted = format_response(message_text, "whatsapp")
 
+    # Resolve the sender number
+    resolved_from = from_number or settings.twilio_phone_number
+
     # If demo mode, check if we should override and send to a real device
     if settings.is_demo:
-        # Check if the "to_number" is a standard raw number (e.g., from a real user in a demo)
-        # If the number matches the demo seed data pattern or we lack real Twilio credentials, route to simulator
         if not settings.twilio_account_sid or not settings.twilio_auth_token:
             from app.services.channel_simulator import simulate_channel_send
             return await simulate_channel_send("twilio_whatsapp", to_number, formatted)
 
-        # If we have Twilio credentials explicitly set in demo mode, proceed to send via Twilio API
         logger.info("Demo Mode Override: Sending real Twilio message to device", to=to_number)
 
     # Dev mode: log to console if credentials missing
     if not settings.twilio_account_sid or not settings.twilio_auth_token:
         if not settings.is_production:
-            logger.info("MOCK_TWILIO_WHATSAPP", to=to_number, msg=formatted[:80])
+            logger.info("MOCK_TWILIO_WHATSAPP", to=to_number, from_=resolved_from, msg=formatted[:80])
             return {"status": "mock_sent"}
-        
+
         logger.warning("Twilio credentials missing in production", to=to_number)
         return {"status": "skipped", "reason": "missing_credentials"}
 
-    return await _send_twilio_text(to_number, formatted)
+    if not resolved_from:
+        logger.error("No Twilio sender number configured", to=to_number)
+        return {"status": "skipped", "reason": "missing_from_number"}
+
+    return await _send_twilio_text(to_number, formatted, resolved_from)
 
 
 @retry(
@@ -53,60 +63,42 @@ async def send_twilio_message(to_number: str, message_text: str):
     wait=wait_exponential(multiplier=1, min=1, max=10),
     retry=retry_if_exception_type(httpx.HTTPStatusError),
 )
-async def _send_twilio_text(to_number: str, text: str) -> dict:
+async def _send_twilio_text(to_number: str, text: str, from_number: str) -> dict:
     """Send a plain text WhatsApp message via Twilio."""
     settings = get_settings()
     url = f"{TWILIO_API_BASE}/{settings.twilio_account_sid}/Messages.json"
-    
-    # Twilio requires form-encoded data
-    # WhatsApp numbers via Twilio must be prefixed with "whatsapp:"
+
+    # Twilio requires WhatsApp numbers to be prefixed with "whatsapp:"
     if not to_number.startswith("whatsapp:"):
         to_number = f"whatsapp:{to_number}"
-        
-    # We need a From number configuring globally for now, or fetch from kwargs if property-specific
-    from_number = settings.twilio_phone_number if hasattr(settings, 'twilio_phone_number') and settings.twilio_phone_number else None
-    
-    # In a real multi-tenant scenario, the from_number would be passed in or looked up.
-    # We will assume properties have `twilio_phone_number` and we will update to pass it down if necessary.
-    # For now, we will handle a global fallback or let it fail if not provided yet.
-    
-    # Let's make an assumption that we fetch the from number from context or settings.
-    # Assuming for basic integration the from number must be provided or we extract it.
-    
+    if not from_number.startswith("whatsapp:"):
+        from_number = f"whatsapp:{from_number}"
+
     payload = {
         "To": to_number,
+        "From": from_number,
         "Body": text,
     }
 
-    # Extract Property Twilio Number if we can from a global context or pass it explicitly.
-    # For this implementation, we will pass `from_number` as an argument update soon.
-    
-    # For now, to keep it simple, we require caller to provide it or we fail.
-    # Actually, we should fetch it from the database upstream and pass it.
-    # Let's add from_number parameter. 
-
-    if from_number:
-        if not from_number.startswith("whatsapp:"):
-            from_number = f"whatsapp:{from_number}"
-        payload["From"] = from_number
-        
-    # HTTPX Auth
     auth = (settings.twilio_account_sid, settings.twilio_auth_token)
-    
-    headers = {
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
     async with httpx.AsyncClient() as client:
         response = await client.post(url, auth=auth, headers=headers, data=payload, timeout=10.0)
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
-            logger.error("Twilio API Error", status_code=response.status_code, response_body=response.text, error=str(e), payload=payload)
+            logger.error(
+                "Twilio API Error",
+                status_code=response.status_code,
+                response_body=response.text,
+                error=str(e),
+                payload={k: v for k, v in payload.items() if k != "Body"},
+            )
             raise e
-        
+
         data = response.json()
-        logger.info("Twilio WhatsApp sent", to=to_number, msg_sid=data.get("sid"))
+        logger.info("Twilio WhatsApp sent", to=to_number, from_=from_number, msg_sid=data.get("sid"))
         return data
 
 
