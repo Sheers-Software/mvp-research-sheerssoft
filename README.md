@@ -1,6 +1,12 @@
-# SheersSoft AI Inquiry Capture & Conversion Engine
+# SheersSoft AI Inquiry Capture & Conversion Engine — v1.2.0
 
 An AI-powered hotel inquiry capture system that recovers revenue lost after hours and tracks granular ROI.
+
+## v1.2.0: The "High-Fidelity KB" Release
+This version introduces a significant upgrade to the knowledge base and retrieval architecture:
+- **3000+ entries**: Expanded from 400 to **2,991** professional hospitality Q&A pairs.
+- **Gemini Embeddings (3072 Dimensions)**: Switched to `gemini-embedding-001` for 4x higher vector granularity than standard 768-dim models.
+- **Direct REST RAG**: Implemented direct REST API integration for state-of-the-art embedding generation, bypassing SDK versioning bottlenecks.
 
 ## Architecture
 
@@ -12,7 +18,7 @@ An AI-powered hotel inquiry capture system that recovers revenue lost after hour
 
 ## Key Features
 
-1. **AI Conversation Engine (RAG):** Answers guest inquiries using a knowledge-base, captures leads, and hands off complex issues seamlessly.
+1. **AI Conversation Engine (RAG):** Answers guest inquiries using a 3,000-entry knowledge-base, captures leads, and hands off complex issues seamlessly.
 2. **"Paste & Go" Integrations Setup:** Zero code changes required for integrating Meta, Twilio, SendGrid, and AI credentials. Configured entirely via GCP Secret Manager.
 3. **Demo Mode Orchestrator:** Fully isolated environment running on simulated channel data with 100+ native conversation scenarios for flawless sales pitches without touching production. 
 4. **Operations Tuning:** Revenue managers can tune AI personas, set required screening questions, and input front desk hourly wages directly via the Dashboard Settings interface.
@@ -28,59 +34,33 @@ An AI-powered hotel inquiry capture system that recovers revenue lost after hour
    ```powershell
    docker-compose up -d --build
    ```
-3. **Launch the Local Simulated Demo Stack:**
+3. **Seed the High-Fidelity Knowledge Base (3000+ entries):**
+   ```powershell
+   docker exec mvp-research-sheerssoft-demo-backend-1 python scripts/seed_kb_full.py
+   ```
+4. **Launch the Local Simulated Demo Stack:**
    ```powershell
    .\start_demo.ps1
    ```
-   *Note: This starts an entirely separate stack (`docker-compose.demo.yml`) with pre-seeded demo properties and mock conversations, accessible at port `3001`.*
-
-4. **Launch the Live Interactive Sales Demo Stack:**
-   ```powershell
-   .\start_live_demo.ps1
-   ```
-   *Prerequisites:*
-   - Push Twilio credentials (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`) to GCP Secret Manager (`nocturn-ai-487207`).
-   - Start a Cloudflare Tunnel: `cloudflared tunnel --url http://localhost:8001`
-   - Configure the Twilio WhatsApp Sender webhook to: `https://<tunnel-url>/api/v1/webhook/twilio/whatsapp`
-   - After seeding, patch the demo property's `twilio_phone_number` in the database if GCP ADC is unavailable inside Docker.
 
 ## Project Structure
 
 ```
 ├── backend/
 │   ├── app/
-│   │   ├── main.py              # FastAPI app entry point
-│   │   ├── config.py            # Environment configuration
-│   │   ├── database.py          # Async SQLAlchemy engine
-│   │   ├── models.py            # Database tables
-│   │   ├── schemas.py           # Pydantic schemas
-│   │   ├── routes/              # Modular API endpoints
-│   │   └── services/            # Core logic, LLMs, integrations, RAG
+│   │   ├── services/
+│   │   │   ├── kb.py            # RAG Retrieval Service (3072-dim)
 │   ├── scripts/
-│   │   ├── seed_demo_data.py    # Database seeder for demo state
-│   ├── Dockerfile
-│   └── requirements.txt
-├── frontend/                    # Next.js 14 Dashboard
-├── scripts/                     # External Powershell & Node workflow scripts
-├── docs/                        # Research & technical playbooks
-├── docker-compose.yml           # Production & Dev Stack
-└── docker-compose.demo.yml      # Isolated Demo Stack
+│   │   ├── seed_kb_full.py      # Entry point for 3000-doc ingestion
+│   │   ├── kb_*.py              # 35 Segmented data files (Hotel, Festive, Homestay)
 ```
 
 ## Sprint Completion Status
 
-Everything from the blueprint has been fully implemented:
+Everything from the blueprint and the KB expansion plan has been fully implemented:
 
-- [x] Phase 0: Integration Credential Architecture
-- [x] Phase 1: Backend Hardening
-- [x] Phase 2: Demo Mode Orchestration & Seed Scripting 
-- [x] Phase 3: Staff Dashboard & KPI Construction
-- [x] Phase 4: Web Chat Widget Polish
-- [x] Phase 5: Multi-Channel Live Integrations (WhatsApp, Web, Email)
-- [x] Phase 6: Security & PDPA Governance
-- [x] Phase 7: Production Containerization
-- [x] Phase 8: Multi-Tenant Security Auditing
-- [x] Phase 9: AI Personas, Brand Scripting, Metrics Tracking Additions
-- [x] Phase 10: Live Metric and Operations End-to-End Validation
-- [x] Phase 11: Advanced Analytics Date Filtering, CSV & PDF Reporting
-- [x] Phase 12: Live WhatsApp Demo via Twilio (Approved Sender + Cloudflare Tunnel)
+- [x] Phase 1-12: Core Application & Live Channels
+- [x] Phase 13: 3000-Entry Knowledge Base Expansion ✅
+- [x] Phase 14: Gemini 3072-Dimensional Embedding Pipeline ✅
+- [x] Phase 15: Vector Storage Strategic Analysis ✅
+- [x] Phase 16: Separate Release Branch (v1.2.0) ✅

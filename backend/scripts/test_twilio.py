@@ -1,34 +1,95 @@
+"""
+test_twilio.py
+--------------
+End-to-end WhatsApp send test via Twilio.
+
+Usage:
+    # From repo root — requires a real Twilio sandbox verified recipient:
+    $env:ENVIRONMENT = "demo"
+    $env:TO_NUMBER   = "+60XXXXXXXXX"   # Your phone number (verified in Twilio sandbox)
+    python backend/scripts/test_twilio.py
+
+The script will send a real WhatsApp test message from the configured Twilio
+sandbox/sender number to TO_NUMBER and print the resulting Twilio Message SID.
+
+Prerequisites:
+  - TWILIO_ACCOUNT_SID loaded (env or GCP Secret Manager)
+  - TWILIO_AUTH_TOKEN loaded
+  - TWILIO_PHONE_NUMBER loaded (the Twilio sandbox / sender number)
+  - TO_NUMBER env var set to a Twilio sandbox–verified phone number
+"""
+
 import asyncio
 import os
 import sys
+import importlib.util
 
-# Add backend directory to sis path so we can import app modules
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app.services.twilio_whatsapp import send_twilio_message
+# Import twilio_whatsapp directly to avoid triggering services/__init__.py
+# which has a top-level 'from google import genai' that fails on local machines
+# without the full ml stack installed.
+_spec = importlib.util.spec_from_file_location(
+    "twilio_whatsapp",
+    os.path.join(os.path.dirname(__file__), "..", "app", "services", "twilio_whatsapp.py"),
+)
+_mod = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_mod)
+send_twilio_message = _mod.send_twilio_message
+
 from app.config import get_settings
 
-async def test_twilio():
-    settings = get_settings()
-    
-    # We will test using explicit numbers here to ensure the logic flows
-    # Ensure credentials are set for Twilio (temporarily mock for the script if they aren't loaded)
-    
-    if not settings.twilio_account_sid or not settings.twilio_auth_token:
-        print("ERROR: Twilio credentials not fully loaded in settings.")
-        print(f"SID Loaded: {'Yes' if settings.twilio_account_sid else 'No'}")
-        print(f"Token Loaded: {'Yes' if settings.twilio_auth_token else 'No'}")
-        return
 
-    print(f"Using Environment: {settings.environment}")
-    print(f"Loaded Twilio SID: {settings.twilio_account_sid[:5]}...")
-    
-    # We need a phone number to test with. For now, we will just print success that the config is loaded
-    # and we can reach the point of calling Twilio.
-    # To actually test sending, we'd need a verified Sandbox number or registered sender.
-    
-    print("\nTwilio integration script loaded successfully. To genuinely test sending, provide a valid 'to' number.")
-    print("For now, this confirms the application environment can parse the Twilio configuration.")
+async def run():
+    settings = get_settings()
+
+    print("── Twilio E2E Send Test ─────────────────────────────────────")
+    print(f"  Environment  : {settings.environment}")
+
+    # Credential checks
+    missing = []
+    if not settings.twilio_account_sid:
+        missing.append("TWILIO_ACCOUNT_SID")
+    if not settings.twilio_auth_token:
+        missing.append("TWILIO_AUTH_TOKEN")
+    if not settings.twilio_phone_number:
+        missing.append("TWILIO_PHONE_NUMBER")
+
+    if missing:
+        print(f"\n  ❌ Missing credentials: {', '.join(missing)}")
+        print("     Run validate_secrets.py first to diagnose the issue.")
+        sys.exit(1)
+
+    print(f"  SID          : {settings.twilio_account_sid[:10]}...")
+    print(f"  From         : {settings.twilio_phone_number}")
+
+    to_number = os.environ.get("TO_NUMBER", "").strip()
+    if not to_number:
+        print("\n  ❌ TO_NUMBER env var not set.")
+        print("     Set it to a Twilio-sandbox-verified number, e.g.:")
+        print("     $env:TO_NUMBER = \"+60XXXXXXXXX\"")
+        sys.exit(1)
+
+    print(f"  To           : {to_number}\n")
+
+    result = await send_twilio_message(
+        to_number=to_number,
+        message_text=(
+            "✅ *Nocturn AI — Test Message*\n\n"
+            "This is a live Twilio WhatsApp send test from the backend.\n"
+            "If you received this, the full stack is working correctly!"
+        ),
+        from_number=settings.twilio_phone_number,
+    )
+
+    if result.get("status") in ("mock_sent", "skipped"):
+        print(f"  ⚠️  Message was NOT actually sent (mode: {result})")
+        print("     Ensure ENVIRONMENT=demo or production and credentials are set.")
+    else:
+        sid = result.get("sid", "unknown")
+        status = result.get("status", "unknown")
+        print(f"  ✅ Message sent!  SID: {sid}  |  Status: {status}")
+
 
 if __name__ == "__main__":
-    asyncio.run(test_twilio())
+    asyncio.run(run())

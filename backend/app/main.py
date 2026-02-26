@@ -39,8 +39,12 @@ async def lifespan(app: FastAPI):
     from sqlalchemy import text
 
     async with engine.begin() as conn:
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        logger.info("pgvector extension ready")
+        try:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+            logger.info("pgvector extension ready")
+        except Exception:
+            # Race condition: another worker already created it — safe to ignore
+            logger.info("pgvector extension already exists (concurrent worker)")
 
     # Create tables if they don't exist (for development)
     if not settings.is_production:

@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     # Gemini (Default LLM)
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"
-    gemini_embedding_model: str = "text-embedding-004"
-    embedding_dimensions: int = 768
+    gemini_embedding_model: str = "gemini-embedding-001"
+    embedding_dimensions: int = 3072
 
     # OpenAI (Fallback)
     openai_api_key: str = ""
@@ -96,13 +96,14 @@ class Settings(BaseSettings):
 
         # Fallback to GCP Secret Manager for missing API keys in both demo and production
         if self.is_production or self.is_demo:
-            # We check the critical APIs that need to be fetched remotely
+            # All critical secrets that must be resolved — either from env or GCP Secret Manager
             secrets_to_fetch = [
                 "GEMINI_API_KEY", "OPENAI_API_KEY", "SENDGRID_API_KEY",
                 "WHATSAPP_API_TOKEN", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN",
+                "TWILIO_PHONE_NUMBER",
                 "DATABASE_URL", "JWT_SECRET", "WHATSAPP_VERIFY_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"
             ]
-            
+
             client = None
             for key in secrets_to_fetch:
                 current_val = getattr(self, key.lower(), "")
@@ -113,12 +114,12 @@ class Settings(BaseSettings):
                                 client = secretmanager.SecretManagerServiceClient()
                             except Exception as client_err:
                                 logger.warning(f"Failed to initialize Secret Manager client: {client_err}")
-                                break # Stop trying to fetch secrets if client fails to init
-                        
+                                break  # Stop trying to fetch secrets if client fails to init
+
                         name = f"projects/nocturn-ai-487207/secrets/{key}/versions/latest"
                         response = client.access_secret_version(request={"name": name})
-                        fetched_val = response.payload.data.decode("UTF-8")
-                        
+                        fetched_val = response.payload.data.decode("UTF-8").strip()
+
                         setattr(self, key.lower(), fetched_val)
                         logger.info(f"Successfully loaded {key} from GCP Secret Manager.")
                     except Exception as e:
@@ -126,6 +127,34 @@ class Settings(BaseSettings):
                             f"Could not load {key} from Secret Manager. "
                             f"Error: {e}"
                         )
+
+            # ── Startup validation ──────────────────────────────────────────────
+            # Log the final resolved state of every critical secret so that
+            # misconfiguration is immediately visible in application logs.
+            REQUIRED_SECRETS = [
+                "gemini_api_key", "twilio_account_sid", "twilio_auth_token",
+                "twilio_phone_number", "database_url", "jwt_secret",
+            ]
+            OPTIONAL_SECRETS = [
+                "openai_api_key", "sendgrid_api_key", "whatsapp_api_token",
+                "whatsapp_verify_token", "whatsapp_phone_number_id",
+            ]
+            all_ok = True
+            for attr in REQUIRED_SECRETS:
+                val = getattr(self, attr, "")
+                if val:
+                    logger.info(f"[secrets] ✅ {attr.upper()} = loaded ({len(val)} chars)")
+                else:
+                    logger.error(f"[secrets] ❌ {attr.upper()} = MISSING (required)")
+                    all_ok = False
+            for attr in OPTIONAL_SECRETS:
+                val = getattr(self, attr, "")
+                status = f"loaded ({len(val)} chars)" if val else "not set (optional)"
+                logger.info(f"[secrets] ℹ️  {attr.upper()} = {status}")
+            if all_ok:
+                logger.info("[secrets] All required secrets loaded successfully.")
+            else:
+                logger.error("[secrets] One or more REQUIRED secrets are missing. Check GCP Secret Manager.")
 
     class Config:
         env_file = ".env"
