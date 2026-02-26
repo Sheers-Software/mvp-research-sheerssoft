@@ -2,7 +2,9 @@
 Knowledge Base service — handles document ingestion and RAG retrieval via pgvector.
 """
 
+import asyncio
 import uuid
+import structlog
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from openai import AsyncOpenAI
@@ -12,6 +14,7 @@ from app.models import KBDocument
 from app.config import get_settings
 
 settings = get_settings()
+logger = structlog.get_logger()
 
 openai_client = AsyncOpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
 gemini_client = genai.Client(api_key=settings.gemini_api_key) if settings.gemini_api_key else None
@@ -19,21 +22,28 @@ gemini_client = genai.Client(api_key=settings.gemini_api_key) if settings.gemini
 async def generate_embedding(text_content: str) -> list[float]:
     """Generate an embedding vector for a text chunk using Gemini or OpenAI."""
     if settings.gemini_api_key and gemini_client:
-        # Use sync client for now as google-genai async support might be complex, 
-        # or use the genai client synchronously (it's fast enough for demo)
-        response = gemini_client.models.embed_content(
-            model=settings.gemini_embedding_model,
-            contents=text_content,
-        )
-        return response.embeddings[0].values
-        
+        # Gemini embedding client is synchronous — run in a thread to avoid blocking the event loop
+        def _sync_embed():
+            return gemini_client.models.embed_content(
+                model=settings.gemini_embedding_model,
+                contents=text_content,
+            )
+        try:
+            response = await asyncio.to_thread(_sync_embed)
+            return response.embeddings[0].values
+        except Exception as e:
+            logger.warning("Gemini embedding failed, trying OpenAI fallback", error=str(e))
+
     if settings.openai_api_key and openai_client:
-        response = await openai_client.embeddings.create(
-            model=settings.openai_embedding_model,
-            input=text_content,
-        )
-        return response.data[0].embedding
-        
+        try:
+            response = await openai_client.embeddings.create(
+                model=settings.openai_embedding_model,
+                input=text_content,
+            )
+            return response.data[0].embedding
+        except Exception as e:
+            logger.warning("OpenAI embedding failed", error=str(e))
+
     # Return a zero vector for mock/demo mode to avoid timeouts
     return [0.0] * settings.embedding_dimensions
 

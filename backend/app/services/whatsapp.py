@@ -165,7 +165,25 @@ def normalize_whatsapp_message(payload: dict) -> dict:
         # Get phone number ID for property lookup
         phone_number_id = value.get("metadata", {}).get("phone_number_id")
 
-        if not from_number or not text_body:
+        if not from_number:
+            return None
+
+        # Handle non-text messages (images, audio, video, location, stickers, etc.)
+        msg_type = msg.get("type", "text")
+        if not text_body:
+            if msg_type != "text":
+                return {
+                    "channel": "whatsapp",
+                    "guest_identifier": from_number,
+                    "guest_name": guest_name,
+                    "content": None,
+                    "metadata": {
+                        "phone_number_id": phone_number_id,
+                        "whatsapp_message_id": msg.get("id"),
+                        "is_unsupported_media": True,
+                        "media_type": msg_type,
+                    },
+                }
             return None
 
         return {

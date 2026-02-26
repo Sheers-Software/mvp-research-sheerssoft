@@ -15,7 +15,7 @@ from app.schemas import (
     ConversationResponse,
     WebChatStartRequest,
 )
-from app.services.conversation import process_guest_message
+from app.services.conversation import process_guest_message, FALLBACK_RESPONSE
 from app.services.whatsapp import send_whatsapp_message, normalize_whatsapp_message
 from app.services.twilio_whatsapp import normalize_twilio_webhook, send_twilio_message
 from app.services.email import send_email, notify_staff_handoff, normalize_email_message
@@ -24,6 +24,12 @@ from app.auth import verify_whatsapp_signature, verify_sendgrid_signature, verif
 
 logger = structlog.get_logger()
 router = APIRouter()
+
+# Sent when a guest sends an image, audio, video, location, or other non-text message
+_MEDIA_NOT_SUPPORTED_MSG = (
+    "Hi! I can only read text messages. Please type your question and I'll be happy to help! 😊\n\n"
+    "*(Maaf, saya hanya boleh membaca mesej teks. Sila taip soalan anda!)*"
+)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -58,22 +64,59 @@ async def whatsapp_webhook(
         logger.warning("WhatsApp webhook: Property not found", phone_id=phone_number_id)
         return {"status": "property_not_found"}
 
+    # Non-text messages (images, audio, etc.) — send canned reply, skip AI
+    if normalized_data["metadata"].get("is_unsupported_media"):
+        background_tasks.add_task(
+            _handle_unsupported_media_async,
+            from_number=normalized_data["guest_identifier"],
+            whatsapp_provider=prop.whatsapp_provider,
+            twilio_from_number=prop.twilio_phone_number,
+        )
+        return {"status": "media_not_supported"}
+
     background_tasks.add_task(
         _handle_whatsapp_message_async,
         property_id=prop.id,
         from_number=normalized_data["guest_identifier"],
         text=normalized_data["content"],
-        guest_name=normalized_data["guest_name"]
+        guest_name=normalized_data["guest_name"],
+        whatsapp_provider=prop.whatsapp_provider,
+        twilio_from_number=prop.twilio_phone_number,
     )
 
     return {"status": "processing"}
+
+
+async def _handle_unsupported_media_async(
+    from_number: str,
+    whatsapp_provider: str,
+    twilio_from_number: str | None,
+):
+    """Background task: reply to unsupported media (images, audio, etc.) with a canned message."""
+    try:
+        if whatsapp_provider == "twilio":
+            await send_twilio_message(
+                to_number=from_number,
+                message_text=_MEDIA_NOT_SUPPORTED_MSG,
+                from_number=twilio_from_number,
+            )
+        else:
+            await send_whatsapp_message(to_number=from_number, message_text=_MEDIA_NOT_SUPPORTED_MSG)
+    except Exception as e:
+        logger.error(
+            "Failed to send unsupported media reply",
+            error=str(e),
+            from_number=from_number,
+        )
 
 
 async def _handle_whatsapp_message_async(
     property_id: uuid.UUID,
     from_number: str,
     text: str,
-    guest_name: str | None
+    guest_name: str | None,
+    whatsapp_provider: str = "meta",
+    twilio_from_number: str | None = None,
 ):
     """Background task to process WhatsApp message and send reply."""
     from app.database import async_session, set_db_context
@@ -81,10 +124,6 @@ async def _handle_whatsapp_message_async(
     async with async_session() as db:
         try:
             await set_db_context(db, str(property_id))
-
-            # Fetch property to verify provider
-            prop_result = await db.execute(select(Property).where(Property.id == property_id))
-            prop = prop_result.scalar_one()
 
             result = await process_guest_message(
                 db=db,
@@ -98,10 +137,14 @@ async def _handle_whatsapp_message_async(
             await db.commit()
 
             response_text = result["response"]
-            
+
             # Route reply based on property configuration
-            if prop.whatsapp_provider == "twilio":
-                await send_twilio_message(to_number=from_number, message_text=response_text)
+            if whatsapp_provider == "twilio":
+                await send_twilio_message(
+                    to_number=from_number,
+                    message_text=response_text,
+                    from_number=twilio_from_number,
+                )
             else:
                 await send_whatsapp_message(to_number=from_number, message_text=response_text)
 
@@ -120,8 +163,25 @@ async def _handle_whatsapp_message_async(
                 "Error processing WhatsApp message",
                 error=str(e),
                 property_id=str(property_id),
-                from_number=from_number
+                from_number=from_number,
+                exc_info=True,
             )
+            # Best-effort fallback: ensure guest gets at least a reply
+            try:
+                if whatsapp_provider == "twilio":
+                    await send_twilio_message(
+                        to_number=from_number,
+                        message_text=FALLBACK_RESPONSE,
+                        from_number=twilio_from_number,
+                    )
+                else:
+                    await send_whatsapp_message(to_number=from_number, message_text=FALLBACK_RESPONSE)
+            except Exception as send_err:
+                logger.error(
+                    "Failed to send fallback reply after processing error",
+                    error=str(send_err),
+                    from_number=from_number,
+                )
 
 
 @router.get("/webhook/whatsapp")
@@ -168,12 +228,24 @@ async def twilio_whatsapp_webhook(
         logger.warning("Twilio webhook: Property not found", to_number=to_number)
         return {"status": "property_not_found"}
 
+    # Non-text messages (images, audio, etc.) — send canned reply, skip AI
+    if normalized_data["metadata"].get("is_unsupported_media"):
+        background_tasks.add_task(
+            _handle_unsupported_media_async,
+            from_number=normalized_data["guest_identifier"],
+            whatsapp_provider="twilio",
+            twilio_from_number=prop.twilio_phone_number,
+        )
+        return {"status": "media_not_supported"}
+
     background_tasks.add_task(
         _handle_whatsapp_message_async,
         property_id=prop.id,
         from_number=normalized_data["guest_identifier"],
         text=normalized_data["content"],
-        guest_name=normalized_data["guest_name"]
+        guest_name=normalized_data["guest_name"],
+        whatsapp_provider="twilio",
+        twilio_from_number=prop.twilio_phone_number,
     )
 
     return {"status": "processing"}

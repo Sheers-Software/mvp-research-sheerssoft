@@ -43,7 +43,7 @@ FALLBACK_RESPONSE_BM = (
 )
 
 
-async def _call_llm(messages: list[dict], max_tokens: int = 300, temperature: float = 0.7) -> tuple:
+async def _call_llm(messages: list[dict], max_tokens: int = 512, temperature: float = 0.7) -> tuple:
     """
     Call LLM with automatic fallback.
     1. Try Gemini
@@ -81,7 +81,11 @@ async def _call_llm(messages: list[dict], max_tokens: int = 300, temperature: fl
                     max_output_tokens=max_tokens,
                 )
             )
-            return response.text.strip(), None, settings.gemini_model
+            text = response.text.strip() if response.text else ""
+            if not text:
+                logger.warning("Gemini returned empty response, trying fallback")
+            else:
+                return text, None, settings.gemini_model
         except Exception as e:
             logger.warning("Gemini LLM call failed, trying fallback", error=str(e))
     else:
@@ -96,7 +100,11 @@ async def _call_llm(messages: list[dict], max_tokens: int = 300, temperature: fl
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
-            return response.choices[0].message.content.strip(), response.usage, settings.openai_model
+            content = response.choices[0].message.content
+            if not content or not content.strip():
+                logger.warning("OpenAI returned empty response, trying fallback")
+            else:
+                return content.strip(), response.usage, settings.openai_model
         except Exception as e:
             logger.warning("OpenAI LLM call failed, trying fallback", error=str(e))
     else:
@@ -140,7 +148,7 @@ SYSTEM_PROMPT_BASE = """You are the AI Concierge for {property_name}, designed t
 Your goal is to be helpful, warm, and *efficient*. You want to get the guest key information quickly so they can book.
 
 ### KEY BEHAVIORS:
-1.  **Be Concise**: Use short sentences. limit responses to 1-3 sentences max.
+1.  **Be Helpful & Warm**: Use natural, welcoming language. Be balanced in length.
 2.  **Be Revenue-Focused**: If a guest asks about rooms, *always* ask for their dates to give an accurate quote.
 3.  **Stick to Facts**: ONLY use the PROPERTY KNOWLEDGE BASE below. If unsure, say: "Let me have our reservations team check that for you."
 4.  **After Hours**: It is currently {after_hours_state}. If it is after hours (late night), be extra reassuring: "Our team is away, but I'm here to take down your details so they can contact you first thing in the morning."
@@ -253,7 +261,9 @@ async def get_or_create_conversation(
     prop_result = await db.execute(
         select(Property).where(Property.id == property_id)
     )
-    prop = prop_result.scalar_one()
+    prop = prop_result.scalar_one_or_none()
+    if not prop:
+        raise ValueError(f"Property {property_id} not found")
 
     conversation = Conversation(
         property_id=property_id,

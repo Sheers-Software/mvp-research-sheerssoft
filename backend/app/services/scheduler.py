@@ -4,7 +4,7 @@ Handles generating the email body and sending it to property stakeholders.
 """
 
 import asyncio
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from decimal import Decimal
 
 import structlog

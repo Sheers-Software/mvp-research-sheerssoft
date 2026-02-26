@@ -73,7 +73,7 @@ Everything from the blueprint has been fully implemented:
 
 - [x] Phase 0: Integration Credential Architecture
 - [x] Phase 1: Backend Hardening
-- [x] Phase 2: Demo Mode Orchestration & Seed Scripting 
+- [x] Phase 2: Demo Mode Orchestration & Seed Scripting
 - [x] Phase 3: Staff Dashboard & KPI Construction
 - [x] Phase 4: Web Chat Widget Polish
 - [x] Phase 5: Multi-Channel Live Integrations (WhatsApp, Web, Email)
@@ -84,3 +84,15 @@ Everything from the blueprint has been fully implemented:
 - [x] Phase 10: Live Metric and Operations End-to-End Validation
 - [x] Phase 11: Advanced Analytics Date Filtering, CSV & PDF Reporting
 - [x] Phase 12: Live WhatsApp Demo via Twilio (Approved Sender + Cloudflare Tunnel)
+- [x] Phase 13: WhatsApp Reliability & Consistency Hardening
+
+## WhatsApp Channel — Reliability Notes
+
+The following hardening was applied to ensure a consistent guest experience:
+
+- **Non-text messages handled gracefully:** Guests who send images, audio, video, or location pins now receive a bilingual acknowledgement (*"I can only read text messages / Saya hanya boleh membaca mesej teks"*) instead of being silently ignored.
+- **Fallback reply on processing errors:** If the AI pipeline or database fails mid-message, the guest still receives a human-readable fallback message rather than seeing no response at all.
+- **Multi-tenant Twilio sender fixed:** Outbound Twilio messages now use each property's registered `twilio_phone_number` as the sender, not a shared global value.
+- **Empty LLM response protection:** A blank response from Gemini or OpenAI now falls through to the next provider in the chain (Gemini → OpenAI → Anthropic → template) instead of being saved as an empty AI message.
+- **Gemini embedding no longer blocks the event loop:** The synchronous Gemini embedding call is now run via `asyncio.to_thread()`, keeping response latency predictable under concurrent load.
+- **Weekly data retention job fixed:** A missing `timezone` import in the scheduler would have caused the PDPA/GDPR cleanup job to crash with a `NameError`; this is now resolved.

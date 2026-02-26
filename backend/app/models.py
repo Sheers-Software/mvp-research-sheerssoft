@@ -81,7 +81,6 @@ class Property(Base):
     # Add server_default to avoid NotNullViolation on existing rows
     timezone: Mapped[str] = mapped_column(String(50), default="Asia/Kuala_Lumpur", server_default="Asia/Kuala_Lumpur")
     plan_tier: Mapped[str] = mapped_column(String(20), default="pilot", server_default="pilot")
-    plan_tier: Mapped[str] = mapped_column(String(20), default="pilot", server_default="pilot")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
