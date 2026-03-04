@@ -49,13 +49,15 @@ async def lifespan(app: FastAPI):
             await conn.run_sync(Base.metadata.create_all)
             logger.info("Database tables created (dev mode)")
 
-    # Start scheduler
-    await start_scheduler()
+    # Start APScheduler only in dev/demo — production uses Cloud Scheduler
+    # calling /api/v1/internal/* endpoints (CPU-throttled Cloud Run).
+    if not settings.is_production:
+        await start_scheduler()
 
     yield
 
-    # Shutdown scheduler
-    await shutdown_scheduler()
+    if not settings.is_production:
+        await shutdown_scheduler()
     logger.info("Shutting down SheersSoft AI Engine")
 
 

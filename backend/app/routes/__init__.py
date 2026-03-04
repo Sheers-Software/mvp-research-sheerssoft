@@ -16,6 +16,7 @@ from app.routes.onboarding import router as onboarding_router
 from app.routes.support import router as support_router
 from app.routes.superadmin import router as superadmin_router
 from app.routes.billing import router as billing_router
+from app.routes.internal import router as internal_router
 
 router = APIRouter(prefix="/api/v1")
 
@@ -30,3 +31,4 @@ router.include_router(onboarding_router, tags=["Onboarding"])
 router.include_router(support_router, tags=["Support"])
 router.include_router(superadmin_router, tags=["SuperAdmin"])
 router.include_router(billing_router, tags=["Billing"])
+router.include_router(internal_router, tags=["Internal"])

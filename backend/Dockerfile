@@ -37,11 +37,12 @@ USER appuser
 # Update PATH
 ENV PATH=/home/appuser/.local/bin:$PATH
 
-EXPOSE 8000
+EXPOSE 8080
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-8000}/api/v1/health || exit 1
+# Healthcheck — Cloud Run injects $PORT (default 8080)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8080}/api/v1/health || exit 1
 
-# Production Command (gunicorn with uvicorn workers for concurrency)
-CMD ["gunicorn", "app.main:app", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
+# Cloud Run injects PORT at runtime. 2 workers sufficient for MVP;
+# Cloud Run scales horizontally for higher load.
+CMD ["sh", "-c", "exec gunicorn app.main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8080} --timeout 120 --keep-alive 5"]

@@ -84,6 +84,10 @@ class Settings(BaseSettings):
     daily_report_minute: int = 30
     timezone: str = "Asia/Kuala_Lumpur"
 
+    # Internal scheduler secret — protects /api/v1/internal/* endpoints
+    # called by Cloud Scheduler in production. Generate with: openssl rand -hex 32
+    internal_scheduler_secret: str = ""
+
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
@@ -113,6 +117,7 @@ class Settings(BaseSettings):
             "WHATSAPP_PHONE_NUMBER_ID", "FERNET_ENCRYPTION_KEY", "ADMIN_PASSWORD",
             "SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY",
             "STRIPE_API_KEY", "STRIPE_WEBHOOK_SECRET",
+            "INTERNAL_SCHEDULER_SECRET",
         ]
 
         client = None
