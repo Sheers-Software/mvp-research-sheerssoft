@@ -61,6 +61,7 @@ class Tenant(Base):
     pilot_start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     pilot_end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255))
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(255))
     assigned_account_manager: Mapped[str | None] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(

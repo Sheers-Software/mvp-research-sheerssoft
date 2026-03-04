@@ -211,3 +211,194 @@ async def test_webhook_unknown_event_type_is_ignored(client):
 
     assert resp.status_code == 200
     mock_db.commit.assert_not_awaited()
+
+
+# ── Subscription event tests ───────────────────────────────────────────────────
+
+def _make_db_mock(tenant):
+    """Build a mock AsyncSession that returns the given tenant on execute()."""
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = tenant
+    mock_db = AsyncMock()
+    mock_db.execute = AsyncMock(return_value=mock_result)
+    mock_db.commit = AsyncMock()
+    mock_db.rollback = AsyncMock()
+    return mock_db
+
+
+@pytest.mark.asyncio
+async def test_webhook_subscription_created_stores_subscription_id(client):
+    """customer.subscription.created stores subscription_id and syncs status."""
+    tenant = MagicMock()
+    tenant.id = uuid.uuid4()
+    tenant.stripe_customer_id = "cus_test_sub"
+    mock_db = _make_db_mock(tenant)
+
+    async def _override_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = _override_db
+
+    event = {
+        "type": "customer.subscription.created",
+        "data": {
+            "object": {
+                "id": "sub_test_123",
+                "customer": "cus_test_sub",
+                "status": "trialing",
+            }
+        },
+    }
+
+    with patch("app.routes.billing.get_settings") as mock_cfg, \
+         patch("stripe.Webhook.construct_event", return_value=event):
+        mock_cfg.return_value.stripe_webhook_secret = "whsec_test_secret"
+        resp = await client.post(
+            "/api/v1/billing/webhook",
+            content=b"{}",
+            headers={"Content-Type": "application/json", "stripe-signature": "t=1,v1=valid"},
+        )
+
+    assert resp.status_code == 200
+    assert tenant.stripe_subscription_id == "sub_test_123"
+    assert tenant.subscription_status == "trialing"
+    mock_db.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_webhook_subscription_updated_syncs_status_and_tier(client):
+    """customer.subscription.updated updates status and tier from metadata."""
+    tenant = MagicMock()
+    tenant.id = uuid.uuid4()
+    mock_db = _make_db_mock(tenant)
+
+    async def _override_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = _override_db
+
+    event = {
+        "type": "customer.subscription.updated",
+        "data": {
+            "object": {
+                "id": "sub_test_123",
+                "customer": "cus_test_sub",
+                "status": "active",
+                "metadata": {"tier": "boutique"},
+            }
+        },
+    }
+
+    with patch("app.routes.billing.get_settings") as mock_cfg, \
+         patch("stripe.Webhook.construct_event", return_value=event):
+        mock_cfg.return_value.stripe_webhook_secret = "whsec_test_secret"
+        resp = await client.post(
+            "/api/v1/billing/webhook",
+            content=b"{}",
+            headers={"Content-Type": "application/json", "stripe-signature": "t=1,v1=valid"},
+        )
+
+    assert resp.status_code == 200
+    assert tenant.subscription_status == "active"
+    assert tenant.subscription_tier == "boutique"
+    mock_db.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_webhook_subscription_deleted_cancels_tenant(client):
+    """customer.subscription.deleted sets status to cancelled."""
+    tenant = MagicMock()
+    tenant.id = uuid.uuid4()
+    mock_db = _make_db_mock(tenant)
+
+    async def _override_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = _override_db
+
+    event = {
+        "type": "customer.subscription.deleted",
+        "data": {"object": {"customer": "cus_test_sub"}},
+    }
+
+    with patch("app.routes.billing.get_settings") as mock_cfg, \
+         patch("stripe.Webhook.construct_event", return_value=event):
+        mock_cfg.return_value.stripe_webhook_secret = "whsec_test_secret"
+        resp = await client.post(
+            "/api/v1/billing/webhook",
+            content=b"{}",
+            headers={"Content-Type": "application/json", "stripe-signature": "t=1,v1=valid"},
+        )
+
+    assert resp.status_code == 200
+    assert tenant.subscription_status == "cancelled"
+    assert tenant.stripe_subscription_id is None
+    mock_db.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_webhook_invoice_payment_failed_marks_past_due(client):
+    """invoice.payment_failed sets subscription_status to past_due."""
+    tenant = MagicMock()
+    tenant.id = uuid.uuid4()
+    mock_db = _make_db_mock(tenant)
+
+    async def _override_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = _override_db
+
+    event = {
+        "type": "invoice.payment_failed",
+        "data": {"object": {"customer": "cus_test_sub"}},
+    }
+
+    with patch("app.routes.billing.get_settings") as mock_cfg, \
+         patch("stripe.Webhook.construct_event", return_value=event):
+        mock_cfg.return_value.stripe_webhook_secret = "whsec_test_secret"
+        resp = await client.post(
+            "/api/v1/billing/webhook",
+            content=b"{}",
+            headers={"Content-Type": "application/json", "stripe-signature": "t=1,v1=valid"},
+        )
+
+    assert resp.status_code == 200
+    assert tenant.subscription_status == "past_due"
+    mock_db.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_webhook_invoice_payment_succeeded_restores_active(client):
+    """invoice.payment_succeeded (renewal) restores past_due tenant to active."""
+    tenant = MagicMock()
+    tenant.id = uuid.uuid4()
+    tenant.subscription_status = "past_due"
+    mock_db = _make_db_mock(tenant)
+
+    async def _override_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = _override_db
+
+    event = {
+        "type": "invoice.payment_succeeded",
+        "data": {
+            "object": {
+                "customer": "cus_test_sub",
+                "billing_reason": "subscription_cycle",  # not "subscription_create"
+            }
+        },
+    }
+
+    with patch("app.routes.billing.get_settings") as mock_cfg, \
+         patch("stripe.Webhook.construct_event", return_value=event):
+        mock_cfg.return_value.stripe_webhook_secret = "whsec_test_secret"
+        resp = await client.post(
+            "/api/v1/billing/webhook",
+            content=b"{}",
+            headers={"Content-Type": "application/json", "stripe-signature": "t=1,v1=valid"},
+        )
+
+    assert resp.status_code == 200
+    assert tenant.subscription_status == "active"
+    mock_db.commit.assert_awaited_once()
