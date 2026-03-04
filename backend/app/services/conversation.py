@@ -285,6 +285,7 @@ async def process_guest_message(
     channel: str,
     message_text: str,
     guest_name: str | None = None,
+    is_follow_up: bool = False,
 ) -> dict:
     """
     Process an incoming guest message and generate an AI response.
@@ -304,20 +305,26 @@ async def process_guest_message(
 
     # Update conversation stats (Audit M1)
     conversation.last_message_at = datetime.now(timezone.utc)
+    # Only update last_interaction_at if this is NOT an automated follow-up
+    # meaning the guest actually replied, or a staff sent a real message
+    if not is_follow_up:
+        conversation.last_interaction_at = datetime.now(timezone.utc)
     conversation.message_count += 1
 
     if guest_name and not conversation.guest_name:
         conversation.guest_name = guest_name
 
-    # 2. Save guest message
-    guest_msg = Message(
-        conversation_id=conversation.id,
-        role="guest",
-        content=message_text,
-        metadata_={"channel": channel},
-    )
-    db.add(guest_msg)
-    await db.flush()
+    # 2. Save guest message (or system message if it's a follow up trigger without text from guest)
+    if message_text:
+        role = "ai" if is_follow_up else "guest"
+        guest_msg = Message(
+            conversation_id=conversation.id,
+            role=role,
+            content=message_text,
+            metadata_={"channel": channel, "is_follow_up": is_follow_up},
+        )
+        db.add(guest_msg)
+        await db.flush()
 
     # 3. Detect intent and update AI mode
     detected_intent = _detect_intent(message_text)
@@ -391,6 +398,9 @@ async def process_guest_message(
         system_prompt += LEAD_CAPTURE_ADDENDUM.format(required_questions_context=required_qs_str)
     elif conversation.ai_mode == "handoff":
         system_prompt += HANDOFF_ADDENDUM
+        
+    if is_follow_up:
+        system_prompt += "\n\n### RE-ENGAGEMENT MODE\nThis guest has gone quiet. Your goal is to politely and warmly follow up. Keep it short, reference their previous interest, and ask if they still need help."
 
     # 8. Call LLM (with retry + fallback)
     start_time = datetime.now(timezone.utc)

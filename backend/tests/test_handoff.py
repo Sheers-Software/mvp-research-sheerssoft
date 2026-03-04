@@ -1,15 +1,15 @@
 
 import pytest
 from unittest.mock import AsyncMock, patch
-from app.services.email import notify_staff_handoff_enhanced
+from app.services.email import notify_staff_handoff
 
 @pytest.mark.asyncio
-async def test_notify_staff_handoff_enhanced():
+async def test_notify_staff_handoff():
     # Mock dependencies
-    with patch("app.services.email.notify_staff_handoff", new_callable=AsyncMock) as mock_email:
+    with patch("app.services.email.send_email", new_callable=AsyncMock) as mock_email:
         with patch("app.services.realtime.realtime_service.publish_handoff", new_callable=AsyncMock) as mock_redis:
             
-            await notify_staff_handoff_enhanced(
+            await notify_staff_handoff(
                 property_id="prop-123",
                 conversation_id="conv-456",
                 guest_identifier="guest@example.com",

@@ -10,9 +10,10 @@ settings = get_settings()
 engine = create_async_engine(
     settings.database_url,
     echo=not settings.is_production,
-    pool_size=20,       # Increased for load testing (50 concurrent users)
-    max_overflow=30,
+    pool_size=2,       # Reduced to fit Supabase free tier connection limits (60 max direct)
+    max_overflow=5,
     pool_pre_ping=True,
+    pool_recycle=300,  # Recycle connections every 5 minutes to play nice with PgBouncer
 )
 
 async_session = async_sessionmaker(
@@ -20,6 +21,9 @@ async_session = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
 )
+
+# Alias for background tasks that need standalone sessions
+async_session_factory = async_session
 
 from sqlalchemy import text
 

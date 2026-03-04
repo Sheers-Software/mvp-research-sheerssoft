@@ -18,6 +18,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     JSON,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -34,16 +35,266 @@ class Base(DeclarativeBase):
     pass
 
 
+# ─────────────────────────────────────────────────────────────
+# Multi-Tenant Hierarchy: Tenant → Property → User
+# ─────────────────────────────────────────────────────────────
+
+
+class Tenant(Base):
+    """
+    Hotel group / billing entity. Top-level organizational unit.
+    A single hotel company may have multiple Properties.
+    """
+    __tablename__ = "tenants"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    subscription_tier: Mapped[str] = mapped_column(
+        String(20), default="pilot", server_default="pilot"
+    )  # "pilot" | "boutique" | "independent" | "premium"
+    subscription_status: Mapped[str] = mapped_column(
+        String(20), default="trialing", server_default="trialing"
+    )  # "trialing" | "active" | "cancelled" | "past_due"
+    pilot_start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    pilot_end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(255))
+    assigned_account_manager: Mapped[str | None] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # Relationships
+    properties: Mapped[list["Property"]] = relationship(
+        back_populates="tenant", cascade="all, delete-orphan"
+    )
+    memberships: Mapped[list["TenantMembership"]] = relationship(
+        back_populates="tenant", cascade="all, delete-orphan"
+    )
+    support_tickets: Mapped[list["SupportTicket"]] = relationship(
+        back_populates="tenant", cascade="all, delete-orphan"
+    )
+    onboarding_progress: Mapped[list["OnboardingProgress"]] = relationship(
+        back_populates="tenant", cascade="all, delete-orphan"
+    )
+
+
+class User(Base):
+    """
+    Human account. Maps 1:1 to Supabase auth.users via UUID.
+    """
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )  # Same UUID as supabase auth.users.id
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(30))
+    is_superadmin: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )  # SheersSoft internal staff
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    # Relationships
+    memberships: Mapped[list["TenantMembership"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class TenantMembership(Base):
+    """
+    Links a User to a Tenant with a specific role and property access scope.
+    """
+    __tablename__ = "tenant_memberships"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(
+        String(20), default="staff", server_default="staff"
+    )  # "owner" | "admin" | "staff"
+    accessible_property_ids: Mapped[list | None] = mapped_column(JSON)
+    # null = all properties, [...] = specific property UUIDs
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship(back_populates="memberships")
+    tenant: Mapped["Tenant"] = relationship(back_populates="memberships")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "tenant_id", name="uq_user_tenant"),
+        Index("ix_membership_tenant", "tenant_id"),
+        Index("ix_membership_user", "user_id"),
+    )
+
+
+class OnboardingProgress(Base):
+    """
+    Tracks onboarding milestones for the gamified getting-started experience.
+    One record per property provisioned.
+    """
+    __tablename__ = "onboarding_progress"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False
+    )
+    property_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("properties.id"), nullable=False
+    )
+    # Channel setup status: "pending" | "configuring" | "active" | "failed" | "skipped"
+    whatsapp_status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default="pending"
+    )
+    email_status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default="pending"
+    )
+    website_status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default="pending"
+    )
+    # Milestone flags
+    kb_populated: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    first_inquiry_received: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    first_lead_captured: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    first_morning_report_sent: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    owner_first_login: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Error tracking
+    channel_errors: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # Relationships
+    tenant: Mapped["Tenant"] = relationship(back_populates="onboarding_progress")
+    property: Mapped["Property"] = relationship(back_populates="onboarding_progress")
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "property_id", name="uq_onboarding_tenant_property"),
+    )
+
+
+class SupportTicket(Base):
+    """
+    Support ticket from a tenant user to the SheersSoft team.
+    """
+    __tablename__ = "support_tickets"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False
+    )
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    subject: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), default="open", server_default="open"
+    )  # "open" | "in_progress" | "resolved" | "closed"
+    priority: Mapped[str] = mapped_column(
+        String(20), default="medium", server_default="medium"
+    )  # "low" | "medium" | "high" | "urgent"
+    assigned_to_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id")
+    )  # SheersSoft staff
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # Relationships
+    tenant: Mapped["Tenant"] = relationship(back_populates="support_tickets")
+    created_by: Mapped["User"] = relationship(foreign_keys=[created_by_user_id])
+    assigned_to: Mapped["User | None"] = relationship(foreign_keys=[assigned_to_user_id])
+
+    __table_args__ = (
+        Index("ix_tickets_tenant_status", "tenant_id", "status"),
+    )
+
+
+class Application(Base):
+    """
+    Intake application from the website (ai.sheerssoft.com/apply).
+    Processed by SheersSoft onboarding team.
+    """
+    __tablename__ = "applications"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    hotel_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    contact_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(30))
+    property_name: Mapped[str | None] = mapped_column(String(255))
+    room_count: Mapped[int | None] = mapped_column(Integer)
+    current_channels: Mapped[list | None] = mapped_column(JSON)
+    # E.g. ["whatsapp", "email", "phone"]
+    message: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(
+        String(20), default="new", server_default="new"
+    )  # "new" | "contacted" | "qualified" | "converted" | "rejected"
+    notes: Mapped[str | None] = mapped_column(Text)  # Internal notes by SheersSoft
+    converted_to_tenant_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_applications_status", "status"),
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# Property (Hotel Location) — Now scoped under Tenant
+# ─────────────────────────────────────────────────────────────
+
+
 class Property(Base):
     """
-    A hotel property. The top-level tenant entity.
-    All data is scoped to a property via property_id foreign keys.
+    A hotel property (location). Belongs to a Tenant.
+    All operational data is scoped to a property via property_id foreign keys.
     """
     __tablename__ = "properties"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    tenant_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id")
+    )  # Nullable for migration of existing rows; will be backfilled
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     whatsapp_number: Mapped[str | None] = mapped_column(String(20))
     whatsapp_provider: Mapped[str] = mapped_column(
@@ -85,6 +336,7 @@ class Property(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Relationships
+    tenant: Mapped["Tenant | None"] = relationship(back_populates="properties")
     conversations: Mapped[list["Conversation"]] = relationship(
         back_populates="property", cascade="all, delete-orphan"
     )
@@ -96,6 +348,9 @@ class Property(Base):
     )
     analytics_daily: Mapped[list["AnalyticsDaily"]] = relationship(
         back_populates="property", cascade="all, delete-orphan"
+    )
+    onboarding_progress: Mapped["OnboardingProgress | None"] = relationship(
+        back_populates="property", uselist=False
     )
 
 
@@ -131,6 +386,12 @@ class Conversation(Base):
     )
     last_message_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+    last_interaction_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    follow_up_stage: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0"
     )
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -214,6 +475,7 @@ class Lead(Base):
         String(20), default="new"
     )  # "new" | "contacted" | "converted" | "lost"
     estimated_value: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    actual_revenue: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     notes: Mapped[str | None] = mapped_column(Text)
     priority: Mapped[str] = mapped_column(
         String(20), default="standard", server_default="standard"
@@ -293,6 +555,9 @@ class AnalyticsDaily(Base):
         Numeric(8, 2), default=Decimal("0")
     )
     estimated_revenue_recovered: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=Decimal("0")
+    )
+    actual_revenue_recovered: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), default=Decimal("0")
     )
     cost_savings: Mapped[Decimal] = mapped_column(

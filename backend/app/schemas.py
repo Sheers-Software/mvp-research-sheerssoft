@@ -89,12 +89,19 @@ class LeadResponse(BaseModel):
     intent: str
     status: str
     estimated_value: float | None
+    actual_revenue: float | None
     priority: str
     flag_reason: str | None
     captured_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class LeadConvertRequest(BaseModel):
+    """Payload to convert a lead and log actual revenue."""
+    actual_revenue: float = Field(..., ge=0)
+    notes: str | None = None
 
 
 class LeadUpdateRequest(BaseModel):
@@ -228,3 +235,204 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class MagicLinkRequest(BaseModel):
+    """Request a magic link login email."""
+    email: str = Field(..., min_length=5, max_length=255)
+
+
+class UserProfileResponse(BaseModel):
+    """Current user profile with tenant memberships."""
+    id: uuid.UUID
+    email: str
+    full_name: str
+    phone: str | None
+    is_superadmin: bool
+    last_login_at: datetime | None
+    memberships: list["TenantMembershipResponse"]
+
+    class Config:
+        from_attributes = True
+
+
+# ─── Tenants ───
+
+class TenantResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    slug: str
+    subscription_tier: str
+    subscription_status: str
+    pilot_start_date: datetime | None
+    pilot_end_date: datetime | None
+    assigned_account_manager: str | None
+    is_active: bool
+    created_at: datetime
+    property_count: int | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class TenantMembershipResponse(BaseModel):
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    tenant_name: str | None = None
+    role: str
+    accessible_property_ids: list | None
+
+    class Config:
+        from_attributes = True
+
+
+class TenantUpdateRequest(BaseModel):
+    subscription_tier: str | None = None
+    subscription_status: str | None = None
+    is_active: bool | None = None
+    assigned_account_manager: str | None = None
+
+
+# ─── Onboarding ───
+
+class ProvisionTenantRequest(BaseModel):
+    """One-click tenant provisioning from SuperAdmin dashboard."""
+    tenant_name: str = Field(..., min_length=1, max_length=255)
+    property_name: str = Field(..., min_length=1, max_length=255)
+    owner_email: str = Field(..., min_length=5, max_length=255)
+    owner_name: str = Field(..., min_length=1, max_length=255)
+    owner_phone: str | None = None
+    timezone: str = "Asia/Kuala_Lumpur"
+    subscription_tier: str = "pilot"
+    pilot_duration_days: int = 30
+    preferred_channels: list[str] = Field(default_factory=lambda: ["whatsapp", "email", "website"])
+    whatsapp_provider: str = "meta"  # "meta" | "twilio"
+    whatsapp_number: str | None = None
+    twilio_phone_number: str | None = None
+    reservation_email: str | None = None
+    website_url: str | None = None
+    assigned_account_manager: str | None = None
+
+
+class ProvisionTenantResponse(BaseModel):
+    tenant_id: uuid.UUID
+    property_id: uuid.UUID
+    user_id: uuid.UUID
+    magic_link_sent: bool
+    channels_setup_initiated: bool
+    message: str
+
+
+class OnboardingProgressResponse(BaseModel):
+    """Gamified onboarding milestone status."""
+    tenant_id: uuid.UUID
+    property_id: uuid.UUID
+    # Channel statuses
+    whatsapp_status: str
+    email_status: str
+    website_status: str
+    # Milestone flags
+    kb_populated: bool
+    first_inquiry_received: bool
+    first_lead_captured: bool
+    first_morning_report_sent: bool
+    owner_first_login: bool
+    # Computed
+    completion_score: int = 0  # 0-100
+    next_milestone: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class InviteUserRequest(BaseModel):
+    """Invite a new user to an existing tenant."""
+    email: str = Field(..., min_length=5, max_length=255)
+    full_name: str = Field(..., min_length=1, max_length=255)
+    role: str = "staff"  # "owner" | "admin" | "staff"
+    accessible_property_ids: list[uuid.UUID] | None = None  # null = all
+
+
+# ─── Support ───
+
+class SupportTicketCreateRequest(BaseModel):
+    subject: str = Field(..., min_length=1, max_length=500)
+    description: str = Field(..., min_length=1)
+    priority: str = "medium"  # "low" | "medium" | "high" | "urgent"
+
+
+class SupportTicketResponse(BaseModel):
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    subject: str
+    description: str
+    status: str
+    priority: str
+    created_by_name: str | None = None
+    assigned_to_name: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SupportTicketUpdateRequest(BaseModel):
+    status: str | None = None
+    priority: str | None = None
+    assigned_to_user_id: uuid.UUID | None = None
+
+
+class SupportChatRequest(BaseModel):
+    """Message to the Nocturn AI support chatbot."""
+    message: str = Field(..., min_length=1, max_length=4000)
+    conversation_id: uuid.UUID | None = None  # Existing conversation or start new
+
+
+# ─── Applications ───
+
+class ApplicationCreateRequest(BaseModel):
+    """Intake from ai.sheerssoft.com/apply."""
+    hotel_name: str = Field(..., min_length=1, max_length=255)
+    contact_name: str = Field(..., min_length=1, max_length=255)
+    email: str = Field(..., min_length=5, max_length=255)
+    phone: str | None = None
+    property_name: str | None = None
+    room_count: int | None = None
+    current_channels: list[str] | None = None
+    message: str | None = None
+
+
+class ApplicationResponse(BaseModel):
+    id: uuid.UUID
+    hotel_name: str
+    contact_name: str
+    email: str
+    phone: str | None
+    room_count: int | None
+    status: str
+    notes: str | None
+    converted_to_tenant_id: uuid.UUID | None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ApplicationUpdateRequest(BaseModel):
+    status: str | None = None
+    notes: str | None = None
+
+
+# ─── SuperAdmin Metrics ───
+
+class PlatformMetricsResponse(BaseModel):
+    """Global platform metrics for the SheersSoft internal dashboard."""
+    total_tenants: int
+    active_tenants: int
+    total_properties: int
+    total_conversations_alltime: int
+    total_conversations_mtd: int
+    total_leads_mtd: int
+    open_support_tickets: int
+    pending_applications: int

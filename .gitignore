@@ -44,3 +44,14 @@ logs/
 
 # Tunnel
 tunnel_url.txt
+
+# Temp / scratch files (contain credentials or are not production code)
+backend/tmp_*.txt
+backend/tests_errors.txt
+backend/output.txt
+backend/check_db.py
+backend/convert_encoding.py
+backend/scan_pooler.py
+backend/test_api.py
+backend/test_db.py
+backend/found_region.txt

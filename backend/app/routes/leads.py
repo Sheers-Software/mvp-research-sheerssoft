@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import Lead
-from app.schemas import LeadResponse, LeadUpdateRequest
+from app.schemas import LeadResponse, LeadUpdateRequest, LeadConvertRequest
 from app.auth import verify_jwt, check_property_access
 
 logger = structlog.get_logger()
@@ -63,6 +63,7 @@ async def list_leads(
             intent=l.intent,
             status=l.status,
             estimated_value=float(l.estimated_value) if l.estimated_value else None,
+            actual_revenue=float(l.actual_revenue) if l.actual_revenue else None,
             priority=l.priority,
             flag_reason=l.flag_reason,
             captured_at=l.captured_at,
@@ -94,6 +95,7 @@ async def get_lead(
         intent=lead.intent,
         status=lead.status,
         estimated_value=float(lead.estimated_value) if lead.estimated_value else None,
+        actual_revenue=float(lead.actual_revenue) if lead.actual_revenue else None,
         priority=lead.priority,
         flag_reason=lead.flag_reason,
         captured_at=lead.captured_at,
@@ -129,6 +131,44 @@ async def update_lead(
         intent=lead.intent,
         status=lead.status,
         estimated_value=float(lead.estimated_value) if lead.estimated_value else None,
+        actual_revenue=float(lead.actual_revenue) if lead.actual_revenue else None,
+        priority=lead.priority,
+        flag_reason=lead.flag_reason,
+        captured_at=lead.captured_at,
+    )
+
+
+@router.post("/leads/{lead_id}/convert", response_model=LeadResponse)
+async def convert_lead(
+    lead_id: str,
+    body: LeadConvertRequest,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(verify_jwt),
+):
+    """Mark a lead as converted and record actual revenue."""
+    result = await db.execute(
+        select(Lead).where(Lead.id == uuid.UUID(lead_id))
+    )
+    lead = result.scalar_one_or_none()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    lead.status = "converted"
+    import decimal
+    lead.actual_revenue = decimal.Decimal(str(body.actual_revenue))
+    if body.notes is not None:
+        lead.notes = body.notes
+
+    return LeadResponse(
+        id=str(lead.id),
+        conversation_id=str(lead.conversation_id),
+        guest_name=lead.guest_name,
+        guest_phone=lead.guest_phone,
+        guest_email=lead.guest_email,
+        intent=lead.intent,
+        status=lead.status,
+        estimated_value=float(lead.estimated_value) if lead.estimated_value else None,
+        actual_revenue=float(lead.actual_revenue) if lead.actual_revenue else None,
         priority=lead.priority,
         flag_reason=lead.flag_reason,
         captured_at=lead.captured_at,
@@ -169,7 +209,7 @@ async def export_leads_csv(
     writer = csv.writer(output)
     writer.writerow([
         "Name", "Phone", "Email", "Intent", "Status",
-        "Estimated Value (RM)", "Priority", "Channel",
+        "Estimated Value (RM)", "Actual Revenue (RM)", "Priority", "Channel",
         "After Hours", "Captured At"
     ])
 
@@ -181,6 +221,7 @@ async def export_leads_csv(
             lead.intent or "",
             lead.status or "",
             float(lead.estimated_value) if lead.estimated_value else "",
+            float(lead.actual_revenue) if lead.actual_revenue else "",
             lead.priority or "",
             lead.source_channel or "",
             "Yes" if lead.is_after_hours else "No",

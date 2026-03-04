@@ -59,7 +59,7 @@ async def test_whatsapp_incoming_message(client: AsyncClient):
     """Test WhatsApp webhook receiving a message (POST)."""
     
     # Mock the outbound send function to avoid API calls
-    with patch("app.routes.send_whatsapp_message", new_callable=AsyncMock) as mock_send:
+    with patch("app.routes.channels.send_whatsapp_message", new_callable=AsyncMock) as mock_send:
         # We also need to ensure a property exists or fallback works.
         # The seed script creates Vivatel. If running against fresh test DB, make sure property exists.
         # Assuming dev DB (seeded) or test DB. 
@@ -119,7 +119,20 @@ async def test_web_chat_flow(client: AsyncClient):
     
     async with async_session() as db:
         result = await db.execute(select(Property).limit(1))
-        prop = result.scalar_one()
+        prop = result.scalar_one_or_none()
+        if not prop:
+            from decimal import Decimal
+            prop = Property(
+                name="Web Chat Test Property",
+                adr=Decimal("100"),
+                ota_commission_pct=Decimal("15"),
+                timezone="Asia/Kuala_Lumpur",
+                plan_tier="pilot",
+                is_active=True
+            )
+            db.add(prop)
+            await db.commit()
+            await db.refresh(prop)
         property_id = str(prop.id)
     
     response = await client.post(
@@ -155,7 +168,29 @@ async def test_web_chat_flow(client: AsyncClient):
 async def test_email_webhook(client: AsyncClient):
     """Test SendGrid Inbound Parse webhook (POST /webhook/email)."""
     
-    with patch("app.routes.send_email", new_callable=AsyncMock) as mock_send:
+    with patch("app.routes.channels.send_email", new_callable=AsyncMock) as mock_send:
+        # Seed test property
+        from app.database import async_session
+        from app.models import Property
+        from sqlalchemy import select
+        from decimal import Decimal
+        
+        async with async_session() as db:
+            result = await db.execute(select(Property).where(Property.notification_email == "inquiry@vivatel.com"))
+            prop = result.scalar_one_or_none()
+            if not prop:
+                prop = Property(
+                    name="Vivatel Demo",
+                    notification_email="inquiry@vivatel.com",
+                    adr=Decimal("100"),
+                    ota_commission_pct=Decimal("15"),
+                    timezone="Asia/Kuala_Lumpur",
+                    plan_tier="pilot",
+                    is_active=True
+                )
+                db.add(prop)
+                await db.commit()
+
         # Construct multipart form data
         # httpx handles data=dict as form-urlencoded, files=... for multipart.
         # But SendGrid sends fields as multipart form fields.

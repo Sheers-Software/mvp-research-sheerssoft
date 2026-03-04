@@ -1,0 +1,5 @@
+steps:
+  - name: 'python:3.11-slim'
+    script: |
+      pip install psycopg2-binary
+      python run_migration.py

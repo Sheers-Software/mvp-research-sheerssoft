@@ -38,6 +38,9 @@ apscheduler==3.10.4
 # Retry / Resilience
 tenacity==9.0.0
 
+# Payments
+stripe==11.4.0
+
 # Utilities
 python-dotenv==1.0.1
 structlog==24.4.0

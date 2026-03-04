@@ -48,17 +48,17 @@ def _format_daily_report_email(prop: Property, stats: AnalyticsDaily) -> str:
             </div>
             
             <div style="padding: 20px;">
-                {(lambda: f"""
+                {(lambda: f'''
                 <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin-bottom: 20px;">
-                    <h3 style="margin: 0 0 5px; color: #b91c1c;">⚠️ Action Required</h3>
+                    <h3 style="margin: 0 0 5px; color: #b91c1c;">&#9888; Action Required</h3>
                     <p style="margin: 0; color: #7f1d1d;">
                         You have <strong>{stats.handoffs} conversation(s)</strong> waiting for staff attention.
                     </p>
                 </div>
-                """ if stats.handoffs > 0 else "")()}
+                ''' if stats.handoffs > 0 else "")()}
 
                 <div style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 15px; margin-bottom: 20px;">
-                    <h3 style="margin: 0 0 10px; color: #0369a1;">💰 Revenue Recovered</h3>
+                    <h3 style="margin: 0 0 10px; color: #0369a1;">&#128176; Revenue Recovered</h3>
                     <div style="display: flex; justify-content: space-between; align-items: baseline;">
                         <span style="font-size: 24px; font-weight: bold; color: #0f172a;">{revenue}</span>
                         <span style="font-size: 14px; color: #64748b;">Est. Value (After Hours)</span>
@@ -90,7 +90,7 @@ def _format_daily_report_email(prop: Property, stats: AnalyticsDaily) -> str:
                     </div>
                 </div>
 
-                <h3 style="border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; font-size: 16px;">📊 Channel Breakdown</h3>
+                <h3 style="border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; font-size: 16px;">&#128202; Channel Breakdown</h3>
                 <ul style="list-style: none; padding: 0;">
                     <li style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
                         <span>WhatsApp</span>
@@ -144,7 +144,7 @@ async def run_daily_reports(report_date: date | None = None):
             
             # Generate email
             email_body = _format_daily_report_email(prop, stats)
-            subject = f"📊 Daily Intelligence: {prop.name} - {report_date.strftime('%d %b %Y')}"
+            subject = f"&#128202; Daily Intelligence: {prop.name} - {report_date.strftime('%d %b %Y')}"
             
             # Send to property notification email (if configured) or staff email
             recipient = prop.notification_email or settings.staff_notification_email
@@ -161,15 +161,15 @@ async def run_daily_reports(report_date: date | None = None):
 
 async def delete_old_leads(db: AsyncSession = None):
     """
-    Weekly job: Delete leads and conversations older than 2 years.
-    Complies with PDPA/GDPR data retention policies.
+    Weekly job: Delete leads and conversations older than 90 days.
+    Complies with PDPA/GDPR data retention policies and fits Supabase 500MB free tier limits.
     """
     from app.database import async_session
     from app.models import Lead, Conversation
     from sqlalchemy import delete
 
-    # 2 years retention
-    cutoff_date = datetime.now(timezone.utc) - timedelta(days=730)
+    # 90 days retention for Free Tier
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=90)
     logger.info("Running data retention cleanup", cutoff_date=cutoff_date)
 
     async with async_session() as session:
@@ -197,7 +197,149 @@ async def delete_old_leads(db: AsyncSession = None):
         except Exception as e:
             logger.error("Data retention job failed", error=str(e))
             await session.rollback()
+
+
+async def process_automated_follow_ups(db: AsyncSession = None):
+    """
+    Hourly job: Check for active conversations that need 24h/72h/7d follow-ups.
+    """
+    from app.database import async_session, set_db_context
+    from app.models import Conversation, Property
+    from app.services.conversation import process_guest_message
+    from app.services.whatsapp import send_whatsapp_message
+    from app.services.twilio_whatsapp import send_twilio_message
+    from app.services.email import send_email
+
+    logger.info("Running automated follow-ups job")
+
+    async with async_session() as session:
+        try:
+            now = datetime.now(timezone.utc)
             
+            # Fetch all active conversations that haven't exhausted follow-ups
+            result = await session.execute(
+                select(Conversation, Property)
+                .join(Property, Conversation.property_id == Property.id)
+                .where(
+                    Conversation.status == "active",
+                    Conversation.follow_up_stage < 3
+                )
+            )
+            
+            pairs = result.all()
+            
+            for conv, prop in pairs:
+                if not conv.last_interaction_at:
+                    continue
+                    
+                age_hours = (now - conv.last_interaction_at).total_seconds() / 3600.0
+                
+                target_stage = None
+                if conv.follow_up_stage == 0 and age_hours >= 24:
+                    target_stage = 1
+                elif conv.follow_up_stage == 1 and age_hours >= 72:
+                    target_stage = 2
+                elif conv.follow_up_stage == 2 and age_hours >= 168:
+                    target_stage = 3
+                    
+                if target_stage:
+                    try:
+                        # Ensure RLS context is set for the tenant if needed
+                        await set_db_context(session, str(prop.id))
+                        
+                        conv.follow_up_stage = target_stage
+                        
+                        # Process system triggered follow up
+                        response = await process_guest_message(
+                            db=session,
+                            property_id=prop.id,
+                            guest_identifier=conv.guest_identifier,
+                            channel=conv.channel,
+                            message_text="",  # System triggered
+                            guest_name=conv.guest_name,
+                            is_follow_up=True
+                        )
+                        
+                        await session.commit()
+                        
+                        reply_text = response["response"]
+                        
+                        # Deliver via correct channel integration
+                        if conv.channel == "whatsapp":
+                            if prop.whatsapp_provider == "twilio":
+                                await send_twilio_message(
+                                    to_number=conv.guest_identifier,
+                                    message_text=reply_text,
+                                    from_number=prop.twilio_phone_number
+                                )
+                            else:
+                                await send_whatsapp_message(
+                                    to_number=conv.guest_identifier,
+                                    message_text=reply_text
+                                )
+                        elif conv.channel == "email":
+                            await send_email(
+                                to_email=conv.guest_identifier,
+                                subject="Following up on your inquiry",
+                                content=reply_text,
+                                hotel_name=prop.name
+                            )
+                            
+                        logger.info("Sent follow-up", conversation_id=str(conv.id), stage=target_stage)
+                        
+                    except Exception as e:
+                        logger.error("Failed to send follow up", conversation_id=str(conv.id), error=str(e))
+                        await session.rollback()
+                        
+        except Exception as e:
+            logger.error("Follow-up job failed", error=str(e))
+            
+
+async def generate_monthly_insights(db: AsyncSession = None):
+    """
+    Monthly job (1st of month): generate guest insight reports.
+    """
+    from app.database import async_session, set_db_context
+    from app.models import Property
+    from app.services.insights import compute_monthly_insights
+    from app.services.email import send_email
+    
+    logger.info("Running monthly insights job")
+    async with async_session() as session:
+        try:
+            # Get all properties
+            result = await session.execute(select(Property))
+            properties = result.scalars().all()
+            
+            for prop in properties:
+                report_md = await compute_monthly_insights(session, prop.id, days_back=30)
+                if not report_md:
+                    continue
+                    
+                # Simple HTML formatting
+                html_body = f"""
+                <html>
+                <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto;">
+                    <h2>&#128161; 30-Day Guest Insights: {prop.name}</h2>
+                    <p>Here is your monthly intelligence report summarizing guest conversations:</p>
+                    <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        {report_md.replace(chr(10), '<br>')}
+                    </div>
+                </body>
+                </html>
+                """
+                
+                recipient = prop.notification_email or settings.staff_notification_email
+                await send_email(
+                    to_email=recipient,
+                    subject=f"&#128161; Monthly Guest Insights: {prop.name}",
+                    content=html_body,
+                    is_html=True
+                )
+                logger.info("Sent monthly insights report", property_id=str(prop.id))
+        except Exception as e:
+            logger.error("Monthly insights job failed", error=str(e))
+
 
 async def start_scheduler():
     """Initialize and start the scheduler."""
@@ -220,6 +362,22 @@ async def start_scheduler():
         delete_old_leads,
         trigger=CronTrigger(day_of_week="sun", hour=3, minute=0, timezone=settings.timezone),
         id="data_retention",
+        replace_existing=True
+    )
+    
+    # Schedule automated follow ups (Hourly)
+    scheduler.add_job(
+        process_automated_follow_ups,
+        trigger=CronTrigger(minute=0, timezone=settings.timezone),
+        id="automated_follow_ups",
+        replace_existing=True
+    )
+
+    # Schedule monthly guest insights (1st of month at 8:00 AM)
+    scheduler.add_job(
+        generate_monthly_insights,
+        trigger=CronTrigger(day=1, hour=8, minute=0, timezone=settings.timezone),
+        id="monthly_insights",
         replace_existing=True
     )
     

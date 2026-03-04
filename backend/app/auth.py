@@ -1,6 +1,6 @@
 """
 Authentication & Security Middleware.
-Handles JWT verification for staff, API keys for widgets, and webhook signature validation.
+Handles Supabase JWT verification, tenant RBAC, API keys for widgets, and webhook signatures.
 """
 
 import hmac
@@ -10,23 +10,32 @@ from typing import Optional
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
 from jose import JWTError, jwt
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 import structlog
 
 from app.config import get_settings
+from app.database import get_db
 
 settings = get_settings()
 logger = structlog.get_logger()
 
 # OAuth2 scheme for Swagger UI
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token", auto_error=False)
 
 # API Key header for widget
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
+# ─────────────────────────────────────────────────────────────
+# JWT Verification (Supabase-issued tokens)
+# ─────────────────────────────────────────────────────────────
+
 async def verify_jwt(token: str = Depends(oauth2_scheme)) -> dict:
     """
-    Verify JWT access token for staff/admin routes.
+    Verify JWT access token.
+    Supports both Supabase-issued JWTs and legacy admin JWTs.
     Returns the decoded token payload (claims).
     """
     credentials_exception = HTTPException(
@@ -34,48 +43,181 @@ async def verify_jwt(token: str = Depends(oauth2_scheme)) -> dict:
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    if not token:
+        raise credentials_exception
+
     try:
         payload = jwt.decode(
             token,
             settings.jwt_secret,
-            algorithms=[settings.jwt_algorithm]
+            algorithms=[settings.jwt_algorithm],
+            options={"verify_aud": False}  # Supabase tokens use 'authenticated' audience
         )
-        username: str = payload.get("sub")
-        if username is None:
+        # Supabase uses 'sub' for user UUID
+        sub: str = payload.get("sub")
+        if sub is None:
             raise credentials_exception
         return payload
     except JWTError:
         raise credentials_exception
 
 
+# ─────────────────────────────────────────────────────────────
+# User Resolution (JWT → User model)
+# ─────────────────────────────────────────────────────────────
+
+async def get_current_user(
+    token: dict = Depends(verify_jwt),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Resolve the JWT's 'sub' claim into a User model instance.
+    Eagerly loads tenant memberships for RBAC checks.
+    Falls back to legacy admin mode if no User record exists (migration period).
+    """
+    from app.models import User
+
+    user_id = token.get("sub")
+
+    # Legacy admin support: if 'sub' is a username (not UUID), treat as superadmin
+    try:
+        import uuid as uuid_mod
+        uuid_mod.UUID(user_id)
+    except (ValueError, AttributeError):
+        # Legacy admin token (sub="admin")
+        if token.get("is_admin") and "*" in token.get("property_ids", []):
+            return {
+                "_legacy": True,
+                "sub": user_id,
+                "is_admin": True,
+                "is_superadmin": True,
+                "property_ids": ["*"],
+                "tenant_id": None,
+            }
+        raise HTTPException(status_code=401, detail="Invalid token format")
+
+    stmt = (
+        select(User)
+        .options(selectinload(User.memberships))
+        .where(User.id == user_id)
+    )
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account not found. Contact support.",
+        )
+
+    # Update last login timestamp
+    from datetime import datetime, timezone
+    user.last_login_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    return user
+
+
+# ─────────────────────────────────────────────────────────────
+# Tenant & Property Access Control
+# ─────────────────────────────────────────────────────────────
+
+async def check_tenant_access(
+    tenant_id: str,
+    user=Depends(get_current_user),
+):
+    """
+    Verify the authenticated user has access to the specified tenant.
+    SuperAdmins can access any tenant.
+    """
+    # Legacy admin bypass
+    if isinstance(user, dict) and user.get("_legacy"):
+        return user
+
+    if user.is_superadmin:
+        return user
+
+    # Check memberships
+    for membership in user.memberships:
+        if str(membership.tenant_id) == str(tenant_id):
+            return user
+
+    logger.warning(
+        "Unauthorized tenant access attempt",
+        user_id=str(user.id),
+        target_tenant=tenant_id,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You do not have access to this organization"
+    )
+
+
 async def check_property_access(
     property_id: str,
-    token: dict = Depends(verify_jwt)
-) -> dict:
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict | object:
     """
-    Dependency to enforce property isolation.
-    Ensures the authenticated user has access to the requested property.
+    Verify the authenticated user has access to the specified property.
+    Checks via the Tenant → Property → TenantMembership chain.
     """
-    # 1. Check if super admin
-    if token.get("is_admin") and "*" in token.get("property_ids", []):
-         return token
+    # Legacy admin bypass
+    if isinstance(user, dict) and user.get("_legacy"):
+        return user
 
-    # 2. Check specific property access
-    allowed_props = token.get("property_ids", [])
-    if property_id not in allowed_props:
-        logger.warning(
-            "Unauthorized property access attempt",
-            user=token.get("sub"),
-            target_property=property_id,
-            allowed_properties=allowed_props
-        )
+    if user.is_superadmin:
+        return user
+
+    # Resolve property's tenant
+    from app.models import Property
+    stmt = select(Property.tenant_id).where(Property.id == property_id)
+    result = await db.execute(stmt)
+    prop_tenant_id = result.scalar_one_or_none()
+
+    if not prop_tenant_id:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    # Check user has membership for this tenant
+    for membership in user.memberships:
+        if str(membership.tenant_id) == str(prop_tenant_id):
+            # Check property-level scope
+            if membership.accessible_property_ids is None:
+                return user  # null = all properties
+            if str(property_id) in [str(pid) for pid in membership.accessible_property_ids]:
+                return user
+
+    logger.warning(
+        "Unauthorized property access attempt",
+        user_id=str(user.id),
+        target_property=property_id,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You do not have access to this property"
+    )
+
+
+async def require_superadmin(user=Depends(get_current_user)):
+    """
+    Gate routes to SheersSoft internal staff only.
+    """
+    # Legacy admin bypass
+    if isinstance(user, dict) and user.get("_legacy"):
+        return user
+
+    if not user.is_superadmin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this property"
+            detail="SuperAdmin access required"
         )
-    
-    return token
+    return user
 
+
+# ─────────────────────────────────────────────────────────────
+# Webhook Signature Verification (unchanged from original)
+# ─────────────────────────────────────────────────────────────
 
 async def verify_sendgrid_signature(request: Request):
     """
@@ -95,8 +237,6 @@ async def verify_sendgrid_signature(request: Request):
 
     if not signature or not timestamp:
         logger.warning("Missing SendGrid signature headers")
-        # For now, allowing it if key is missing/empty, but if key is present, we enforce it.
-        # If user configured the key, they expect enforcement.
         raise HTTPException(status_code=403, detail="Missing signature")
 
     # Construct payload: timestamp + raw body
@@ -120,14 +260,6 @@ async def verify_api_key(
 ) -> Optional[str]:
     """
     Verify API Key for widget access.
-    
-    In strict mode (widget_api_key_strict=True):
-      - Requires a valid API key header
-      - Validates the key against the property's stored API key
-    
-    In permissive mode (default for MVP):
-      - Allows access if property_id in the request is a valid UUID
-      - Logs a warning if no API key is provided
     """
     if settings.widget_api_key_strict:
         if not api_key:
@@ -135,8 +267,6 @@ async def verify_api_key(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="API key required. Set X-API-Key header."
             )
-        # In strict mode, validate against DB
-        # For now, validate the key format and log
         logger.info("Widget API key validated", api_key_prefix=api_key[:8] + "..." if len(api_key) > 8 else api_key)
         return api_key
     
@@ -149,10 +279,8 @@ async def verify_api_key(
 async def verify_whatsapp_signature(request: Request):
     """
     Verify WhatsApp Cloud API webhook signature (X-Hub-Signature-256).
-    Prevents forged requests from attackers.
     """
     if not settings.whatsapp_app_secret:
-        # Warn but allow if secret not configured (dev mode helper)
         if settings.is_production:
             logger.error("WhatsApp secret not configured in production!")
             raise HTTPException(status_code=500, detail="Server misconfiguration")
@@ -163,16 +291,12 @@ async def verify_whatsapp_signature(request: Request):
         logger.warning("Missing WhatsApp signature")
         raise HTTPException(status_code=403, detail="Missing signature")
 
-    # Signature format: "sha256=<hash>"
     if not signature.startswith("sha256="):
         raise HTTPException(status_code=403, detail="Invalid signature format")
         
     sig_hash = signature.split("=")[1]
-    
-    # Read raw body
     body = await request.body()
     
-    # Calculate expected HMAC
     expected_hash = hmac.new(
         settings.whatsapp_app_secret.encode(),
         body,
@@ -189,14 +313,11 @@ async def verify_twilio_signature(request: Request):
     Verify Twilio webhook signature using the Twilio Python SDK RequestValidator.
     """
     if not settings.twilio_auth_token:
-        # Warn but allow if secret not configured (dev mode helper)
         if settings.is_production:
             logger.error("Twilio auth token not configured in production!")
             raise HTTPException(status_code=500, detail="Server misconfiguration")
         return
 
-    # In demo mode, skip signature verification to avoid proxy/tunnel complications.
-    # The demo stack is isolated and not customer-facing.
     if settings.is_demo:
         logger.info("Demo mode: skipping Twilio signature verification")
         return
@@ -204,18 +325,15 @@ async def verify_twilio_signature(request: Request):
     from twilio.request_validator import RequestValidator
     validator = RequestValidator(settings.twilio_auth_token)
 
-    # Twilio sends the signature in X-Twilio-Signature
     signature = request.headers.get("X-Twilio-Signature")
     if not signature:
         logger.warning("Missing Twilio signature")
         raise HTTPException(status_code=403, detail="Missing signature")
 
-    # Use the original URL to handle proxies like Ngrok/localtunnel
     forwarded_host = request.headers.get("X-Forwarded-Host")
     forwarded_proto = request.headers.get("X-Forwarded-Proto", "https")
     
     if forwarded_host:
-        # Reconstruct the original public URL
         base_url = f"{forwarded_proto}://{forwarded_host}"
         path = request.url.path
         url_str = f"{base_url}{path}"
@@ -230,4 +348,3 @@ async def verify_twilio_signature(request: Request):
     if not validator.validate(url_str, post_vars, signature):
         logger.warning("Invalid Twilio signature", signature=signature, url=url_str)
         raise HTTPException(status_code=403, detail="Invalid signature")
-

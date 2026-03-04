@@ -176,6 +176,17 @@ async def compute_daily_analytics(
 
     estimated_revenue = total_revenue * Decimal("0.20") # Apply default conversion rate 20%
 
+    # Actual revenue recovered (only from converted leads)
+    leads_actual_result = await db.execute(
+        select(func.sum(Lead.actual_revenue)).where(
+            Lead.property_id == property_id,
+            Lead.captured_at >= day_start,
+            Lead.captured_at < day_end,
+            Lead.status == "converted"
+        )
+    )
+    actual_revenue_recovered = leads_actual_result.scalar() or Decimal("0")
+
     # Calculate AI vs Manual handling
     inquiries_handled_manually = handoffs
     inquiries_handled_by_ai = total_inquiries - inquiries_handled_manually
@@ -207,6 +218,7 @@ async def compute_daily_analytics(
         record.inquiries_handled_manually = inquiries_handled_manually
         record.avg_response_time_sec = avg_response_time
         record.estimated_revenue_recovered = estimated_revenue
+        record.actual_revenue_recovered = actual_revenue_recovered
         record.cost_savings = cost_savings
         record.channel_breakdown = channel_breakdown
     else:
@@ -222,6 +234,7 @@ async def compute_daily_analytics(
             inquiries_handled_manually=inquiries_handled_manually,
             avg_response_time_sec=avg_response_time,
             estimated_revenue_recovered=estimated_revenue,
+            actual_revenue_recovered=actual_revenue_recovered,
             cost_savings=cost_savings,
             channel_breakdown=channel_breakdown,
         )
@@ -335,6 +348,16 @@ async def get_realtime_stats(
 
     estimated_revenue = float(total_revenue * Decimal("0.20"))
     
+    # Actual revenue (converted leads today)
+    leads_actual_result = await db.execute(
+        select(func.sum(Lead.actual_revenue)).where(
+            Lead.property_id == property_id,
+            Lead.captured_at >= today_start,
+            Lead.status == "converted"
+        )
+    )
+    actual_revenue_recovered = float(leads_actual_result.scalar() or Decimal("0"))
+    
     # 6. Response Time
     response_times_result = await db.execute(
         select(Message.metadata_["response_time_ms"]).where(
@@ -387,6 +410,7 @@ async def get_realtime_stats(
         "leads_captured": leads_captured,
         "avg_response_time_sec": avg_response_time,
         "estimated_revenue_recovered": estimated_revenue,
+        "actual_revenue_recovered": actual_revenue_recovered,
         "active_conversations": active_conversations,
         "handed_off_conversations": handed_off_conversations,
         "inquiries_handled_by_ai": inquiries_handled_by_ai,

@@ -12,6 +12,10 @@ from app.routes.analytics import router as analytics_router
 from app.routes.admin import router as admin_router
 from app.routes.auth import router as auth_router
 from app.routes.health import router as health_router
+from app.routes.onboarding import router as onboarding_router
+from app.routes.support import router as support_router
+from app.routes.superadmin import router as superadmin_router
+from app.routes.billing import router as billing_router
 
 router = APIRouter(prefix="/api/v1")
 
@@ -22,3 +26,7 @@ router.include_router(analytics_router, tags=["Analytics"])
 router.include_router(admin_router, tags=["Admin"])
 router.include_router(auth_router, tags=["Auth"])
 router.include_router(health_router, tags=["Health"])
+router.include_router(onboarding_router, tags=["Onboarding"])
+router.include_router(support_router, tags=["Support"])
+router.include_router(superadmin_router, tags=["SuperAdmin"])
+router.include_router(billing_router, tags=["Billing"])

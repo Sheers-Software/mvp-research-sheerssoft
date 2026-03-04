@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # Database
-    database_url: str = "postgresql+asyncpg://sheerssoft:sheerssoft_dev_password@localhost:5432/sheerssoft"
+    database_url: str = ""  # Loaded from GCP Secret Manager; fallback to local dev if empty after fetch
     redis_url: str = "redis://localhost:6379/0"
 
     # Gemini (Default LLM)
@@ -53,18 +53,27 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_phone_number: str = ""
 
-    # Auth
-    jwt_secret: str = "dev_jwt_secret_change_in_production"
+    # Auth (Supabase Auth — magic link based)
+    jwt_secret: str = "dev_jwt_secret_change_in_production"  # Supabase project JWT secret
     jwt_algorithm: str = "HS256"
     jwt_expiry_hours: int = 24
+    supabase_url: str = ""  # e.g. https://xxx.supabase.co
+    supabase_anon_key: str = ""
+    supabase_service_role_key: str = ""  # Admin API access (user creation, magic links)
     
-    # Admin Credentials
+    # Legacy Admin Credentials (kept for backward compatibility during migration)
     admin_user: str = "admin"
     admin_password: str = "password123"
 
     # Security
     fernet_encryption_key: str = ""  # PII field-level encryption key
     widget_api_key_strict: bool = False  # Enforce API key validation for widget
+
+    # Stripe
+    stripe_api_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_currency: str = "usd"          # e.g. "usd" or "myr"
+    stripe_setup_fee_amount: int = 15000  # Smallest currency unit (cents/sen); 15000 = $150 USD
 
     # Environment
     environment: str = "development"
@@ -91,9 +100,6 @@ class Settings(BaseSettings):
         )
 
     def model_post_init(self, __context):
-        if self.database_url.startswith("postgresql://"):
-            self.database_url = self.database_url.replace("postgresql://", "postgresql+asyncpg://")
-
         # All environments use GCP Secret Manager as the single source of truth for secrets.
         # Credentials are resolved via Application Default Credentials (ADC):
         #   - Local dev: run `gcloud auth application-default login`
@@ -105,6 +111,8 @@ class Settings(BaseSettings):
             "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER",
             "DATABASE_URL", "JWT_SECRET", "WHATSAPP_VERIFY_TOKEN",
             "WHATSAPP_PHONE_NUMBER_ID", "FERNET_ENCRYPTION_KEY", "ADMIN_PASSWORD",
+            "SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY",
+            "STRIPE_API_KEY", "STRIPE_WEBHOOK_SECRET",
         ]
 
         client = None
@@ -121,7 +129,7 @@ class Settings(BaseSettings):
 
                     name = f"projects/nocturn-ai-487207/secrets/{key}/versions/latest"
                     response = client.access_secret_version(request={"name": name})
-                    fetched_val = response.payload.data.decode("UTF-8")
+                    fetched_val = response.payload.data.decode("UTF-8").strip().lstrip("\ufeff")
 
                     setattr(self, key.lower(), fetched_val)
                     logger.info(f"Successfully loaded {key} from GCP Secret Manager.")
@@ -130,6 +138,14 @@ class Settings(BaseSettings):
                         f"Could not load {key} from Secret Manager. "
                         f"Error: {e}"
                     )
+
+        # Post-fetch fixups
+        if self.database_url.startswith("postgresql://"):
+            self.database_url = self.database_url.replace("postgresql://", "postgresql+asyncpg://")
+
+        # Fallback for pure local dev without GCP ADC (no .env and no Secret Manager)
+        if not self.database_url:
+            self.database_url = "postgresql+asyncpg://sheerssoft:sheerssoft_dev_password@localhost:5432/sheerssoft"
 
     class Config:
         env_file = ".env"

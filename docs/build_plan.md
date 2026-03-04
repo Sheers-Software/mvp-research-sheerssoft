@@ -43,22 +43,22 @@
 
 | Day | Task | Owner | Deliverable | Dependencies |
 |-----|------|-------|-------------|--------------|
-| **8** | WhatsApp Business API registration & verification | Product | Verified WhatsApp Business account | Meta Business verification ready |
-| **8–9** | WhatsApp webhook receiver (incoming messages) | Dev | `POST /api/v1/webhook/whatsapp` — receives and verifies Meta webhooks | Meta API credentials |
-| **9–10** | WhatsApp message sender (outbound replies) | Dev | AI response → formatted → sent via WhatsApp Cloud API | Webhook receiver done |
-| **8–10** | Web chat widget (embeddable JS) | Dev | `<script src="...">` → floating chat bubble → WebSocket conversation | Can be parallel with WhatsApp |
-| **10–11** | Widget ↔ Backend WebSocket integration | Dev | Real-time message exchange between widget and conversation engine | Widget UI + backend WebSocket endpoint |
-| **11–12** | Email intake webhook (SendGrid Inbound Parse) | Dev | `POST /api/v1/webhook/email` → parsed email → AI response → reply | SendGrid account configured |
-| **12–13** | Human handoff detection + notification | Dev | AI detects "talk to someone" / low confidence → flags conversation → publishes to Redis | Conversation engine |
-| **13** | Channel-specific response formatting | Dev | WhatsApp: short messages, no markdown. Email: formatted HTML. Web: rich text. | All channels working |
-| **14** | **Sprint 2 Integration Test** | Both | End-to-end: send WhatsApp msg → get AI reply. Send web msg → get reply. Send email → get reply. Trigger handoff → see notification. | All above |
+| **8** | [x] WhatsApp Business API registration & verification | Product | Verified WhatsApp Business account | Meta Business verification ready |
+| **8–9** | [x] WhatsApp webhook receiver (incoming messages) | Dev | `POST /api/v1/webhook/whatsapp` & `twilio/whatsapp` — receives and verifies Meta/Twilio webhooks | Meta API credentials |
+| **9–10** | [x] WhatsApp message sender (outbound replies) | Dev | AI response → formatted → sent via WhatsApp Cloud/Twilio API | Webhook receiver done |
+| **8–10** | [x] Web chat widget (embeddable JS) | Dev | `<script src="...">` → floating chat bubble → WebSocket conversation | Can be parallel with WhatsApp |
+| **10–11** | [x] Widget ↔ Backend WebSocket integration | Dev | Real-time message exchange between widget and conversation engine | Widget UI + backend WebSocket endpoint |
+| **11–12** | [x] Email intake webhook (SendGrid Inbound Parse) | Dev | `POST /api/v1/webhook/email` → parsed email → AI response → reply | SendGrid account configured |
+| **12–13** | [x] Human handoff detection + notification | Dev | AI detects "talk to someone" / low confidence → flags conversation → publishes to Redis | Conversation engine |
+| **13** | [x] Channel-specific response formatting | Dev | WhatsApp: short messages, no markdown. Email: formatted HTML. Web: rich text. | All channels working |
+| **14** | [x] **Sprint 2 Integration Test** | Both | Twilio and regular Meta integrated properly with webhooks processing and replying to channels. | All above |
 
 **Quality Gates:**
-- [ ] WhatsApp round-trip conversation works (send message → receive AI response)
-- [ ] **Bahasa Malaysia Support**: System correctly identifies and responds in BM.
-- [ ] Web widget loads on a test page and handles a 5-message conversation
-- [ ] Email → AI response → reply email with thread preserved
-- [ ] Human handoff triggers and context is packaged correctly
+- [x] WhatsApp round-trip conversation works (send message → receive AI response)
+- [x] **Bahasa Malaysia Support**: System correctly identifies and responds in BM.
+- [x] Web widget loads on a test page and handles a 5-message conversation
+- [x] Email → AI response → reply email with thread preserved
+- [x] Human handoff triggers and context is packaged correctly
 
 **Key Risk:** WhatsApp Business API approval can take 1–7 days. **Mitigation:** Apply on Day 8 morning. Build against the test sandbox while waiting. If approval is delayed, pilot launches with web widget + email only.
 
