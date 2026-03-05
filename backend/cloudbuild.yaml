@@ -90,6 +90,7 @@ steps:
       - --memory=512Mi
       - --timeout=60
       - --cpu-throttling
+      - --set-env-vars=NEXT_PUBLIC_API_URL=https://nocturn-backend-owtn645vea-as.a.run.app
       - --allow-unauthenticated
       - --port=3000
 
