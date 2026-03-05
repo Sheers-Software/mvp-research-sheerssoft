@@ -49,6 +49,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     useEffect(() => {
+        // Parse Supabase magic link redirect hash (e.g. #access_token=...)
+        if (typeof window !== 'undefined' && window.location.hash) {
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+            const accessToken = hashParams.get('access_token');
+            if (accessToken) {
+                localStorage.setItem('nocturn_token', accessToken);
+                // Clean the URL hash without triggering a page reload
+                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+        }
+
         const token = localStorage.getItem('nocturn_token');
         if (token) {
             fetchUser();

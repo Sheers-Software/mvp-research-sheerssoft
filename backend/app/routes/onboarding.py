@@ -166,7 +166,12 @@ async def provision_tenant(
                             "apikey": settings.supabase_anon_key,
                             "Content-Type": "application/json",
                         },
-                        json={"email": body.owner_email},
+                        json={
+                            "email": body.owner_email,
+                            "options": {
+                                "emailRedirectTo": settings.allowed_origins.split(",")[0]
+                            }
+                        },
                         timeout=10.0,
                     )
                     magic_link_sent = ml_resp.status_code < 300
@@ -392,7 +397,12 @@ async def invite_user(
                             "apikey": settings.supabase_anon_key,
                             "Content-Type": "application/json",
                         },
-                        json={"email": body.email},
+                        json={
+                            "email": body.email,
+                            "options": {
+                                "emailRedirectTo": settings.allowed_origins.split(",")[0]
+                            }
+                        },
                         timeout=10.0,
                     )
                     magic_link_sent = ml_resp.status_code < 300

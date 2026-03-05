@@ -46,7 +46,7 @@ All credentials go into GCP Secret Manager project `nocturn-ai-487207`. Run `gcl
 | `JWT_SECRET` | Supabase dashboard → Project Settings → API → JWT Secret |
 | `FERNET_ENCRYPTION_KEY` | `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | Twilio Console |
-| `SENDGRID_API_KEY` | SendGrid dashboard |
+| `SENDGRID_API_KEY` | SendGrid dashboard (also used as Supabase custom SMTP) |
 
 ### Launch
 
@@ -178,6 +178,7 @@ cd backend && alembic revision --autogenerate -m "description"
 - [x] Phase 13: WhatsApp Reliability & Consistency Hardening
 - [x] Phase 14: Gap Resolution (Automated Follow-ups, Revenue Tracking, Monthly AI Briefings)
 - [x] Phase 15: Multi-Tenant SaaS — Stripe Billing, Supabase Auth, Onboarding Flow, SuperAdmin Dashboard
+- [x] Phase 16: Auth & Integration Hardening — Magic Link Redirect Fix, SendGrid SMTP for Supabase, Tenant Detail Dashboard, Twilio Sandbox Linking
 
 ## Database & Supabase Notes
 
@@ -186,6 +187,8 @@ cd backend && alembic revision --autogenerate -m "description"
 - **Connection:** Uses Supabase's Session Pooler when direct connection is unavailable. Set `sslmode=require` in the URL.
 - **Migrations:** Managed via Alembic. For DDL-heavy migrations against the pooler, use `npx supabase db push` with the Supabase CLI.
 - **RLS:** Row-Level Security is enabled. Call `set_db_context(session, property_id)` at the start of any session touching property-scoped data.
+- **Magic Link Redirect:** Backend passes `emailRedirectTo` referencing `ALLOWED_ORIGINS` to Supabase GoTrue, ensuring magic links redirect to the correct frontend port.
+- **Custom SMTP:** Supabase Auth is configured to use SendGrid SMTP (`smtp.sendgrid.net:465`, user `apikey`) to bypass free-tier email rate limits.
 
 ## WhatsApp Channel — Reliability Notes
 

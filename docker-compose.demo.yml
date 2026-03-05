@@ -17,7 +17,7 @@ services:
     ports:
       - "5434:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U demo -d nocturn_demo"]
+      test: [ "CMD-SHELL", "pg_isready -U demo -d nocturn_demo" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -27,7 +27,7 @@ services:
     ports:
       - "6381:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -43,7 +43,7 @@ services:
       # Local Docker: mount GCP ADC credentials (see volumes below).
       GOOGLE_APPLICATION_CREDENTIALS: /gcp/credentials.json
     ports:
-      - "8001:8000"
+      - "8001:8080"
     depends_on:
       demo-db:
         condition: service_healthy
@@ -54,12 +54,14 @@ services:
       # Mount GCP Application Default Credentials for local development.
       # Run `gcloud auth application-default login` on the host first.
       # On GCP deployments, this volume is unused (workload identity takes precedence).
-      - ${GOOGLE_APPLICATION_CREDENTIALS_PATH:-${HOME}/.config/gcloud/application_default_credentials.json}:/gcp/credentials.json:ro
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-${APPDATA}/gcloud/application_default_credentials.json}:/gcp/credentials.json:ro
 
   demo-frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8001
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8001
     ports:

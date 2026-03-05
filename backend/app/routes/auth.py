@@ -86,7 +86,12 @@ async def request_magic_link(body: MagicLinkRequest):
                     "apikey": settings.supabase_anon_key,
                     "Content-Type": "application/json",
                 },
-                json={"email": body.email},
+                json={
+                    "email": body.email,
+                    "options": {
+                        "emailRedirectTo": settings.allowed_origins.split(",")[0]
+                    }
+                },
                 timeout=10.0,
             )
             if response.status_code >= 400:
