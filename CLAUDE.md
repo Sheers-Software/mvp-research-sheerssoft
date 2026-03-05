@@ -185,7 +185,21 @@ Use `async_session_factory` (alias for `async_session`) when creating standalone
 
 ### Analytics
 
-`AnalyticsDaily` is pre-aggregated (one row per property per day). Background scheduler (`services/scheduler.py`) runs daily aggregation via APScheduler. Live stats endpoint reads directly from `Conversation`/`Message` tables.
+`AnalyticsDaily` is pre-aggregated (one row per property per day). In development/demo, APScheduler (`services/scheduler.py`) runs jobs in-process. In production, APScheduler is **disabled** — Cloud Scheduler calls `POST /api/v1/internal/run-daily-report` etc. instead.
+
+### Redis / Session / Realtime
+
+`app/core/redis.py` has a graceful in-memory fallback. If `REDIS_URL` points to localhost or connection fails, all ops silently use a dict-based in-process store. Pub/sub is a no-op when Redis is unavailable. This means the app runs on Cloud Run without Memorystore for the pilot phase — sessions survive within a single instance but are not shared across instances.
+
+### Internal Scheduler Endpoints
+
+`app/routes/internal.py` — four `POST` endpoints called by Cloud Scheduler in production:
+- `/api/v1/internal/run-daily-report`
+- `/api/v1/internal/run-followups`
+- `/api/v1/internal/run-insights`
+- `/api/v1/internal/cleanup-leads`
+
+All require `X-Internal-Secret` header matching `settings.internal_scheduler_secret` (loaded from GCP Secret Manager as `INTERNAL_SCHEDULER_SECRET`). Endpoints are excluded from OpenAPI docs (`include_in_schema=False`).
 
 ## Configuration
 
@@ -209,7 +223,7 @@ STRIPE_SECRET_KEY=...     # optional; needed for billing routes
 
 For the demo stack, use `.env.demo` (already configured with Twilio/Gemini credentials).
 
-**GCP Secret Manager state** (project `nocturn-ai-487207`): `DATABASE_URL`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, `STRIPE_API_KEY`, `JWT_SECRET`, `SUPABASE_URL`, and all Twilio keys are stored. Still missing: `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `FERNET_ENCRYPTION_KEY`. Secrets stored with BOM (`\ufeff`) are stripped in `config.py` automatically.
+**GCP Secret Manager state** (project `nocturn-ai-487207`): All critical secrets are stored — `DATABASE_URL` (has BOM, stripped automatically), `GEMINI_API_KEY`, `OPENAI_API_KEY`, `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, `JWT_SECRET`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, all Twilio keys, `INTERNAL_SCHEDULER_SECRET`. Still missing: `FERNET_ENCRYPTION_KEY`, `ANTHROPIC_API_KEY`, `SENDGRID_API_KEY`, `WHATSAPP_API_TOKEN`, `WHATSAPP_APP_SECRET`. Secrets stored with BOM (`\ufeff`) are stripped in `config.py` automatically.
 
 ## WhatsApp Channel — Key Patterns
 
@@ -250,9 +264,48 @@ Tests that require seeded data (e.g., `test_ai_accuracy.py`) will skip if `seed_
 
 For integration testing against live channels, see `docs/sit_uat_guide.md` and `docs/testing_guide.md`.
 
+## Production Deployment (GCP Cloud Run)
+
+**Live URLs:**
+- Backend: `https://nocturn-backend-owtn645vea-as.a.run.app`
+- Frontend: `https://nocturn-frontend-owtn645vea-as.a.run.app`
+
+**Deploy (manual trigger):**
+```bash
+gcloud builds submit \
+  --config=backend/cloudbuild.yaml \
+  --project=nocturn-ai-487207 \
+  --region=asia-southeast1 \
+  --substitutions=COMMIT_SHA=$(git rev-parse HEAD) \
+  .
+```
+
+**CI/CD:** `backend/cloudbuild.yaml` defines the full pipeline: build backend → build frontend → push both to Artifact Registry → deploy backend Cloud Run → deploy frontend Cloud Run. Hook this to a Cloud Build GitHub trigger for automatic deploys on push to `main`.
+
+**New PC setup:**
+```bash
+gcloud auth login
+gcloud auth application-default login
+gcloud config set project nocturn-ai-487207
+gcloud auth configure-docker asia-southeast1-docker.pkg.dev
+```
+
+**Stripe local webhook listener (Windows):**
+```powershell
+.\stripe_webhook_listen.ps1   # Stripe CLI installed at %LOCALAPPDATA%\Microsoft\WinGet\Packages\Stripe.StripeCli_*\
+```
+Run in a separate terminal. Copy the printed `whsec_` and add to Secret Manager as `STRIPE_WEBHOOK_SECRET`.
+
+**Pending infra tasks:**
+1. Create Cloud Scheduler jobs (daily-report, run-followups, run-insights, db-keepalive)
+2. Add live Stripe webhook in Stripe dashboard → update `STRIPE_WEBHOOK_SECRET`
+3. Add `FERNET_ENCRYPTION_KEY` to Secret Manager
+4. Custom domain mapping (optional): `api.sheerssoft.com` / `app.sheerssoft.com`
+
 ## Documentation
 
 - `docs/architecture.md` — detailed system design rationale
 - `docs/prd.md` — product requirements
 - `docs/walkthrough_twilio_demo.md` — step-by-step live demo guide
 - `docs/testing_guide.md` / `docs/sit_uat_guide.md` — test procedures
+- `memory/MEMORY.md` — persistent session memory: infra state, secrets, next steps, new PC setup
