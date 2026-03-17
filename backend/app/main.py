@@ -54,6 +54,27 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as conn:
             await ensure_system_config_table(conn)
 
+    # Apply incremental column migrations (safe to run on every startup)
+    async with engine.begin() as conn:
+        await conn.execute(text("""
+            ALTER TABLE tenants
+                ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(255),
+                ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(255),
+                ADD COLUMN IF NOT EXISTS assigned_account_manager VARCHAR(255),
+                ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                ADD COLUMN IF NOT EXISTS pilot_start_date TIMESTAMPTZ,
+                ADD COLUMN IF NOT EXISTS pilot_end_date TIMESTAMPTZ;
+        """))
+        await conn.execute(text("""
+            ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
+        """))
+        await conn.execute(text("""
+            ALTER TABLE tenant_memberships
+                ADD COLUMN IF NOT EXISTS accessible_property_ids JSONB;
+        """))
+        logger.info("Incremental column migrations applied")
+
     # Seed default scheduler config (no-op if already seeded)
     from app.services.system_config import seed_default_config
     async with async_session() as db:
