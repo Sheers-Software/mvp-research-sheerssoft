@@ -580,6 +580,41 @@ class AnalyticsDaily(Base):
     )
 
 
+class Announcement(Base):
+    """
+    Platform-wide announcements from SheersSoft to tenants.
+    Types: maintenance | incident | feature | billing
+    Status lifecycle: draft → scheduled → active → resolved → archived
+    Targeting: all tenants | by subscription tier | specific tenant
+    """
+    __tablename__ = "announcements"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    type: Mapped[str] = mapped_column(String(20), nullable=False)       # maintenance|incident|feature|billing
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    target_type: Mapped[str] = mapped_column(String(20), nullable=False, default="all")  # all|tier|tenant
+    target_tier: Mapped[str | None] = mapped_column(String(20))         # populated when target_type='tier'
+    target_tenant_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True
+    )
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    send_email: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class SystemConfig(Base):
     """
     Platform-wide key-value configuration store.

@@ -73,6 +73,24 @@ async def lifespan(app: FastAPI):
             ALTER TABLE tenant_memberships
                 ADD COLUMN IF NOT EXISTS accessible_property_ids JSONB;
         """))
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS announcements (
+                id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                type             VARCHAR(20) NOT NULL,
+                status           VARCHAR(20) NOT NULL DEFAULT 'draft',
+                title            VARCHAR(255) NOT NULL,
+                body             TEXT NOT NULL,
+                target_type      VARCHAR(20) NOT NULL DEFAULT 'all',
+                target_tier      VARCHAR(20),
+                target_tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+                scheduled_at     TIMESTAMPTZ,
+                resolved_at      TIMESTAMPTZ,
+                send_email       BOOLEAN NOT NULL DEFAULT FALSE,
+                created_by       UUID REFERENCES users(id),
+                created_at       TIMESTAMPTZ DEFAULT NOW(),
+                updated_at       TIMESTAMPTZ DEFAULT NOW()
+            );
+        """))
         logger.info("Incremental column migrations applied")
 
     # Seed default scheduler config (no-op if already seeded)

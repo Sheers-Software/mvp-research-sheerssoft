@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Property
+from app.models import Property, Announcement, TenantMembership
 from app.schemas import (
     PropertyResponse,
     PropertyCreateRequest,
@@ -300,6 +300,61 @@ async def delete_guest_data(
         "conversations_affected": len(conv_ids),
         "message": "Guest data has been anonymized per PDPA 2010.",
     }
+
+
+@router.get("/announcements/active")
+async def get_active_announcements(
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(verify_jwt),
+):
+    """
+    Active announcements visible to the authenticated user's tenant.
+    Scoped by: all-tenant announcements OR matching tier OR matching tenant_id.
+    No superadmin required — called by /dashboard and /portal layouts.
+    """
+    from datetime import datetime, timezone
+    from sqlalchemy import or_
+
+    # Resolve tenant_id from the user's TenantMembership (first active membership)
+    user_id = token.get("sub") or token.get("user_id")
+    tenant_id = None
+    tier = None
+
+    if user_id:
+        mem_result = await db.execute(
+            select(TenantMembership).where(TenantMembership.user_id == uuid.UUID(str(user_id))).limit(1)
+        )
+        membership = mem_result.scalar_one_or_none()
+        if membership:
+            tenant_id = membership.tenant_id
+            # fetch tier from Tenant
+            from app.models import Tenant
+            tenant = await db.get(Tenant, tenant_id)
+            if tenant:
+                tier = tenant.subscription_tier
+
+    stmt = select(Announcement).where(
+        Announcement.status == "active",
+        or_(
+            Announcement.target_type == "all",
+            (Announcement.target_type == "tier") & (Announcement.target_tier == tier),
+            (Announcement.target_type == "tenant") & (Announcement.target_tenant_id == tenant_id),
+        )
+    ).order_by(Announcement.created_at.desc())
+
+    result = await db.execute(stmt)
+    announcements = result.scalars().all()
+
+    return [
+        {
+            "id": str(a.id),
+            "type": a.type,
+            "title": a.title,
+            "body": a.body,
+            "created_at": a.created_at.isoformat(),
+        }
+        for a in announcements
+    ]
 
 
 @router.get("/system/encryption")

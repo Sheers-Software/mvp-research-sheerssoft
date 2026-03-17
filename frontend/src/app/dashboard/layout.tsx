@@ -25,6 +25,14 @@ interface MaintenanceInfo {
     eta: string | null;
 }
 
+interface ActiveAnnouncement {
+    id: string;
+    type: 'maintenance' | 'incident' | 'feature' | 'billing';
+    title: string;
+    body: string;
+    created_at: string;
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { user, loading, logout } = useAuth();
     const router = useRouter();
@@ -32,6 +40,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const [property, setProperty] = useState<PropertyInfo | null>(null);
     const [maintenance, setMaintenance] = useState<MaintenanceInfo | null>(null);
     const [bannerDismissed, setBannerDismissed] = useState(false);
+    const [announcements, setAnnouncements] = useState<ActiveAnnouncement[]>([]);
+    const [dismissedAnnIds, setDismissedAnnIds] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         if (!loading && !user) {
@@ -66,6 +76,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         checkMaintenance();
         const interval = setInterval(checkMaintenance, 60000);
         return () => clearInterval(interval);
+    }, []);
+
+    useEffect(() => {
+        // Fetch active announcements on load (no polling needed — staff refresh is sufficient)
+        apiGet<ActiveAnnouncement[]>('/announcements/active')
+            .then((data) => setAnnouncements(data || []))
+            .catch(() => {});
     }, []);
 
     if (loading) {
@@ -122,6 +139,44 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </aside>
 
             <main className="main-content">
+                {/* Active announcements from SheersSoft */}
+                {announcements
+                    .filter((a) => !dismissedAnnIds.has(a.id))
+                    .map((ann) => {
+                        const isUrgent = ann.type === 'incident' || ann.type === 'maintenance';
+                        const color = ann.type === 'incident' ? 'var(--danger)' : ann.type === 'feature' ? 'var(--info)' : 'var(--warning)';
+                        const icon = ann.type === 'incident' ? '🚨' : ann.type === 'feature' ? '✨' : ann.type === 'billing' ? '💳' : '🔧';
+                        return (
+                            <div key={ann.id} style={{
+                                background: `${color}12`,
+                                border: `1px solid ${color}35`,
+                                borderRadius: 8,
+                                padding: '10px 16px',
+                                marginBottom: 12,
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                justifyContent: 'space-between',
+                                gap: 12,
+                            }}>
+                                <div className="flex items-start gap-sm">
+                                    <span>{icon}</span>
+                                    <div>
+                                        <strong style={{ fontSize: 13, color }}>{ann.title}</strong>
+                                        <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{ann.body}</p>
+                                    </div>
+                                </div>
+                                {!isUrgent && (
+                                    <button
+                                        onClick={() => setDismissedAnnIds((s) => new Set([...s, ann.id]))}
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16, padding: 0, flexShrink: 0 }}
+                                    >
+                                        ×
+                                    </button>
+                                )}
+                            </div>
+                        );
+                    })}
+
                 {/* Maintenance mode banner */}
                 {maintenance?.enabled && !bannerDismissed && (
                     <div style={{

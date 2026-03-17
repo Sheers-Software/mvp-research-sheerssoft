@@ -19,7 +19,7 @@ from app.auth import require_superadmin
 from app.models import (
     Tenant, Property, User, TenantMembership,
     Conversation, Lead, SupportTicket, Application,
-    OnboardingProgress,
+    OnboardingProgress, Announcement,
 )
 from app.schemas import (
     TenantResponse, TenantUpdateRequest,
@@ -806,3 +806,108 @@ async def update_application(
     await db.commit()
 
     return {"message": "Application updated.", "app_id": app_id}
+
+
+# ─────────────────────────────────────────────────────────────
+# Announcements
+# ─────────────────────────────────────────────────────────────
+
+_VALID_TYPES = {"maintenance", "incident", "feature", "billing"}
+_VALID_STATUSES = {"draft", "scheduled", "active", "resolved", "archived"}
+_VALID_TARGET_TYPES = {"all", "tier", "tenant"}
+
+
+@router.post("/superadmin/announcements", status_code=201)
+async def create_announcement(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(require_superadmin),
+):
+    """Create a new announcement. Set status='active' to make it immediately visible to tenants."""
+    ann_type = body.get("type", "")
+    if ann_type not in _VALID_TYPES:
+        raise HTTPException(400, f"type must be one of {sorted(_VALID_TYPES)}")
+
+    target_type = body.get("target_type", "all")
+    if target_type not in _VALID_TARGET_TYPES:
+        raise HTTPException(400, f"target_type must be one of {sorted(_VALID_TARGET_TYPES)}")
+
+    ann = Announcement(
+        type=ann_type,
+        status=body.get("status", "draft"),
+        title=str(body.get("title", "")).strip(),
+        body=str(body.get("body", "")).strip(),
+        target_type=target_type,
+        target_tier=body.get("target_tier"),
+        target_tenant_id=uuid.UUID(body["target_tenant_id"]) if body.get("target_tenant_id") else None,
+        scheduled_at=body.get("scheduled_at"),
+        send_email=bool(body.get("send_email", False)),
+        created_by=admin.id,
+    )
+    db.add(ann)
+    await db.commit()
+    await db.refresh(ann)
+    logger.info("Announcement created", id=str(ann.id), type=ann.type, status=ann.status)
+    return _ann_dict(ann)
+
+
+@router.get("/superadmin/announcements")
+async def list_announcements(
+    status: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(require_superadmin),
+):
+    """List all announcements (admin view, all statuses by default)."""
+    stmt = select(Announcement).order_by(Announcement.created_at.desc())
+    if status:
+        stmt = stmt.where(Announcement.status == status)
+    result = await db.execute(stmt)
+    return [_ann_dict(a) for a in result.scalars().all()]
+
+
+@router.patch("/superadmin/announcements/{ann_id}")
+async def update_announcement(
+    ann_id: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(require_superadmin),
+):
+    """Update an announcement. Pass status='active'|'resolved'|'archived' to change lifecycle."""
+    ann = await db.get(Announcement, uuid.UUID(ann_id))
+    if not ann:
+        raise HTTPException(404, "Announcement not found")
+
+    for field in ("title", "body", "type", "target_type", "target_tier", "scheduled_at", "send_email"):
+        if field in body:
+            setattr(ann, field, body[field])
+
+    if "status" in body:
+        new_status = body["status"]
+        if new_status not in _VALID_STATUSES:
+            raise HTTPException(400, f"status must be one of {sorted(_VALID_STATUSES)}")
+        ann.status = new_status
+        if new_status == "resolved" and not ann.resolved_at:
+            ann.resolved_at = datetime.now(timezone.utc)
+
+    ann.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(ann)
+    return _ann_dict(ann)
+
+
+def _ann_dict(ann: Announcement) -> dict:
+    return {
+        "id": str(ann.id),
+        "type": ann.type,
+        "status": ann.status,
+        "title": ann.title,
+        "body": ann.body,
+        "target_type": ann.target_type,
+        "target_tier": ann.target_tier,
+        "target_tenant_id": str(ann.target_tenant_id) if ann.target_tenant_id else None,
+        "scheduled_at": ann.scheduled_at.isoformat() if ann.scheduled_at else None,
+        "resolved_at": ann.resolved_at.isoformat() if ann.resolved_at else None,
+        "send_email": ann.send_email,
+        "created_at": ann.created_at.isoformat(),
+        "updated_at": ann.updated_at.isoformat(),
+    }
