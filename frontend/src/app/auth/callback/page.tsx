@@ -68,7 +68,8 @@ export default function AuthCallbackPage() {
                     headers: { Authorization: `Bearer ${access_token}` },
                 });
                 const user = await profileRes.json();
-                router.replace(user.is_superadmin ? '/admin' : '/dashboard');
+                // Full reload so AuthProvider re-reads the token from localStorage
+                window.location.replace(user.is_superadmin ? '/admin' : '/dashboard');
             } catch (err: any) {
                 setError(err.message || 'Sign-in failed. Please request a new magic link.');
             }
