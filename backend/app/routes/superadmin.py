@@ -109,6 +109,45 @@ async def update_scheduler_config(
 
 
 # ─────────────────────────────────────────────────────────────
+# Maintenance Mode
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/superadmin/maintenance")
+async def get_maintenance(
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(require_superadmin),
+):
+    """Return current maintenance mode state."""
+    from app.services.system_config import get_maintenance_config
+    return await get_maintenance_config(db)
+
+
+@router.put("/superadmin/maintenance")
+async def set_maintenance(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(require_superadmin),
+):
+    """
+    Set maintenance mode. Body: {enabled: bool, message: str, eta: str|null}
+    When enabled, all non-admin channel and API requests receive a 503 with
+    the maintenance message. The /admin and /api/v1/internal/* paths are exempt.
+    """
+    from app.services.system_config import set_maintenance_config
+    config = {
+        "enabled": bool(body.get("enabled", False)),
+        "message": str(body.get("message", "")) or "Scheduled maintenance in progress. We'll be back shortly.",
+        "eta": body.get("eta"),  # ISO8601 string or null
+    }
+    await set_maintenance_config(config, db)
+    # Bust the in-process cache so the middleware picks up the change immediately
+    from app.middleware import _maintenance_cache
+    _maintenance_cache["expires_at"] = 0.0
+    logger.info("Maintenance mode updated", enabled=config["enabled"], eta=config["eta"])
+    return config
+
+
+# ─────────────────────────────────────────────────────────────
 # Tenant Management
 # ─────────────────────────────────────────────────────────────
 

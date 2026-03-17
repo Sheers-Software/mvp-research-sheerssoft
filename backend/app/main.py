@@ -103,8 +103,9 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-from app.middleware import TelemetryMiddleware
+from app.middleware import TelemetryMiddleware, MaintenanceModeMiddleware
 app.add_middleware(TelemetryMiddleware)
+app.add_middleware(MaintenanceModeMiddleware)
 
 # CORS — allow all origins in dev, restrict in production
 if settings.is_production:

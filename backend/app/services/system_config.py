@@ -90,3 +90,33 @@ async def is_job_enabled(job_name: str, db: AsyncSession) -> bool:
     """Check if a specific scheduler job is enabled."""
     config = await get_jobs_config(db)
     return bool(config.get(job_name, True))
+
+
+# ─────────────────────────────────────────────────────────────
+# Maintenance Mode
+# ─────────────────────────────────────────────────────────────
+
+MAINTENANCE_KEY = "maintenance_mode"
+
+_DEFAULT_MAINTENANCE = {"enabled": False, "message": "", "eta": None}
+
+
+async def get_maintenance_config(db: AsyncSession) -> dict:
+    """Return the current maintenance mode config."""
+    from app.models import SystemConfig
+    row = await db.get(SystemConfig, MAINTENANCE_KEY)
+    if row:
+        return dict(row.value)
+    return _DEFAULT_MAINTENANCE.copy()
+
+
+async def set_maintenance_config(config: dict, db: AsyncSession):
+    """Update maintenance mode config."""
+    from app.models import SystemConfig
+    row = await db.get(SystemConfig, MAINTENANCE_KEY)
+    if row:
+        row.value = config
+        row.updated_at = datetime.now(timezone.utc)
+    else:
+        db.add(SystemConfig(key=MAINTENANCE_KEY, value=config))
+    await db.commit()

@@ -19,11 +19,19 @@ interface PropertyInfo {
     name: string;
 }
 
+interface MaintenanceInfo {
+    enabled: boolean;
+    message: string;
+    eta: string | null;
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { user, loading, logout } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
     const [property, setProperty] = useState<PropertyInfo | null>(null);
+    const [maintenance, setMaintenance] = useState<MaintenanceInfo | null>(null);
+    const [bannerDismissed, setBannerDismissed] = useState(false);
 
     useEffect(() => {
         if (!loading && !user) {
@@ -39,9 +47,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     setProperty({ id: data.property_id, name: data.property_name });
                 }
             })
-            .catch(() => {
-                // Try to get from the first property in the user's scope
-            });
+            .catch(() => {});
+    }, []);
+
+    useEffect(() => {
+        // Poll for maintenance mode — check on load and every 60s
+        const checkMaintenance = () => {
+            apiGet<any>('/system/info')
+                .then((info) => {
+                    if (info?.maintenance) {
+                        setMaintenance(info.maintenance);
+                        // Re-show banner if maintenance just became active
+                        if (info.maintenance.enabled) setBannerDismissed(false);
+                    }
+                })
+                .catch(() => {});
+        };
+        checkMaintenance();
+        const interval = setInterval(checkMaintenance, 60000);
+        return () => clearInterval(interval);
     }, []);
 
     if (loading) {
@@ -98,6 +122,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </aside>
 
             <main className="main-content">
+                {/* Maintenance mode banner */}
+                {maintenance?.enabled && !bannerDismissed && (
+                    <div style={{
+                        background: 'rgba(245, 158, 11, 0.12)',
+                        border: '1px solid rgba(245, 158, 11, 0.35)',
+                        borderRadius: 8,
+                        padding: '10px 16px',
+                        marginBottom: 20,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                    }}>
+                        <div className="flex items-center gap-sm">
+                            <span>🔧</span>
+                            <span style={{ fontSize: 13, color: 'var(--warning)' }}>
+                                <strong>Scheduled maintenance:</strong>{' '}
+                                {maintenance.message || 'Platform maintenance in progress.'}
+                                {maintenance.eta && ` Expected completion: ${maintenance.eta}`}
+                            </span>
+                        </div>
+                        <button
+                            onClick={() => setBannerDismissed(true)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16, padding: 0 }}
+                        >
+                            ×
+                        </button>
+                    </div>
+                )}
                 {children}
             </main>
         </div>

@@ -209,16 +209,19 @@ async def get_integrations(
 
 @router.get("/system/info")
 async def get_system_info(
-    token: dict = Depends(verify_jwt),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Get system environment info."""
+    """Get system environment info. No auth required — used by frontend layout for maintenance polling."""
     from app.config import get_settings
+    from app.services.system_config import get_maintenance_config
     s = get_settings()
+    maintenance = await get_maintenance_config(db)
     return {
         "environment": s.environment,
         "is_demo": s.is_demo,
         "is_production": s.is_production,
         "channels_are_live": s.channels_are_live,
+        "maintenance": maintenance,
     }
 
 
