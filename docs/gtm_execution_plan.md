@@ -1,7 +1,7 @@
 # Go-to-Market Execution Plan
 ## Nocturn AI — From Build to First Paying Customer
-### Version 1.0 · 17 Mar 2026
-### Cross-referenced with: product_gap.md, prd.md v2.0, opportunity_2_playbook.md, gap_analysis.md, alignment.md, building-successful-saas-guide.md
+### Version 1.1 · 18 Mar 2026
+### Cross-referenced with: product_gap.md, prd.md v2.0, opportunity_2_playbook.md, gap_analysis.md, alignment.md, building-successful-saas-guide.md, portal_architecture.md, auth_rbac_plan.md
 
 ---
 
@@ -31,14 +31,33 @@ Every task in this plan is evaluated against this constraint. If a task does not
 
 | Phase | Name | Duration | Outcome |
 |-------|------|----------|---------|
-| **0** | Fix the Gaps | Days 1–5 | Product matches the pitch |
-| **1** | Activate Vivatel | Days 6–12 | Pilot is live with real guests |
+| **0** | Fix the Gaps | Days 1–5 | Product matches the pitch; demo-ready |
+| **1** | Activate Vivatel | Days 6–12 | Pilot live with real guests |
+| **1.5** | Internal Controls | Days 10–20 | SheersSoft can operate multi-tenant safely |
 | **2** | Capture the Evidence | Days 13–30 | Numbers in hand |
 | **3** | Convert to Paid | Days 28–35 | First invoice issued |
-| **4** | Replicate the Pilot | Days 35–60 | 3 more properties live |
-| **5** | Close to 10 | Days 55–90 | RM 15,000–30,000 MRR |
+| **4** | Replicate the Pilot | Days 35–60 | 3 more properties; tenant self-service live |
+| **5** | Close to 10 | Days 55–90 | RM 15,000–30,000 MRR; portal fully operational |
 
 These phases overlap intentionally. Sales conversations happen during Phase 1. Marketing updates happen before Phase 3. Nothing waits for "the right time."
+
+---
+
+## Portal Architecture — GTM Alignment
+
+The platform has three distinct portals (see `docs/portal_architecture.md`). Each unlocks a different GTM capability:
+
+| Portal | Path | Who Uses It | GTM Gate |
+|--------|------|-------------|----------|
+| **Property Operations** | `/dashboard` | Hotel staff (daily use) | Phase 0 — must be right before any demo |
+| **Internal Ops** | `/admin` | SheersSoft team | Phase 1.5 — needed before multi-tenant scale |
+| **Tenant Management** | `/portal` | Hotel owners/admins | Phase 4 — enables self-service onboarding |
+| **Onboarding Wizard** | `/welcome` | New hotel owners | Phase 4 — replaces manual SheersSoft-led setup |
+
+**Implication for sequencing:**
+- Phase 0–3 live entirely on `/dashboard`. Get that right first.
+- Phase 1.5 adds maintenance mode and health monitoring to `/admin`. Operational necessity before having 2+ live tenants.
+- Phase 4 is when `/portal` and `/welcome` become revenue-multipliers: each new tenant self-serves in 48 hours instead of requiring a SheersSoft engineer session.
 
 ---
 
@@ -338,6 +357,62 @@ Document answers verbatim. This is primary research for the case study.
 
 ---
 
+## Phase 1.5: Internal Controls
+### Days 10–20 · Owner: Ahmad Basyir (Dev) · Goal: SheersSoft can operate multi-tenant safely
+
+> **Why this exists:** Running a live pilot with real hotel guests is different from running a demo. Things break. APIs go down. Bad AI responses happen. Without operational controls, your only option is to call Zul personally and explain why the AI told a guest the wrong rate. That is not a scalable business.
+
+---
+
+### Task I1.1 — Maintenance Mode Toggle
+**Effort:** 1 day (backend + admin UI)
+
+Add a maintenance mode toggle to `/admin/system`. When enabled:
+- Channel webhooks respond with a canned message to guests (not an error)
+- Tenant dashboards show a maintenance banner with ETA
+- `/admin` stays accessible to SheersSoft team
+
+**Backend:** `PUT /api/v1/superadmin/maintenance` writing to `system_config` table. Middleware check on all non-admin routes. See `docs/portal_architecture.md` Section 4.3.
+
+**Use case:** Supabase free tier goes into maintenance, or a bad deployment needs a 10-minute rollback window. Instead of Vivatel guests getting 500 errors, they get: "Our reservation system is undergoing scheduled maintenance. We'll be back shortly."
+
+---
+
+### Task I1.2 — Service Health Dashboard
+**Effort:** 2 days
+
+Build `/admin/health`. Show live status of: PostgreSQL, Redis, Supabase Auth, Gemini, OpenAI, Anthropic, SendGrid, WhatsApp API, Stripe. Color-coded (green/amber/red), latency readout, last-checked time.
+
+**Backend:** `GET /api/v1/superadmin/service-health` — parallel asyncio checks, 3s timeout per service, 20s cache.
+
+**Use case:** Gemini degrades at 2pm on a Tuesday. You know before Vivatel's front desk notices the AI is slow. You have a 5-minute head start to investigate or activate maintenance mode.
+
+---
+
+### Task I1.3 — Announcements System
+**Effort:** 3 days (backend + admin composer + tenant banner)
+
+Build the ability to notify all tenants (or specific ones) of planned maintenance, incidents, or new features — via in-app banner.
+
+1. `POST /api/v1/superadmin/announcements` — create
+2. `GET /api/v1/announcements/active` — tenant-scoped fetch
+3. `/admin/announcements` — composer UI (title, body, type, target, schedule)
+4. `/dashboard/layout.tsx` — banner strip (dismissable, re-appears for maintenance type)
+
+**Data model:** `announcements` table (see `docs/portal_architecture.md` Section 4.4).
+
+**Use case:** Before taking the system down for a 30-minute maintenance window, SheersSoft creates an announcement. All logged-in hotel staff see a yellow banner: "Scheduled maintenance tonight 11pm–11:30pm MYT. All conversations will resume automatically." Professional. No personal WhatsApp calls needed.
+
+---
+
+### Phase 1.5 Exit Criteria
+
+- Maintenance mode toggle works: flip to ON in `/admin/system`, send a WhatsApp test message, verify canned response arrives
+- Health dashboard shows green for all live services
+- Create a test announcement, verify it appears as a banner in `/dashboard`
+
+---
+
 ## Phase 2: Capture the Evidence
 ### Days 13–30 · Owner: Ahmad Basyir (Product + Sales) · Goal: Data that sells the next customer
 
@@ -569,6 +644,13 @@ Document everything that was learned from Vivatel:
 **Target:** Second property should go live in 48 hours from KB handoff. Vivatel took longer because you were learning. The process is now documented.
 
 **Create:** `docs/onboarding_playbook_internal.md` — SheersSoft internal use only. This is the operations manual.
+
+**Portal readiness check:** By Phase 4, the following must be live or the second onboarding still requires a SheersSoft engineer for every step:
+- `/portal/kb/[propertyId]` — tenant can upload/edit their own KB (eliminates 90-minute KB session dependency)
+- `/welcome` onboarding wizard — guides new property owner through KB → channel → team → go-live without a call
+- `/admin` maintenance mode — SheersSoft can gracefully pause the platform if something breaks during a new onboarding without alarming existing tenants
+
+**If these are not live by Phase 4**, fall back to admin scripts for KB ingestion. Do not delay the second pilot for portal completeness.
 
 ---
 
@@ -883,13 +965,25 @@ These activities consume time without moving toward the first invoice. Stop them
 | Activity | Why to Stop |
 |----------|-------------|
 | Working on Stripe billing integration | Manual invoicing works for 10 properties. Stripe is for 50+. |
-| Building the Supabase Auth flow | You are provisioning accounts manually. Self-serve signup is not needed yet. |
-| Improving the SuperAdmin dashboard | You are the only superadmin. Use scripts. |
+| Building the Supabase Auth flow (self-serve signup) | You are provisioning accounts manually. Self-serve signup is not needed yet. |
+| Building staff RBAC / `staff_tier` permission system | Zero tenants to enforce permissions for. Build when a tenant asks for it. |
+| Building the `/portal` tenant management layer | Use admin scripts until Phase 4. Do not build self-service for 1 tenant. |
+| Building the `/welcome` onboarding wizard | Manual onboarding is fine for 3 pilots. Build when it bottlenecks Phase 4. |
 | Building the support chatbot | Zero support tickets. Build when you have customers who need support. |
 | Optimizing the application intake form | Zero inbound traffic to justify it. Build when marketing drives leads. |
 | Adding new AI capabilities (voice, image, etc.) | Customers haven't asked. Fix what's broken before adding what's new. |
 | Refactoring existing code | Ship, then refactor. Not the reverse. |
 | Exploring Opportunity #1 (F&B Intelligence) | Right direction, wrong timing. Get 5 paying customers on Opp #2 first. |
+
+**What IS worth building now (internal portal — Phase 1.5):**
+
+| Activity | Why It Belongs Now |
+|----------|-------------------|
+| Maintenance mode toggle (`/admin/system`) | You need a graceful way to pause the platform without alarming Vivatel's guests mid-conversation |
+| Service health dashboard (`/admin/health`) | You need to know before Vivatel does when Supabase/Gemini/WhatsApp is degraded |
+| Announcements system | When scheduled maintenance is needed, you need a way to tell tenants via in-app banner — not a personal WhatsApp message |
+
+These are SheersSoft **operational tools**, not customer-facing features. They protect the quality of the pilot and every subsequent relationship. Build them between Vivatel going live and onboarding the second property.
 
 ---
 
