@@ -158,10 +158,24 @@ Onboarding progress score (0–100) computed from milestone flags, surfaced at `
 
 ### Authentication & Authorization
 
-- **SuperAdmin** (`require_superadmin()`): checks `User.is_superadmin`; protects all `/superadmin` routes
+**Current state (v0.3.0 — functional but incomplete, see `docs/auth_rbac_plan.md` for full plan):**
+
+- **SuperAdmin** (`require_superadmin()`): checks `User.is_superadmin`; protects all `/superadmin` and `/onboarding` routes. Intended for SheersSoft internal staff only.
 - **Tenant access** (`check_tenant_access()`): verifies `TenantMembership`; `is_superadmin` bypasses check
 - **Property access** (`check_property_access()`): legacy JWT property_id matching
-- **Supabase Auth**: Optional — gracefully skips if `SUPABASE_URL`/`SERVICE_ROLE_KEY` not set; local `User` record always created
+- **Supabase Auth**: Magic link via `POST /auth/v1/magiclink?redirect_to=...` → PKCE code exchange at `/auth/callback` (supabase-js) → backend issues own JWT via `POST /auth/supabase-callback`
+
+**User planes — intended separation:**
+1. **SheersSoft System Admin** (`is_superadmin=True`) → `/admin` portal
+2. **Tenant Owner/Admin** (`TenantMembership.role=owner|admin`) → `/portal` (not yet built)
+3. **Property Staff** (`TenantMembership.role=staff`) → `/dashboard`
+4. **First-time invited user** (no membership yet) → `/welcome` onboarding wizard (not yet built)
+
+**Known security gaps (P0 before first real client):**
+- `SUPERADMIN_EMAILS` is currently in `cloudbuild.yaml` (should be in Secret Manager, not in repo)
+- Legacy `admin/password123` hardcoded in config — development only, must be removed before client onboarding
+- Auto-provisioning of unknown emails should be gated to invitation-only (currently creates a user record for any valid Supabase auth)
+- `staff_tier` granularity within `role=staff` not yet implemented (manager vs revenue vs ops)
 
 ### Support Chatbot
 
