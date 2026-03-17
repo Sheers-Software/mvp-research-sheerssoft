@@ -1,6 +1,6 @@
 # Product Gap Analysis
 ## Nocturn AI — What to Build, What to Drop, How to Get Paid
-### Version 1.1 · 18 Mar 2026
+### Version 1.2 · 18 Mar 2026
 ### Cross-referenced with: prd.md v2.0, portal_architecture.md, gtm_execution_plan.md, workflow_zero_to_paid.md, revenue_methodology.md
 
 ---
@@ -19,7 +19,7 @@
 | FERNET encryption key | ❌ Not in Secret Manager |
 | BM end-to-end test (50 questions) | ❌ Not run |
 | Vivatel KB population | ❌ Requires Zul session |
-| Service health dashboard | ❌ Not built — Phase 1.5 next |
+| Service health dashboard (`/admin/health`) | ✅ Done — Phase 1.5 I1.2 |
 | Announcements system | ❌ Not built — Phase 1.5 |
 | `/portal` tenant management layer | ❌ Not built — Phase 4 |
 | `/welcome` onboarding wizard | ❌ Not built — Phase 4 |
@@ -144,7 +144,7 @@ These protect the quality of the pilot and all subsequent relationships. Build w
 | Feature | Status | Priority | Effort |
 |---------|--------|----------|--------|
 | Maintenance mode | ✅ Done | — | — |
-| Service health dashboard (`/admin/health`) | ❌ Not built | **Next** | 2 days |
+| Service health dashboard (`/admin/health`) | ✅ Done | — | — |
 | Announcements system (backend + admin + tenant banner) | ❌ Not built | After health | 3 days |
 
 ---
@@ -247,4 +247,4 @@ Cost Savings = AI-handled inquiries × 0.25 hrs × RM 25/hr
 
 ---
 
-*v1.1 update: Obstacles A, B, and the Lost filter are resolved. Remaining blockers are infra tasks (2h) and field work (1.5 days) — no product code blocks the pilot. Phase 1.5 internal controls in progress.*
+*v1.2 update: Maintenance mode (I1.1) and service health dashboard (I1.2) complete. Phase 1.5 is 2/3 done — only announcements system (I1.3) remaining. Remaining pilot blockers are infra tasks (2h) and field work (1.5 days) — no product code blocks the pilot.*

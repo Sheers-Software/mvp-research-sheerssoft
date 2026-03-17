@@ -1,8 +1,9 @@
 # System Architecture
 ## Nocturn AI — AI Inquiry Capture & Conversion Engine
-### Version 2.0 · 17 Mar 2026
+### Version 2.1 · 18 Mar 2026
 ### Aligned with [product_context.md](./product_context.md) · Steered by [building-successful-saas-guide.md](./building-successful-saas-guide.md)
-### Implementation Status: v0.3.0 live on GCP Cloud Run · Backend: `https://nocturn-backend-owtn645vea-as.a.run.app`
+### Cross-referenced with: [portal_architecture.md](./portal_architecture.md), [prd.md](./prd.md) v2.1
+### Implementation Status: v0.3.2 live on GCP Cloud Run · Backend: `https://nocturn-backend-owtn645vea-as.a.run.app`
 
 ---
 
@@ -179,9 +180,22 @@ Design the API as if external customers will use it from day one. This forces go
 
 ---
 
-## 4.5 Dormant SaaS Infrastructure (Built Ahead of Validation — Not Activated in v1)
+## 4.5 SaaS Infrastructure — Activation Status
 
-> **Status:** Code exists, routes are registered, but these features are **not in the v1 customer scope**. They were built speculatively beyond what 8 market interviews validated. Do not activate until release conditions in PRD Section 9.2 are met.
+> **Status:** Multi-tenant SaaS hierarchy is built. The SheersSoft internal portal (`/admin`) is now active. The tenant self-service portals (`/portal`, `/welcome`) are not yet built. Do not activate customer-facing features until release conditions in PRD Section 9.2 are met. Full portal spec: [portal_architecture.md](./portal_architecture.md).
+
+### Four-Portal Architecture
+
+The frontend is structured as four distinct route groups in a single Next.js app:
+
+| Portal | Route | Users | GTM Phase |
+|--------|-------|-------|-----------|
+| **Property Operations** | `/dashboard` | Hotel staff (daily use) | Phase 0 — must be right before any demo |
+| **Internal Ops** | `/admin` | SheersSoft team only | Phase 1.5 — operational controls before multi-tenant scale |
+| **Tenant Management** | `/portal` | Hotel owners/admins | Phase 4 — tenant self-service onboarding |
+| **Onboarding Wizard** | `/welcome` | New hotel owners (first login) | Phase 4 — replaces manual SheersSoft-led setup |
+
+Security boundary is enforced at the API level: `require_superadmin()` for `/admin`, `check_tenant_access()` for `/portal`, `check_property_access()` for `/dashboard`. Route separation is cosmetic until the client list grows.
 
 The original design targeted a single-property pilot (Vivatel). Separately, the system was extended with a full multi-tenant SaaS hierarchy. This section documents what exists but is dormant.
 
@@ -217,11 +231,21 @@ SuperAdmin → POST /api/v1/onboarding/provision-tenant
 
 ### Authorization Layers
 
-| Guard | Scope | Active in v1? | Used In |
-|-------|-------|---------------|---------|
-| `require_superadmin()` | SheersSoft staff only | ⚠️ Internal use only | `/superadmin` routes |
-| `check_tenant_access()` | TenantMembership, is_superadmin bypasses | ❌ Dormant | Tenant-level routes |
-| `check_property_access()` | JWT property_id matching | ✅ Active | Property data routes |
+| Guard | Scope | Status | Used In |
+|-------|-------|--------|---------|
+| `require_superadmin()` | SheersSoft staff only (`a.basyir@sheerssoft.com`) | ✅ Active | All `/superadmin` routes, `/admin` portal |
+| `check_tenant_access()` | TenantMembership, is_superadmin bypasses | ⚠️ Partially active — used in onboarding routes; full enforcement deferred to Phase 4 `/portal` | Tenant-level routes |
+| `check_property_access()` | JWT property_id matching | ✅ Active | All property data routes (`/dashboard`) |
+
+**Auth callback routing (target state — full implementation in Phase 4):**
+```
+is_superadmin=True          →  /admin
+role=owner, onboarding=false →  /welcome
+role=owner, onboarding=true  →  /portal
+role=admin                   →  /portal
+role=staff                   →  /dashboard
+```
+Current: `is_superadmin → /admin`, else → `/dashboard`. Full routing requires `onboarding_completed` flag on `User` (data model change — Phase 4).
 
 ### Internal Scheduler (Production)
 
@@ -445,7 +469,7 @@ sequenceDiagram
     S-->>G: "Hi! I'm [Name] from reservations.<br/>I can see you're looking for..."
 ```
 
-> **⚠️ v1 Gap — Staff Reply from Dashboard Not Implemented.** The dashboard shows the handoff queue and conversation history. However, staff cannot yet send a reply message directly from the dashboard UI. Staff must reply via the original channel (e.g., WhatsApp on their phone) after being notified. This is the #2 critical gap for v1 completion.
+> **✅ Staff reply from dashboard is implemented.** Staff can type a reply in `/dashboard/conversations` and send it to the guest via the original channel (WhatsApp or web widget). Implemented in `backend/app/routes/staff.py` → `POST /api/v1/conversations/{id}/reply`. Done in v0.3.1.
 
 ### 6.3 After-Hours Detection
 
@@ -569,6 +593,37 @@ GET    /api/v1/properties/{id}/reports           # Generated reports list
 
 # ─── Health ───────────────────────────────────────
 GET    /api/v1/health                            # Liveness + dependency check
+
+# ─── Staff Conversations (Dashboard) ──────────────
+GET    /api/v1/properties/{id}/conversations     # List conversations
+GET    /api/v1/conversations/{id}                # Conversation detail + messages
+POST   /api/v1/conversations/{id}/reply          # Staff sends reply (forwarded to guest channel) ✅
+POST   /api/v1/conversations/{id}/takeover       # Staff takes over from AI
+POST   /api/v1/conversations/{id}/resolve        # Staff resolves conversation
+
+# ─── System Info (public — polled by frontend) ────
+GET    /api/v1/system/info                       # Environment flags + maintenance mode state ✅
+
+# ─── Internal Scheduler (Cloud Scheduler → backend, X-Internal-Secret) ─
+POST   /api/v1/internal/run-daily-report
+POST   /api/v1/internal/run-followups
+POST   /api/v1/internal/run-insights
+POST   /api/v1/internal/cleanup-leads
+
+# ─── SuperAdmin (SheersSoft internal — require_superadmin) ───────────────
+GET    /api/v1/superadmin/metrics                # Platform-wide KPIs ✅
+GET    /api/v1/superadmin/tenants                # Tenant list ✅
+GET    /api/v1/superadmin/tenants/{id}           # Tenant detail ✅
+PUT    /api/v1/superadmin/tenants/{id}           # Update tenant ✅
+GET    /api/v1/superadmin/scheduler-config       # Scheduler job toggle states ✅
+PUT    /api/v1/superadmin/scheduler-config       # Update scheduler job states ✅
+GET    /api/v1/superadmin/maintenance            # Get maintenance mode state ✅
+PUT    /api/v1/superadmin/maintenance            # Toggle maintenance mode + message + eta ✅
+GET    /api/v1/superadmin/service-health         # Parallel health check of all 9 external services ✅
+POST   /api/v1/superadmin/announcements          # Create announcement          [Phase 1.5 I1.3]
+GET    /api/v1/superadmin/announcements          # List all announcements       [Phase 1.5 I1.3]
+PATCH  /api/v1/superadmin/announcements/{id}     # Update/resolve announcement  [Phase 1.5 I1.3]
+GET    /api/v1/announcements/active              # Active announcements (tenant-scoped) [Phase 1.5 I1.3]
 ```
 
 ### 8.2 Authentication Model
@@ -664,6 +719,8 @@ Attach a Cloud Build GitHub trigger on `main` for automatic deploys.
 - **Input sanitization**: All guest messages sanitized before LLM prompt injection (strip special tokens, limit length).
 - **PII handling**: Guest phone/email encrypted at field level using Fernet symmetric encryption. Decrypted only at display time. ⚠️ `FERNET_ENCRYPTION_KEY` not yet in GCP Secret Manager — PII encryption is bypassed until this secret is added. Add before first paying tenant.
 - **API key rotation**: Property API keys can be rotated without downtime.
+- **Maintenance mode**: `MaintenanceModeMiddleware` in `app/middleware.py` intercepts all requests when `maintenance_mode.enabled = true` in `system_config`. Returns HTTP 503 with JSON to guests. Exempt: `/api/v1/superadmin/*`, `/api/v1/internal/*`, `/api/v1/system/info`, `/health`. In-process 30s TTL cache; cache busted immediately on toggle. Activated from `/admin/system`.
+- **Superadmin restriction**: `SUPERADMIN_EMAILS` is an explicit comma-separated allowlist (no domain wildcards). Bidirectional sync on every login — users removed from the list are immediately downgraded on next login.
 
 ### 10.3 Backup & Disaster Recovery
 

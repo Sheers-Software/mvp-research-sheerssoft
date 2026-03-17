@@ -1,7 +1,8 @@
 # Product Requirements Document (PRD)
 ## Nocturn AI — AI Inquiry Capture & Conversion Engine
-### Version 2.0 · 17 Mar 2026
+### Version 2.1 · 18 Mar 2026
 ### Aligned with [product_context.md](./product_context.md) · Ground truth: [opportunity_2_playbook.md](./opportunity_2_playbook.md)
+### Cross-referenced with: [portal_architecture.md](./portal_architecture.md), [product_gap.md](./product_gap.md), [gtm_execution_plan.md](./gtm_execution_plan.md)
 
 ---
 
@@ -126,8 +127,8 @@ Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct
 | **Triggers** | Guest requests human. AI confidence below threshold. Complaint detected. Complex booking (group, event). |
 | **Behavior** | AI acknowledges → publishes to Redis → dashboard shows conversation in `handed_off` status → staff clicks "Take Over" → staff sees full message history and lead data. |
 | **After-Hours** | *"Our team will follow up first thing tomorrow morning."* Lead is flagged as priority follow-up. |
-| **Current Gap** | Staff view full context from the dashboard but **reply to the guest on the original channel** (WhatsApp, email). There is no in-dashboard reply input yet. This is a v1 gap — see Section 4.1.1. |
-| **Acceptance Criteria** | Staff sees full conversation context and captured lead data. Staff can mark conversation resolved from dashboard. *(In-dashboard reply is a pending v1 deliverable — not yet met.)* |
+| **Staff Reply** | Staff can reply to guest directly from the `/dashboard/conversations` view. Reply is forwarded to the guest via the original channel (WhatsApp or web widget). Implemented via `POST /api/v1/conversations/{id}/reply`. ✅ Done in v0.3.1. |
+| **Acceptance Criteria** | Staff sees full conversation context and captured lead data. Staff can send reply from dashboard. Staff can mark conversation resolved from dashboard. |
 
 #### F7: After-Hours Recovery Dashboard
 | Attribute | Detail |
@@ -153,15 +154,17 @@ Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct
 
 ---
 
-### 4.1.1 Known Gaps — Must Fix Before Pilot Go-Live
+### 4.1.1 Known Gaps — Status as of v2.1
 
-| # | Gap | Impact | Fix Required |
-|---|-----|--------|--------------|
-| 1 | **Dashboard home shows onboarding checklist, not revenue KPIs** | GM logs in and sees a milestone tracker instead of recovered revenue. Violates Design Principle #5 and F7. The product's retention hook doesn't fire. | `/dashboard` home must show revenue KPI cards first. Redirect to `/dashboard/analytics` post-setup, or embed KPIs inline. This is the single most important fix before the pilot. |
-| 2 | **Staff cannot reply to guest from dashboard** | Handoff transfers context but reply happens outside the product (WhatsApp app, email client). The "same thread" experience is broken. | Add staff reply text input to the conversations page that sends via the correct channel adapter. |
-| 3 | **Daily email non-functional in production** | The GM morning report — the product's primary retention mechanism — is silent. GMs who don't log in daily will silently disengage. | Add `SENDGRID_API_KEY` to GCP Secret Manager. Create Cloud Scheduler `run-daily-report` job. |
-| 4 | **"Lost" status missing from leads UI** | Churned leads are invisible. The team cannot track why leads fail to convert, making churn analysis impossible. | Add Lost filter tab. Allow staff to mark a lead Lost with a required reason field. |
-| 5 | **Bilingual AI not formally tested** | BM/Manglish support is claimed but untested. A pilot hotel testing in Bahasa Malaysia could encounter failures that immediately destroy trust. | Build 50-question BM/Manglish test suite. Run against current model before 1st pilot go-live. Document pass rate. If below 80%, implement language fallback before pilot. Re-run before each subsequent property onboarded. |
+| # | Gap | Status | Fix |
+|---|-----|--------|-----|
+| 1 | **Dashboard home shows onboarding checklist, not revenue KPIs** | ✅ **RESOLVED** — `/dashboard` home shows revenue KPI cards (inquiries, after-hours, leads, estimated revenue recovered). Rebuilt in v0.3.1. | — |
+| 2 | **Staff cannot reply to guest from dashboard** | ✅ **RESOLVED** — Staff reply input live in `/dashboard/conversations`. Replies forwarded to guest via original channel (WhatsApp/web). v0.3.1. | — |
+| 3 | **Daily email non-functional in production** | ❌ **OUTSTANDING** — `SENDGRID_API_KEY` missing from GCP Secret Manager. Cloud Scheduler `run-daily-report` job not created. This is the highest remaining infra task before pilot go-live. | Add `SENDGRID_API_KEY` to Secret Manager. Create 4 Cloud Scheduler jobs. ~2h. |
+| 4 | **"Lost" status missing from leads UI** | ✅ **RESOLVED** — Lost filter tab live in `/dashboard/leads`. Staff can mark leads lost. v0.3.1. | — |
+| 5 | **Bilingual AI not formally tested** | ❌ **OUTSTANDING** — BM/Manglish support is live but the 50-question test suite has not been run. Must pass ≥80% before pilot go-live. | Run 50-question suite (see `docs/bm_test_suite.md`) via Twilio sandbox → Vivatel test number. Half-day field work. |
+
+**Summary: 3 of 5 gaps resolved. Remaining:** daily email infra (P0.3) and BM test (P0.6). No product code outstanding for P0.
 
 ---
 
@@ -288,14 +291,16 @@ Targets aligned with `gtm_execution_plan.md` 90-day scorecard:
 
 ### 9.1 Validated v1.x Roadmap
 
-**Pre-pilot deliverables** (must complete before Vivatel goes live — see Section 4.1.1 and `gtm_execution_plan.md` Phase 0):
-- Dashboard home shows revenue KPI cards (not onboarding checklist)
-- Staff reply input in conversations view
-- Daily email live in production (SENDGRID_API_KEY + Cloud Scheduler)
-- `FERNET_ENCRYPTION_KEY` in Secret Manager
-- 50-question BM/Manglish test suite run at ≥80% pass rate
-- "Lost" status filter in leads UI
-- Vivatel KB populated
+**Pre-pilot deliverables** — status as of v2.1:
+- ✅ Dashboard home shows revenue KPI cards (rebuilt v0.3.1)
+- ✅ Staff reply input in conversations view (v0.3.1)
+- ✅ "Lost" status filter in leads UI (v0.3.1)
+- ✅ Maintenance mode — backend + admin toggle + tenant banner (v0.3.2)
+- ✅ Service health dashboard `/admin/health` (v0.3.2)
+- ❌ Daily email live in production — add `SENDGRID_API_KEY` + create 4 Cloud Scheduler jobs (~2h infra)
+- ❌ `FERNET_ENCRYPTION_KEY` in Secret Manager + redeploy (~30min infra)
+- ❌ 50-question BM/Manglish test suite run at ≥80% pass rate (half-day field work)
+- ❌ Vivatel KB populated (1-day session with Zul)
 
 **Post-pilot roadmap** (after first real-world data):
 
@@ -309,18 +314,21 @@ Targets aligned with `gtm_execution_plan.md` 90-day scorecard:
 | **v2.0** | F&B Revenue Intelligence (Opportunity #1) | 5+ paying properties; Amsyar or equivalent advisor locked |
 | **v2.5** | Guest Recognition & KYC (Opportunity #3) | Cross-stay data accumulated from inquiry + F&B layers |
 
-### 9.2 Dormant SaaS Infrastructure (Codebase — Not Customer-Facing v1)
+### 9.2 SaaS Infrastructure — Activation Status
 
-The following systems exist in the codebase and must not be broken by new development. They are **not part of the v1 customer-facing product** and must not be referenced in demos, sales materials, or hotel-facing documentation until explicitly released.
+The codebase contains infrastructure built ahead of validation. This table tracks what is active vs dormant.
 
-| Feature | Release Condition |
-|---------|-------------------|
-| Multi-tenant hierarchy (Tenant, TenantMembership, OnboardingProgress) | 10+ paying customers; need for multi-property group billing |
-| Supabase Auth (magic links, admin provisioning) | Self-serve signup motion validated with real inbound |
-| SuperAdmin dashboard (platform metrics, tenant CRUD) | Onboarding volume exceeds manual process (>2 new properties/week) |
-| Stripe billing (checkout, subscriptions) | Pilot-to-paid conversion proven; manual invoicing no longer viable |
-| Support chatbot + ticket system | Support ticket volume exceeds direct handling |
-| Application intake form | Self-serve GTM motion validated |
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Multi-tenant hierarchy (Tenant, TenantMembership, OnboardingProgress) | ✅ **Active (SheersSoft-internal)** | Used by admin provisioning and the `/admin` portal. Not customer-facing until Phase 4. |
+| Supabase Auth (magic links, admin provisioning) | ✅ **Active** | Magic link login live. Restricted to `a.basyir@sheerssoft.com` for superadmin. Hotel staff use property JWT. |
+| SuperAdmin dashboard (`/admin`) | ✅ **Active (internal ops)** | SheersSoft ops tool — tenant management, scheduler config, maintenance mode, service health. Never shown to hotel clients. |
+| Stripe billing (checkout, subscriptions) | ❌ **Dormant** | Activate when pilot-to-paid conversion is proven; manual invoicing until ≥3 paying tenants. |
+| Support chatbot + ticket system | ❌ **Dormant** | Support is handled directly by SheersSoft. Activate when ticket volume exceeds direct handling. |
+| Application intake form | ❌ **Dormant** | Self-serve GTM motion not yet validated. Activate when inbound demand justifies it. |
+| Tenant self-service portal (`/portal`, `/welcome`) | ❌ **Not yet built** | Phase 4 deliverable. Required before onboarding 3rd+ tenant without SheersSoft engineer in the loop. |
+
+**Rule for activating dormant features:** Follow the decision tree in `product_gap.md` Section 7. A feature unlocks only when its release condition is met — not when it is technically ready.
 
 ---
 
