@@ -50,6 +50,9 @@ async def create_property(
         operating_hours=body.operating_hours,
         adr=Decimal(str(body.adr)),
         ota_commission_pct=Decimal(str(body.ota_commission_pct)),
+        hourly_rate=Decimal(str(body.hourly_rate)),
+        brand_vocabulary=body.brand_vocabulary,
+        required_questions=body.required_questions,
     )
     db.add(prop)
     await db.flush()
@@ -61,6 +64,9 @@ async def create_property(
         website_url=prop.website_url,
         adr=float(prop.adr),
         ota_commission_pct=float(prop.ota_commission_pct),
+        hourly_rate=float(prop.hourly_rate),
+        brand_vocabulary=prop.brand_vocabulary,
+        required_questions=prop.required_questions,
         created_at=prop.created_at,
     )
 
@@ -86,6 +92,9 @@ async def get_property(
         website_url=prop.website_url,
         adr=float(prop.adr),
         ota_commission_pct=float(prop.ota_commission_pct),
+        hourly_rate=float(prop.hourly_rate) if prop.hourly_rate else 25.0,
+        brand_vocabulary=prop.brand_vocabulary,
+        required_questions=prop.required_questions,
         created_at=prop.created_at,
     )
 
@@ -107,14 +116,17 @@ async def get_property_settings(
     return {
         "id": str(prop.id),
         "name": prop.name,
+        "notification_email": prop.notification_email,
         "operating_hours": prop.operating_hours,
-        "knowledge_base_config": prop.knowledge_base_config,
         "timezone": prop.timezone,
         "plan_tier": prop.plan_tier,
         "is_active": prop.is_active,
+        "adr": float(prop.adr) if prop.adr else 230.0,
         "hourly_rate": float(prop.hourly_rate) if prop.hourly_rate else 25.00,
         "brand_vocabulary": prop.brand_vocabulary,
         "required_questions": prop.required_questions,
+        "whatsapp_number": prop.whatsapp_number,
+        "website_url": prop.website_url,
     }
 
 from app.schemas import PropertySettingsUpdateRequest
@@ -134,6 +146,14 @@ async def update_property_settings(
     if not prop:
         raise HTTPException(status_code=404, detail="Property not found")
 
+    if body.notification_email is not None:
+        prop.notification_email = body.notification_email
+    if body.operating_hours is not None:
+        prop.operating_hours = body.operating_hours
+    if body.timezone is not None:
+        prop.timezone = body.timezone
+    if body.adr is not None:
+        prop.adr = Decimal(str(body.adr))
     if body.hourly_rate is not None:
         prop.hourly_rate = Decimal(str(body.hourly_rate))
     if body.brand_vocabulary is not None:

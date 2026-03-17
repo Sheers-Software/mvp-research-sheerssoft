@@ -16,6 +16,7 @@ from app.database import get_db
 from app.models import Conversation, Message
 from app.auth import verify_jwt, check_property_access
 from app.services.analytics import get_realtime_stats
+from app.schemas import StaffReplyRequest
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -184,6 +185,76 @@ async def takeover_conversation(
     return {"status": "staff_takeover", "conversation_id": conversation_id}
 
 
+@router.post("/conversations/{conversation_id}/reply")
+async def staff_reply(
+    conversation_id: str,
+    body: StaffReplyRequest,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(verify_jwt),
+):
+    """Staff sends a reply from the dashboard — saved as role='staff' and forwarded to guest via original channel."""
+    from app.models import Property
+
+    result = await db.execute(
+        select(Conversation).where(Conversation.id == uuid.UUID(conversation_id))
+    )
+    conv = result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if conv.status == "resolved":
+        raise HTTPException(status_code=400, detail="Cannot reply to a resolved conversation")
+
+    content = body.content.strip()
+
+    # Persist message
+    msg = Message(
+        conversation_id=conv.id,
+        role="staff",
+        content=content,
+        sent_at=datetime.now(timezone.utc),
+    )
+    db.add(msg)
+    conv.message_count = (conv.message_count or 0) + 1
+    conv.last_message_at = datetime.now(timezone.utc)
+    await db.flush()
+
+    # Forward to guest via original channel
+    prop_result = await db.execute(
+        select(Property).where(Property.id == conv.property_id)
+    )
+    prop = prop_result.scalar_one_or_none()
+
+    if prop and conv.channel == "whatsapp":
+        try:
+            if getattr(prop, "whatsapp_provider", "meta") == "twilio":
+                from app.services.twilio_whatsapp import send_twilio_message
+                await send_twilio_message(
+                    to_number=conv.guest_identifier,
+                    message=content,
+                    from_number=getattr(prop, "twilio_phone_number", None),
+                )
+            else:
+                from app.services.whatsapp import send_whatsapp_message
+                await send_whatsapp_message(
+                    to=conv.guest_identifier,
+                    message=content,
+                    phone_number_id=getattr(prop, "whatsapp_phone_number_id", None),
+                )
+        except Exception as exc:
+            # Message is already saved — log the delivery failure but don't fail the request
+            logger.warning("staff_reply_delivery_failed", channel=conv.channel, error=str(exc))
+
+    # Web/email: message is in DB; web widget polls for new messages automatically
+
+    return {
+        "id": str(msg.id),
+        "role": "staff",
+        "content": content,
+        "sent_at": msg.sent_at.isoformat(),
+        "channel": conv.channel,
+    }
+
+
 @router.get("/analytics/dashboard")
 async def get_dashboard_stats(
     property_id: Optional[str] = Query(None, description="Property UUID. Defaults to first accessible property."),
@@ -215,9 +286,15 @@ async def get_dashboard_stats(
                 )
             )
         else:
-            # Wildcard access — return first active property
+            # Wildcard access — pick property with most activity
+            from sqlalchemy import func as sqlfunc
             result = await db.execute(
-                select(Property).where(Property.is_active == True).limit(1)
+                select(Property)
+                .outerjoin(Conversation, Conversation.property_id == Property.id)
+                .where(Property.is_active == True)
+                .group_by(Property.id)
+                .order_by(sqlfunc.count(Conversation.id).desc())
+                .limit(1)
             )
 
     prop = result.scalar_one_or_none()
@@ -225,4 +302,6 @@ async def get_dashboard_stats(
         raise HTTPException(status_code=404, detail="No property found")
 
     stats = await get_realtime_stats(db, prop.id)
+    stats["property_id"] = str(prop.id)
+    stats["property_name"] = prop.name
     return stats

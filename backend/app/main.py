@@ -34,20 +34,30 @@ async def lifespan(app: FastAPI):
         environment=settings.environment,
     )
 
-    # Ensure pgvector extension exists on startup
-    from app.database import engine
+    # Ensure pgvector extension and system_config table exist
+    from app.database import engine, async_session
     from sqlalchemy import text
 
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         logger.info("pgvector extension ready")
 
-    # Create tables if they don't exist (for development)
+    # Create tables if they don't exist (for development/demo)
     if not settings.is_production:
         from app.models import Base
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-            logger.info("Database tables created (dev mode)")
+            logger.info("Database tables created (dev/demo mode)")
+    else:
+        # In production, only ensure system_config table exists (no full create_all)
+        from app.services.system_config import ensure_system_config_table
+        async with engine.begin() as conn:
+            await ensure_system_config_table(conn)
+
+    # Seed default scheduler config (no-op if already seeded)
+    from app.services.system_config import seed_default_config
+    async with async_session() as db:
+        await seed_default_config(db)
 
     # Start APScheduler only in dev/demo — production uses Cloud Scheduler
     # calling /api/v1/internal/* endpoints (CPU-throttled Cloud Run).

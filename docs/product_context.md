@@ -71,7 +71,7 @@
 | Metric | Target | Red Flag |
 |--------|--------|----------|
 | **LTV:CAC ratio** | ≥ 3:1 | If CAC > LTV/3, stop scaling acquisition |
-| **CAC payback period** | < 12 months | Beyond 12 months = cash flow risk |
+| **CAC payback period** | < 6 months | > 6 months = cash flow risk at bootstrap stage |
 | **Monthly churn** | < 5% (B2B SaaS benchmark) | > 10% = product problem, not sales |
 | **Annual churn (contract)** | < 20% | Above = immediate attention |
 | **Gross margin** | > 80% | RM 2,100–4,000 cost vs RM 22,500 MRR at 10 properties ✓ |
@@ -126,7 +126,7 @@
 | **Web Chat Widget** | "One line of code" — single `<script>` tag | Embeddable JS, zero dependencies |
 | **Email Auto-Handler** | "Turn your inbox into a revenue machine" | Forward reservation email → parse → AI response |
 | **Lead Capture Dashboard** | Every inquiry: name, contact, intent, timestamp. Filter, export to Excel | CRM-lite, sortable table |
-| **After-Hours Recovery Report** | GM email at 8am: inquiries, recovery %, est. revenue | Scheduled daily report |
+| **After-Hours Recovery Report** | GM email at **7am** property-local-time: inquiries, recovery %, est. revenue | Scheduled daily report (Cloud Scheduler `30 7 * * *` MYT) |
 | **Human Handoff** | AI transfers with full context when complex/complaint/group | Detection + context packaging |
 
 ### What AI Handles vs. Transfers
@@ -177,11 +177,12 @@
 - OTA commission avoided: RM 1,863
 
 ### Case Study: Bukit Bintang City Hotel
+> ⚠️ **Unverified benchmark — do not use in sales materials until confirmed.** Replace with Vivatel's real 30-day numbers once available (see `gtm_execution_plan.md` Task E2.4). Publish RM 920 honest estimate rather than RM 12,400 unverified figure.
 - **Problem:** "Missing 40% of WhatsApp inquiries during peak hours; 100% after midnight"
-- **30-day pilot results:** 463 inquiries handled, 92% captured (name/number), **RM 12,400 est. revenue recovered**
+- **Benchmark (unverified):** 463 inquiries handled, 92% captured, RM 12,400 est. revenue recovered — pending real Vivatel data to replace or confirm
 
 ### Trust Claim
-> *"Trusted by hotels recovering RM 50,000+ monthly"*
+> ⚠️ **"Trusted by hotels recovering RM 50,000+ monthly"** — remove from website until verified by real customer data. Replace with Vivatel's confirmed numbers.
 
 ---
 
@@ -265,8 +266,8 @@ Use this section to validate PRD, Build Plan, and Architecture:
 - [ ] **Widget:** Single `<script>` tag, no dependencies, works on WordPress
 - [ ] **Pricing tiers:** Starter (RM 1,500), Pro (RM 3,000), Enterprise (RM 5,000+)
 - [ ] **Pilot:** 30 days free, no credit card, month-to-month after
-- [ ] **Report:** Daily at 8am property-local-time; weekly summary Monday
-- [ ] **Case study metrics:** 463 inquiries, 92% capture, RM 12,400 recovered (30 days)
+- [ ] **Report:** Daily at **7am** property-local-time (Cloud Scheduler `30 7 * * *` MYT); weekly summary Monday
+- [ ] **Case study metrics:** Replace RM 12,400 unverified benchmark with Vivatel's real 30-day numbers once available
 - [ ] **Product naming:** Nocturn AI (public)
 - [ ] **Unit economics:** CAC, LTV, churn tracked from first paying customer
 - [ ] **ICP ruthlessness:** No expansion beyond 3–4 star Malaysian hotels until PMF

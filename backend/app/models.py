@@ -578,3 +578,17 @@ class AnalyticsDaily(Base):
             unique=True,
         ),
     )
+
+
+class SystemConfig(Base):
+    """
+    Platform-wide key-value configuration store.
+    Used for scheduler job toggles and other runtime settings.
+    """
+    __tablename__ = "system_config"
+
+    key: Mapped[str] = mapped_column(String(255), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSON, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

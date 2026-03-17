@@ -17,6 +17,11 @@ class MessageRequest(BaseModel):
     guest_name: str | None = None
 
 
+class StaffReplyRequest(BaseModel):
+    """Staff sends a message from the dashboard back to the guest."""
+    content: str = Field(..., min_length=1, max_length=4000)
+
+
 class ConversationResponse(BaseModel):
     response: str
     conversation_id: uuid.UUID
@@ -144,6 +149,10 @@ class PropertyCreateRequest(BaseModel):
 
 
 class PropertySettingsUpdateRequest(BaseModel):
+    notification_email: str | None = None
+    operating_hours: dict | None = None
+    timezone: str | None = None
+    adr: float | None = None
     hourly_rate: float | None = None
     brand_vocabulary: str | None = None
     required_questions: list[str] | None = None

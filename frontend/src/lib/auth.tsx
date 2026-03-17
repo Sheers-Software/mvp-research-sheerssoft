@@ -73,10 +73,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         formData.append('username', email);
         formData.append('password', password);
 
-        const res = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/auth/token`,
-            { method: 'POST', body: formData, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
-        );
+        const res = await fetch('/api/v1/auth/token', {
+            method: 'POST',
+            body: formData,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
         if (!res.ok) throw new Error('Invalid credentials');
         const data = await res.json();
         localStorage.setItem('nocturn_token', data.access_token);

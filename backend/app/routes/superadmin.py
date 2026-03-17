@@ -77,6 +77,38 @@ async def get_platform_metrics(
 
 
 # ─────────────────────────────────────────────────────────────
+# System Configuration (Scheduler Job Controls)
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/superadmin/scheduler-config")
+async def get_scheduler_config(
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(require_superadmin),
+):
+    """Return current scheduler job enabled states."""
+    from app.services.system_config import get_jobs_config
+    config = await get_jobs_config(db)
+    return {"jobs": config}
+
+
+@router.put("/superadmin/scheduler-config")
+async def update_scheduler_config(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(require_superadmin),
+):
+    """Update scheduler job enabled states. Body: {jobs: {daily_report: bool, ...}}"""
+    from app.services.system_config import set_jobs_config, get_jobs_config
+
+    jobs = body.get("jobs", {})
+    # Merge with existing to allow partial updates
+    current = await get_jobs_config(db)
+    current.update({k: bool(v) for k, v in jobs.items()})
+    await set_jobs_config(current, db)
+    return {"jobs": current}
+
+
+# ─────────────────────────────────────────────────────────────
 # Tenant Management
 # ─────────────────────────────────────────────────────────────
 

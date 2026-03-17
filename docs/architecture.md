@@ -1,7 +1,8 @@
 # System Architecture
 ## Nocturn AI — AI Inquiry Capture & Conversion Engine
-### Version 1.2 · 13 Feb 2026
+### Version 2.0 · 17 Mar 2026
 ### Aligned with [product_context.md](./product_context.md) · Steered by [building-successful-saas-guide.md](./building-successful-saas-guide.md)
+### Implementation Status: v0.3.0 live on GCP Cloud Run · Backend: `https://nocturn-backend-owtn645vea-as.a.run.app`
 
 ---
 
@@ -10,7 +11,7 @@
 This system is designed around **four non-negotiable constraints** derived from 20 years of building production systems at scale:
 
 1. **Guest latency < 30 seconds end-to-end.** Every architectural decision optimizes for this. A guest sends a WhatsApp message at 11pm and gets a useful answer before they switch to Booking.com.
-2. **Multi-tenant isolation from Day 1.** Property A's data never leaks to Property B. This is a trust product — one leak and every hotel cancels.
+2. **Property data isolation from Day 1.** Property A's data never leaks to Property B. This is a trust product — one leak and every hotel cancels. (Note: full multi-tenant SaaS hierarchy — Tenant, TenantMembership, OnboardingProgress — is built but dormant in v1. Property-level isolation is the enforced guarantee.)
 3. **Operational simplicity over architectural elegance.** This is a 2-person engineering team shipping in 28 days. No microservices. No Kubernetes. One backend, one database, auto-scaling containers.
 4. **Observability from the start.** You cannot fix what you cannot measure. OpenTelemetry + metrics + alerting from day one. Set up alerts at 70% capacity thresholds.
 
@@ -45,7 +46,7 @@ graph TB
 
     subgraph "External Services"
         META["Meta WhatsApp<br/>Cloud API"]
-        LLM["OpenAI GPT-4o-mini"]
+        LLM["Google Gemini 1.5 Flash<br/><i>(+ OpenAI / Anthropic fallback)</i>"]
         SMTP["SendGrid<br/><i>Inbound Parse + Outbound</i>"]
     end
 
@@ -108,6 +109,8 @@ Conversations are multi-turn. The AI needs the last 5–10 messages as context f
 - **Write-behind**: Session updates are written to PostgreSQL asynchronously for persistence. Redis is the hot path.
 - **TTL-based expiry**: Inactive sessions auto-expire after 30 minutes. No cleanup jobs.
 
+> **v1 Production note:** No dedicated Memorystore for the pilot phase. `app/core/redis.py` falls back to a dict-based in-process store when Redis is unavailable or points to localhost. Sessions survive within a single Cloud Run instance but are **not shared across scale-out**. When scaling beyond 1 instance (>~50 concurrent conversations), provision Cloud Memorystore Redis Basic (1GB, ~RM 150/month) and set `REDIS_URL`.
+
 ### 3.4 Channel Normalization Pattern
 
 All three channels (WhatsApp, Web, Email) produce different message formats. The Conversation Engine normalizes them into a single internal message format before processing:
@@ -140,6 +143,7 @@ This is critical. The AI engine should never know or care what channel a message
 | **Refactoring cadence** | One refactoring sprint every 4–5 feature sprints |
 | **Hardcoding v1** | Acceptable if it validates the business model faster. Track and schedule cleanup. |
 | **Critical path testing** | Signup-to-payment flow: comprehensive automated tests. Everything involving money. |
+| **SaaS infrastructure debt** | Tenant hierarchy, Stripe billing, Supabase Auth, SuperAdmin dashboard, gamified onboarding, support chatbot, application intake — all built ahead of validation. Dormant in v1. Do not activate until release conditions in PRD Section 9.2 are met. |
 
 **Rule:** Technical perfectionism kills. Ship in 28 days. Iterate based on customer feedback.
 
@@ -157,21 +161,77 @@ Design the API as if external customers will use it from day one. This forces go
 
 | Layer | Technology | Justification |
 |---|---|---|
-| **Backend API** | Python 3.12 + FastAPI | Async-native. LLM ecosystem is Python-first. Team already building in it (Sprint 1 complete). |
+| **Backend API** | Python 3.12 + FastAPI | Async-native. LLM ecosystem is Python-first. Implemented and live. |
 | **Database** | PostgreSQL 16 + pgvector | Battle-tested. Vector search built-in. Handles relational + vector in one engine. |
-| **Cache / Sessions** | Redis 7 (Cloud Memorystore) | Sub-millisecond session reads. Pub/Sub for real-time handoff notifications. |
-| **LLM** | OpenAI GPT-4o-mini (primary) | ~$0.15/1M input tokens. Best cost/quality for conversational AI at this scale. |
-| **LLM Fallback** | Anthropic Claude Haiku | If OpenAI is down or rate-limited. Same prompt templates, different provider. |
+| **Cache / Sessions** | Redis 7 (graceful in-memory fallback) | Graceful dict-based fallback when Redis unavailable — allows Cloud Run to run without Memorystore for pilot phase. Sessions survive within a single instance. Pub/Sub is a no-op when Redis is absent. |
+| **LLM Primary** | Google Gemini 1.5 Flash | Cost-effective, fast. Primary provider for conversation engine. Gemini roles mapped: `"assistant"` → `"model"`. |
+| **LLM Fallback Chain** | OpenAI GPT-4o-mini → Anthropic Claude Haiku → template string | Ordered fallback. Empty responses from any provider fall through. Anthropic requires `system` prompt as separate param, not in messages array. |
+| **Embeddings** | Gemini text-embedding-004 (768-dim) | `generate_embedding()` wraps synchronous client in `asyncio.to_thread()`. pgvector HNSW indexed on 768-dim vectors. |
 | **Web Widget** | Vanilla JS + CSS (embeddable) | Zero dependencies for hotel. Single `<script>` tag. <50KB bundle. |
-| **Staff Dashboard** | Next.js 14 (React) | SSR for performance. App Router for clean routing. Team has experience. |
-| **Authentication** | JWT (v1) → Auth0/Clerk (production hardening) | *Don't build auth yourself.* Current JWT acceptable for MVP. Migrate to Auth0 or Clerk before SOC 2 or 50+ customers. Security breaches kill young SaaS. |
-| **Observability** | OpenTelemetry + DataDog/New Relic (or GCP Cloud Trace) | Structured metrics, latency percentiles, error tracking. Alerts at 70% DB/API capacity. Implement in Sprint 1–2. |
-| **Product Analytics** | Amplitude or Mixpanel | Every feature instrumented for usage. Implement in month one. A/B testing infrastructure before needed. |
-| **WhatsApp** | Meta WhatsApp Business Cloud API | Official API. No third-party dependency. Webhook-based. |
-| **Email** | SendGrid (Inbound Parse + Outbound) | Webhook for inbound. SMTP for outbound. **Requires:** SPF, DKIM, DMARC for deliverability. |
-| **Payments** | Stripe (when added) | Don't build payment processing. Implement dunning (failed payment retry) — recovers 20–30% of failed transactions. |
-| **Infrastructure** | Google Cloud Run | Auto-scaling containers. Pay-per-use. No cluster management. Already deployed. |
-| **CI/CD** | GitHub Actions | Standard. Fast. Integrated with Cloud Run deployment. |
+| **Staff Dashboard** | Next.js 14 (React) | SSR for performance. App Router for clean routing. Deployed to Cloud Run. |
+| **Authentication** | Supabase Auth + local JWT | Supabase Auth (magic links, admin API) implemented. Local `User` record always created. Supabase gracefully skipped if env vars absent. `check_property_access()` for property routes, `check_tenant_access()` for tenant routes. |
+| **Observability** | Structlog (structured logging) | Structlog implemented. OpenTelemetry + metrics/tracing as backlog (alert at 70% capacity thresholds). |
+| **WhatsApp** | Meta WhatsApp Business Cloud API + Twilio | Both providers implemented. `Property.whatsapp_provider = "meta" | "twilio"`. Multi-tenant sender uses `prop.twilio_phone_number` (not global settings). |
+| **Email** | SendGrid (Inbound Parse + Outbound) | Webhook for inbound. SMTP for outbound reports. Used by channel_setup, scheduler, onboarding. |
+| **Payments** | Stripe *(dormant in v1)* | Checkout session + webhook stub implemented in `services/stripe_service.py`. Not activated — pilot invoicing is manual. Activate when ≥3 paying tenants confirmed. |
+| **Infrastructure** | Google Cloud Run | Auto-scaling containers. Pay-per-use. Two services: backend + frontend. Min 1 instance to avoid cold starts. |
+| **CI/CD** | Google Cloud Build (`backend/cloudbuild.yaml`) | Builds both containers → Artifact Registry → deploys both Cloud Run services → runs Alembic migrations. Triggered manually or via Cloud Build GitHub trigger on `main`. |
+
+---
+
+## 4.5 Dormant SaaS Infrastructure (Built Ahead of Validation — Not Activated in v1)
+
+> **Status:** Code exists, routes are registered, but these features are **not in the v1 customer scope**. They were built speculatively beyond what 8 market interviews validated. Do not activate until release conditions in PRD Section 9.2 are met.
+
+The original design targeted a single-property pilot (Vivatel). Separately, the system was extended with a full multi-tenant SaaS hierarchy. This section documents what exists but is dormant.
+
+### Tenant Hierarchy
+
+```
+Tenant (billing entity — hotel group)
+  ├─ subscription_tier: "pilot" | "boutique" | "independent" | "premium"
+  ├─ subscription_status: "trialing" | "active" | "cancelled" | "past_due"
+  ├─ stripe_customer_id
+  ├─ Property (one or many per tenant)
+  │   ├─ all original models (Conversation, Message, Lead, KBDocument, AnalyticsDaily)
+  │   └─ tenant_id, slug, plan_tier, is_active, deleted_at
+  ├─ TenantMembership (user ↔ tenant with role)
+  │   ├─ role: "owner" | "admin" | "staff"
+  │   └─ accessible_property_ids: null=all, array=scoped
+  └─ OnboardingProgress (per property — gamified milestone tracking)
+      └─ channel statuses + milestone flags
+
+User (1:1 with Supabase auth.users, is_superadmin for SheersSoft staff)
+SupportTicket (tenant user → SheersSoft staff workflow)
+Application (public intake at ai.sheerssoft.com/apply → converts to Tenant)
+```
+
+### Tenant Provisioning Flow
+
+```
+SuperAdmin → POST /api/v1/onboarding/provision-tenant
+  → Creates Tenant + Property + User (Supabase Auth Admin API) + TenantMembership + OnboardingProgress
+  → Sends magic link to new user
+  → Background: _setup_channels_async() → updates OnboardingProgress per channel
+```
+
+### Authorization Layers
+
+| Guard | Scope | Active in v1? | Used In |
+|-------|-------|---------------|---------|
+| `require_superadmin()` | SheersSoft staff only | ⚠️ Internal use only | `/superadmin` routes |
+| `check_tenant_access()` | TenantMembership, is_superadmin bypasses | ❌ Dormant | Tenant-level routes |
+| `check_property_access()` | JWT property_id matching | ✅ Active | Property data routes |
+
+### Internal Scheduler (Production)
+
+In production, APScheduler is **disabled**. Cloud Scheduler calls internal endpoints instead:
+- `POST /api/v1/internal/run-daily-report`
+- `POST /api/v1/internal/run-followups`
+- `POST /api/v1/internal/run-insights`
+- `POST /api/v1/internal/cleanup-leads`
+
+All require `X-Internal-Secret` header. Excluded from OpenAPI docs.
 
 ---
 
@@ -203,7 +263,7 @@ erDiagram
         string category "rooms|rates|facilities|faq|policies|dining"
         string title
         text content
-        vector embedding "pgvector: 1536 dimensions (OpenAI)"
+        vector embedding "pgvector: 768 dimensions (Gemini)"
         json metadata
         boolean is_active
         timestamp updated_at
@@ -280,7 +340,7 @@ erDiagram
     PROPERTY ||--o{ LEAD : "owns"
 ```
 
-### 5.2 Multi-Tenant Data Isolation
+### 5.2 Property Data Isolation
 
 Every query includes `property_id` as a mandatory filter. Implemented via:
 
@@ -322,7 +382,7 @@ sequenceDiagram
     participant RD as Redis
     participant AI as AI Core
     participant KB as Knowledge Base<br/>(pgvector)
-    participant LLM as OpenAI
+    participant LLM as Gemini<br/>(+ fallbacks)
     participant PG as PostgreSQL
 
     G->>CH: Sends message
@@ -354,10 +414,10 @@ sequenceDiagram
 | Rate limit + Auth | 10ms | Redis lookup |
 | Session retrieval (Redis) | 5ms | In-memory |
 | KB semantic search (pgvector) | 30ms | HNSW index |
-| LLM API call (GPT-4o-mini) | 800–2000ms | **Dominant cost.** Streaming reduces perceived latency. |
+| LLM API call (Gemini 1.5 Flash) | 600–1800ms | **Dominant cost.** Streaming reduces perceived latency. |
 | Persistence (async) | 0ms on hot path | Written after response is sent |
 | Response formatting + send | 50ms | Channel API call |
-| **Total** | **~1–2.5 seconds** | Well within 30s target |
+| **Total** | **~1–2 seconds** | Well within 30s target |
 
 ### 6.2 Human Handoff Flow
 
@@ -385,6 +445,8 @@ sequenceDiagram
     S-->>G: "Hi! I'm [Name] from reservations.<br/>I can see you're looking for..."
 ```
 
+> **⚠️ v1 Gap — Staff Reply from Dashboard Not Implemented.** The dashboard shows the handoff queue and conversation history. However, staff cannot yet send a reply message directly from the dashboard UI. Staff must reply via the original channel (e.g., WhatsApp on their phone) after being notified. This is the #2 critical gap for v1 completion.
+
 ### 6.3 After-Hours Detection
 
 ```python
@@ -411,7 +473,7 @@ When `is_after_hours == True`:
 > **Note:** To support "Live in 48 Hours" (website promise), this pipeline must support rapid ingestion. SheersSoft team builds the KB from property info (rate card, FAQs) shared on Day 0. Supports bulk ingestion from raw formats (PDF, Docx, CSV) via admin CLI or scripts, converting to structured Markdown/JSON.
 
 ```
-Property KB Document (Markdown/JSON)
+Property KB Document (Markdown/JSON/PDF/Docx)
     │
     ▼
 ┌───────────────────┐
@@ -421,22 +483,22 @@ Property KB Document (Markdown/JSON)
         │
         ▼
 ┌───────────────────┐
-│  Embedder         │  OpenAI text-embedding-3-small
-│  (1536 dims)      │  Batch processing
+│  Embedder         │  Gemini text-embedding-004
+│  (768 dims)       │  Wrapped in asyncio.to_thread()
 └───────┬───────────┘
         │
         ▼
 ┌───────────────────┐
-│  PostgreSQL       │  INSERT into knowledge_items
-│  + pgvector       │  HNSW index per property
+│  PostgreSQL       │  INSERT into kb_documents (model: KBDocument)
+│  + pgvector       │  HNSW index, cosine distance, scoped by property_id
 └───────────────────┘
 ```
 
 ### 7.2 RAG Retrieval Strategy
 
-1. **Embed** the guest's question using the same embedding model.
-2. **Vector search** against `knowledge_items` WHERE `property_id = :pid` ORDER BY cosine similarity, LIMIT 5.
-3. **Relevance filter**: only include items with similarity > 0.7.
+1. **Embed** the guest's question using Gemini text-embedding-004 (768-dim), wrapped in `asyncio.to_thread()`.
+2. **Vector search** against `kb_documents` WHERE `property_id = :pid` ORDER BY cosine distance (pgvector `<=>` operator), LIMIT 5.
+3. **Relevance filter**: only include items with cosine similarity > 0.7.
 4. **Inject** retrieved items into the LLM prompt as structured context.
 
 ### 7.3 Prompt Architecture
@@ -517,7 +579,7 @@ GET    /api/v1/health                            # Liveness + dependency check
 | **Web widget** | Property API key (embedded in widget config). Rate-limited per key. |
 | **Email webhook** | SendGrid IP allowlist + Basic Auth on webhook URL |
 | **Staff dashboard** | JWT (access + refresh tokens). Property-scoped. |
-| **Admin API** | JWT with admin role. Super-tenant access for onboarding. |
+| **Admin API** | JWT with `is_superadmin` flag. SheersSoft-internal only. Not exposed to hotel GMs. |
 
 ---
 
@@ -543,9 +605,10 @@ Google Cloud Platform
 │   ├── Automated backups (daily)
 │   └── High availability for production
 │
-├── Cloud Memorystore (Redis 7)
-│   ├── 1GB instance (Basic tier)
-│   └── Session state + pub/sub
+├── Redis (graceful in-memory fallback)
+│   ├── No dedicated Memorystore for pilot phase
+│   ├── app/core/redis.py: falls back to dict-based store if connection fails
+│   └── Sessions survive within a single instance (not shared across scale-out)
 │
 └── Cloud CDN / Cloud Storage
     └── Widget JS bundle (static hosting)
@@ -555,17 +618,29 @@ Google Cloud Platform
 
 ```mermaid
 graph LR
-    A["git push<br/>to main"] --> B["GitHub Actions<br/>CI/CD"]
-    B --> C["Run tests<br/>+ lint"]
-    C --> D["Build Docker<br/>images"]
-    D --> E["Push to GCR<br/>(Container Registry)"]
-    E --> F["Deploy to<br/>Cloud Run"]
-    F --> G["Run migration<br/>(Alembic)"]
-    G --> H["Smoke tests<br/>against prod"]
+    A["git push<br/>to main"] --> B["Cloud Build<br/>(cloudbuild.yaml)"]
+    B --> C["Build backend<br/>Docker image"]
+    C --> D["Build frontend<br/>Docker image"]
+    D --> E["Push both to<br/>Artifact Registry"]
+    E --> F["Deploy backend<br/>Cloud Run"]
+    F --> G["Deploy frontend<br/>Cloud Run"]
+    G --> H["Alembic<br/>migrations"]
 
     style A fill:#22c55e,color:#fff
     style H fill:#22c55e,color:#fff
 ```
+
+**Manual trigger:**
+```bash
+gcloud builds submit \
+  --config=backend/cloudbuild.yaml \
+  --project=nocturn-ai-487207 \
+  --region=asia-southeast1 \
+  --substitutions=COMMIT_SHA=$(git rev-parse HEAD) \
+  .
+```
+
+Attach a Cloud Build GitHub trigger on `main` for automatic deploys.
 
 ---
 
@@ -587,7 +662,7 @@ graph LR
 
 - **Rate limiting**: SlowAPI middleware. 100 req/min per widget API key. 500 req/min per WhatsApp webhook.
 - **Input sanitization**: All guest messages sanitized before LLM prompt injection (strip special tokens, limit length).
-- **PII handling**: Guest phone/email encrypted at field level using Fernet symmetric encryption. Decrypted only at display time.
+- **PII handling**: Guest phone/email encrypted at field level using Fernet symmetric encryption. Decrypted only at display time. ⚠️ `FERNET_ENCRYPTION_KEY` not yet in GCP Secret Manager — PII encryption is bypassed until this secret is added. Add before first paying tenant.
 - **API key rotation**: Property API keys can be rotated without downtime.
 
 ### 10.3 Backup & Disaster Recovery

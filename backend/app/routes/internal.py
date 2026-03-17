@@ -14,15 +14,18 @@ Cloud Scheduler job targets:
 
 import logging
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
+from app.database import get_db
 from app.services.scheduler import (
     delete_old_leads,
     generate_monthly_insights,
     process_automated_follow_ups,
     run_daily_reports,
 )
+from app.services.system_config import is_job_enabled
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/internal")
@@ -38,9 +41,15 @@ def _verify(x_internal_secret: str | None):
 
 
 @router.post("/run-daily-report", include_in_schema=False)
-async def run_daily_report(x_internal_secret: str | None = Header(default=None)):
+async def run_daily_report(
+    x_internal_secret: str | None = Header(default=None),
+    db: AsyncSession = Depends(get_db),
+):
     """Triggered by Cloud Scheduler — runs daily analytics + email report."""
     _verify(x_internal_secret)
+    if not await is_job_enabled("daily_report", db):
+        logger.info("daily_report job skipped — disabled via system config")
+        return {"status": "skipped", "reason": "disabled"}
     try:
         await run_daily_reports()
         return {"status": "ok", "job": "daily_reports"}
@@ -50,9 +59,15 @@ async def run_daily_report(x_internal_secret: str | None = Header(default=None))
 
 
 @router.post("/run-followups", include_in_schema=False)
-async def run_followups(x_internal_secret: str | None = Header(default=None)):
+async def run_followups(
+    x_internal_secret: str | None = Header(default=None),
+    db: AsyncSession = Depends(get_db),
+):
     """Triggered by Cloud Scheduler — processes automated lead follow-up emails."""
     _verify(x_internal_secret)
+    if not await is_job_enabled("followups", db):
+        logger.info("followups job skipped — disabled via system config")
+        return {"status": "skipped", "reason": "disabled"}
     try:
         await process_automated_follow_ups()
         return {"status": "ok", "job": "automated_follow_ups"}
@@ -62,9 +77,15 @@ async def run_followups(x_internal_secret: str | None = Header(default=None)):
 
 
 @router.post("/run-insights", include_in_schema=False)
-async def run_insights(x_internal_secret: str | None = Header(default=None)):
+async def run_insights(
+    x_internal_secret: str | None = Header(default=None),
+    db: AsyncSession = Depends(get_db),
+):
     """Triggered by Cloud Scheduler — generates monthly guest insights report."""
     _verify(x_internal_secret)
+    if not await is_job_enabled("insights", db):
+        logger.info("insights job skipped — disabled via system config")
+        return {"status": "skipped", "reason": "disabled"}
     try:
         await generate_monthly_insights()
         return {"status": "ok", "job": "monthly_insights"}
@@ -74,9 +95,15 @@ async def run_insights(x_internal_secret: str | None = Header(default=None)):
 
 
 @router.post("/cleanup-leads", include_in_schema=False)
-async def cleanup_leads(x_internal_secret: str | None = Header(default=None)):
+async def cleanup_leads(
+    x_internal_secret: str | None = Header(default=None),
+    db: AsyncSession = Depends(get_db),
+):
     """Triggered by Cloud Scheduler — removes leads past data retention window."""
     _verify(x_internal_secret)
+    if not await is_job_enabled("cleanup", db):
+        logger.info("cleanup job skipped — disabled via system config")
+        return {"status": "skipped", "reason": "disabled"}
     try:
         await delete_old_leads()
         return {"status": "ok", "job": "data_retention"}

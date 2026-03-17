@@ -126,9 +126,16 @@ async def run_daily_reports(report_date: date | None = None):
     Cron job: Generate and send daily reports for all properties.
     Default: run for yesterday.
     """
+    from app.database import async_session as _async_session
+    from app.services.system_config import is_job_enabled as _is_job_enabled
+    async with _async_session() as _db:
+        if not await _is_job_enabled("daily_report", _db):
+            logger.info("daily_report skipped — disabled via system config")
+            return
+
     if report_date is None:
         report_date = date.today() - timedelta(days=1)
-        
+
     logger.info("Starting daily report generation", report_date=report_date)
     
     async with async_session() as db:
@@ -209,6 +216,12 @@ async def process_automated_follow_ups(db: AsyncSession = None):
     from app.services.whatsapp import send_whatsapp_message
     from app.services.twilio_whatsapp import send_twilio_message
     from app.services.email import send_email
+    from app.services.system_config import is_job_enabled as _is_job_enabled
+
+    async with async_session() as _db:
+        if not await _is_job_enabled("followups", _db):
+            logger.info("followups skipped — disabled via system config")
+            return
 
     logger.info("Running automated follow-ups job")
 
@@ -301,6 +314,12 @@ async def generate_monthly_insights(db: AsyncSession = None):
     """
     from app.database import async_session, set_db_context
     from app.models import Property
+    from app.services.system_config import is_job_enabled as _is_job_enabled
+
+    async with async_session() as _db:
+        if not await _is_job_enabled("insights", _db):
+            logger.info("insights skipped — disabled via system config")
+            return
     from app.services.insights import compute_monthly_insights
     from app.services.email import send_email
     

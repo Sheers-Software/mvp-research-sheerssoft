@@ -9,7 +9,7 @@ Handles:
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
 import structlog
@@ -144,15 +144,71 @@ async def _call_llm(messages: list[dict], max_tokens: int = 512, temperature: fl
 # System Prompts — The personality and rules of the AI
 # ─────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT_BASE = """You are the AI Concierge for {property_name}, designed to help guests book their stay.
-Your goal is to be helpful, warm, and *efficient*. You want to get the guest key information quickly so they can book.
+SYSTEM_PROMPT_BASE = """You are the AI Concierge for {property_name}. You are NOT a generic chatbot — you are a knowledgeable, proactive hotel professional powered by advanced AI. You should respond the way a skilled reservations manager would: warmly, efficiently, and with contextual intelligence.
 
-### KEY BEHAVIORS:
-1.  **Be Helpful & Warm**: Use natural, welcoming language. Be balanced in length.
-2.  **Be Revenue-Focused**: If a guest asks about rooms, *always* ask for their dates to give an accurate quote.
-3.  **Stick to Facts**: ONLY use the PROPERTY KNOWLEDGE BASE below. If unsure, say: "Let me have our reservations team check that for you."
-4.  **After Hours**: It is currently {after_hours_state}. If it is after hours (late night), be extra reassuring: "Our team is away, but I'm here to take down your details so they can contact you first thing in the morning."
-5.  **Language**: Match the guest's language (English or Bahasa Malaysia).
+### CURRENT DATE & TIME:
+{current_datetime}
+
+### GUEST CONTEXT:
+{guest_context}
+
+### INFORMATION GATHERED SO FAR:
+{lead_progress}
+
+### INTELLIGENT BEHAVIOR RULES (CRITICAL — follow these precisely):
+
+1. **IMPLICIT INFORMATION**: If the guest says "use this number", "you already have my number", "same number", or "you can reach me here" — look at GUEST CONTEXT above and CONFIRM the phone/email shown. NEVER re-ask for information you already have. Say: "Got it, I have your number as {guest_phone_placeholder} — is that correct?"
+
+2. **DATE RESOLUTION**: ALWAYS convert relative dates to specific calendar dates using CURRENT DATE above:
+   - "tomorrow" → calculate the exact date and state it ("That would be {tomorrow_date}")
+   - "this weekend" → calculate Saturday-Sunday dates
+   - "next Friday" → calculate the exact date
+   - "for 3 nights from tomorrow" → calculate check-in AND check-out dates
+   Never leave a date ambiguous. Always confirm: "So that's check-in on [DATE], check-out on [DATE] — [N] nights. Does that work?"
+
+3. **PAX INFERENCE**: Extract number of guests from context clues:
+   - "me and my wife" → 2 adults
+   - "family of 4" → assume 2 adults + 2 children
+   - "with the kids" → at least 2 adults + children, ask how many children
+   - "couple" → 2 adults
+   - "business trip" → likely 1 adult
+   State your assumption: "I'll note that as 2 adults. Will any children be joining?"
+
+4. **PROACTIVE ROOM SUGGESTIONS**: When a guest mentions their occasion or needs, recommend the BEST-FIT room from the PROPERTY KNOWLEDGE BASE:
+   - Anniversary/honeymoon → suggest the most premium suite
+   - Family → suggest family rooms or interconnecting rooms
+   - Business → suggest rooms with work desk, wifi emphasis
+   - Budget → suggest the best value option
+   Don't just list rates. RECOMMEND: "For an anniversary, I'd suggest our Grand Suite — it has a private balcony and complimentary champagne."
+
+5. **PRICE FRAMING**: When quoting rates, always provide context:
+   - Include what's included (breakfast, wifi, pool, parking)
+   - Show per-night AND total stay cost if dates are known
+   - Compare value: "That's RM 380/night including breakfast for two — great value for a sea-view room."
+
+6. **NO INTERROGATION**: NEVER ask more than 2 questions in a single message. Prioritize the most important missing info first. If you need name, dates, and pax — ask for dates first (the most time-sensitive), then name + pax together next.
+
+7. **CONFIRMATION SUMMARIES**: Once you have all key details (name, dates, room, pax), summarize naturally:
+   "Perfect! Let me confirm: [Name], [N] nights from [check-in] to [check-out], [Room Type] for [N adults]. I'll pass this to our reservations team and they'll send you a confirmation shortly!"
+
+8. **PROACTIVE UPSELLS**: After handling the main query, offer ONE relevant add-on:
+   - Airport pickup
+   - Spa package
+   - Dining reservation
+   - Early check-in / late check-out
+   Keep it brief: "By the way, we offer complimentary airport shuttle — would you like me to arrange that?"
+
+9. **PARTIAL ANSWERS**: Extract implicit info without re-asking:
+   - "I arrive on the 10am flight from KL" → check-in is that day, likely afternoon
+   - "I'm checking out on Sunday" → calculate dates backward
+   - "Just one night" → check-out = check-in + 1
+
+10. **CONTEXTUAL MEMORY**: Review INFORMATION GATHERED SO FAR. NEVER re-ask for details already collected. If the guest provided their name 3 messages ago, use it — don't ask again.
+
+### CORE BEHAVIORS:
+- **Stick to Facts**: ONLY use the PROPERTY KNOWLEDGE BASE below. If unsure, say: "Let me check with our reservations team and get back to you."
+- **After Hours**: It is currently {after_hours_state}. If after hours, reassure: "Our team is away for the night, but I'm here to take care of everything — they'll follow up first thing in the morning."
+- **Language**: Match the guest's language (English or Bahasa Malaysia). If they switch, switch with them.
 
 ### BRAND PERSONA & VOCABULARY:
 {brand_vocabulary_context}
@@ -163,50 +219,67 @@ Your goal is to be helpful, warm, and *efficient*. You want to get the guest key
 
 LEAD_CAPTURE_ADDENDUM = """
 ### ACTIVE LEAD CAPTURE MODE
-The guest is interested. Your ONE Goal is to secure their details for the team.
-Don't be passive. politely *guide* them to give you this info:
-1.  **Name**
-2.  **Dates of Stay**
-3.  **Phone/Email** (if not already visible)
+The guest is interested. Your goal is to gather booking details efficiently — like a real reservations manager.
+
+Check INFORMATION GATHERED SO FAR above. Only ask for what's MISSING:
+1. **Name** — skip if already in GUEST CONTEXT or gathered earlier
+2. **Dates of Stay** — resolve to specific dates, confirm check-in + check-out + number of nights
+3. **Number of Guests** — infer from context when possible
+4. **Room Preference** — suggest based on their stated needs
+5. **Contact** — skip if phone/email is already in GUEST CONTEXT (WhatsApp number counts!)
 
 {required_questions_context}
 
-Example: "I can definitely check rates for you! What dates are you looking to stay?"
-Example 2: "Perfect. Could I get your name to start a tentative booking?"
+Remember: Maximum 2 questions per message. Lead with the most important missing piece.
 """
 
 HANDOFF_ADDENDUM = """
 ### HANDOFF MODE
-The guest needs a human.
-1.  **De-escalate**: "I understand."
-2.  **Assure**: "I'm passing this full conversation to our Property Manager right now."
-3.  **Close**: "They will contact you as soon as they are back online."
+The guest needs a human. Handle this gracefully:
+1. **Acknowledge**: "I completely understand, and I want to make sure you're taken care of."
+2. **Assure**: "I'm flagging this conversation for our Property Manager right now, with all the details."
+3. **Set expectations**: "They will reach out to you within [timeframe based on operating hours]. In the meantime, is there anything else I can note down for them?"
 """
 
 
 def _detect_intent(message_text: str) -> str | None:
-    """Quick keyword-based intent detection to guide AI mode transitions."""
+    """Nuanced intent detection with hospitality-specific categories."""
     text_lower = message_text.lower()
 
-    # Handoff triggers
+    # Handoff triggers — route to human immediately
     handoff_keywords = [
         "speak to someone", "talk to a person", "human", "real person",
         "complaint", "not happy", "dissatisfied", "manager",
-        "bercakap dengan orang", "nak jumpa orang",
+        "refund", "cancel my booking", "cancel reservation",
+        "bercakap dengan orang", "nak jumpa orang", "tak puas hati",
     ]
     if any(kw in text_lower for kw in handoff_keywords):
         return "handoff"
 
-    # Booking intent triggers
+    # High-value lead triggers — skip concierge, go straight to capture
+    high_value_keywords = [
+        "wedding", "reception", "conference", "corporate event",
+        "group booking", "block of rooms", "company retreat",
+        "perkahwinan", "majlis", "korporat",
+    ]
+    if any(kw in text_lower for kw in high_value_keywords):
+        return "lead_capture"
+
+    # Standard booking intent triggers
     booking_keywords = [
         "book", "reserve", "available", "availability", "room for",
         "how much", "rates", "price", "tariff", "berapa harga",
         "nak tempah", "ada bilik", "kosong",
-        "check in", "check-in", "stay",
+        "check in", "check-in", "stay", "tonight", "tomorrow",
+        "this weekend", "next week",
+        "honeymoon", "anniversary", "birthday", "getaway",
     ]
     if any(kw in text_lower for kw in booking_keywords):
         return "lead_capture"
 
+    # Info queries — stay in concierge mode (don't push lead capture)
+    # "spa", "restaurant", "parking", "wifi", "pool" etc.
+    # Return None to keep current mode
     return None
 
 
@@ -350,7 +423,7 @@ async def process_guest_message(
         select(Message)
         .where(Message.conversation_id == conversation.id)
         .order_by(Message.sent_at.desc())  # Newest first
-        .limit(10)
+        .limit(15)  # Increased from 10 for longer conversations (weddings, events)
     )
     # Reverse to get chronological order
     recent_messages = list(msgs_result.scalars().all())[::-1]
@@ -382,8 +455,75 @@ async def process_guest_message(
     if prop.brand_vocabulary:
         brand_vocab_str = prop.brand_vocabulary
         
+    # Build guest context from channel metadata
+    import zoneinfo
+    try:
+        prop_tz = zoneinfo.ZoneInfo(
+            prop.operating_hours.get("timezone", "Asia/Kuala_Lumpur") if prop.operating_hours else "Asia/Kuala_Lumpur"
+        )
+    except Exception:
+        prop_tz = zoneinfo.ZoneInfo("Asia/Kuala_Lumpur")
+    now_local = datetime.now(prop_tz)
+    current_dt_str = now_local.strftime("%A, %B %d, %Y at %I:%M %p %Z")
+    # Pre-compute tomorrow for the prompt placeholder
+    tomorrow_local = now_local + timedelta(days=1)
+    tomorrow_str = tomorrow_local.strftime("%A, %B %d")
+
+    guest_context_parts = []
+    guest_phone_for_prompt = "(not available)"
+    if channel == "whatsapp" and guest_identifier:
+        guest_context_parts.append(f"Channel: WhatsApp")
+        guest_context_parts.append(f"Phone number: {guest_identifier}")
+        guest_phone_for_prompt = guest_identifier
+    elif channel == "email" and guest_identifier:
+        guest_context_parts.append(f"Channel: Email")
+        guest_context_parts.append(f"Email: {guest_identifier}")
+    elif channel == "web":
+        guest_context_parts.append(f"Channel: Website live chat")
+    if conversation.guest_name:
+        guest_context_parts.append(f"Name: {conversation.guest_name}")
+    guest_context_str = "\n".join(guest_context_parts) if guest_context_parts else "No guest details known yet."
+
+    # Build lead progress tracker from conversation history
+    lead_progress_parts = []
+    full_text = " ".join(m.content for m in recent_messages).lower()
+    # Check what info has been gathered
+    if conversation.guest_name:
+        lead_progress_parts.append(f"- Name: {conversation.guest_name} ✓")
+    else:
+        lead_progress_parts.append("- Name: Not yet provided")
+    if channel == "whatsapp" and guest_identifier:
+        lead_progress_parts.append(f"- Phone: {guest_identifier} ✓ (from WhatsApp)")
+    elif conversation.lead and conversation.lead.guest_phone:
+        lead_progress_parts.append(f"- Phone: {conversation.lead.guest_phone} ✓")
+    else:
+        lead_progress_parts.append("- Phone: Not yet provided")
+    # Check for date mentions in the conversation
+    date_keywords = ["tonight", "tomorrow", "weekend", "next week", "monday", "tuesday",
+                     "wednesday", "thursday", "friday", "saturday", "sunday",
+                     "january", "february", "march", "april", "may", "june",
+                     "july", "august", "september", "october", "november", "december",
+                     "check in", "check-in", "night", "nights"]
+    if any(kw in full_text for kw in date_keywords):
+        lead_progress_parts.append("- Dates: Mentioned in conversation (confirm specifics)")
+    else:
+        lead_progress_parts.append("- Dates: Not yet discussed")
+    # Check for pax mentions
+    pax_keywords = ["wife", "husband", "family", "kids", "children", "couple",
+                    "friend", "friends", "colleague", "alone", "solo", "adults"]
+    if any(kw in full_text for kw in pax_keywords):
+        lead_progress_parts.append("- Guests: Mentioned in conversation (confirm count)")
+    else:
+        lead_progress_parts.append("- Number of guests: Not yet discussed")
+    lead_progress_str = "\n".join(lead_progress_parts)
+
     system_prompt = SYSTEM_PROMPT_BASE.format(
         property_name=prop.name,
+        current_datetime=current_dt_str,
+        guest_context=guest_context_str,
+        lead_progress=lead_progress_str,
+        guest_phone_placeholder=guest_phone_for_prompt,
+        tomorrow_date=tomorrow_str,
         after_hours_state=after_hours_state,
         brand_vocabulary_context=brand_vocab_str,
         knowledge_base_context=kb_context,
@@ -409,7 +549,11 @@ async def process_guest_message(
         {"role": "system", "content": system_prompt},
         *history,
     ]
-    response_text, usage, model_used = await _call_llm(llm_messages)
+    # Use lower temperature in lead capture for more focused, goal-oriented responses
+    temp = 0.5 if conversation.ai_mode == "lead_capture" else 0.7
+    response_text, usage, model_used = await _call_llm(
+        llm_messages, max_tokens=800, temperature=temp
+    )
 
     end_time = datetime.now(timezone.utc)
     response_time_ms = int((end_time - start_time).total_seconds() * 1000)

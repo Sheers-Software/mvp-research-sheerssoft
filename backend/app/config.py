@@ -38,8 +38,8 @@ class Settings(BaseSettings):
 
     # SendGrid
     sendgrid_api_key: str = ""
-    sendgrid_from_email: str = "reports@yourdomain.com"
-    staff_notification_email: str = "reservations@vivatel.com.my"  # Default for pilot
+    sendgrid_from_email: str = ""  # Loaded from Secret Manager as SENDGRID_FROM_EMAIL
+    staff_notification_email: str = ""  # Loaded from Secret Manager as STAFF_NOTIFICATION_EMAIL; fallback to from_email
     sendgrid_webhook_public_key: str = ""  # Ed25519 public key for signature verification
 
     # WhatsApp
@@ -111,7 +111,8 @@ class Settings(BaseSettings):
         #   - GCP (Cloud Run / GCE): workload identity / attached service account (automatic)
         secrets_to_fetch = [
             "GEMINI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY",
-            "SENDGRID_API_KEY", "WHATSAPP_API_TOKEN", "WHATSAPP_APP_SECRET",
+            "SENDGRID_API_KEY", "SENDGRID_FROM_EMAIL", "STAFF_NOTIFICATION_EMAIL",
+            "WHATSAPP_API_TOKEN", "WHATSAPP_APP_SECRET",
             "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER",
             "DATABASE_URL", "JWT_SECRET", "WHATSAPP_VERIFY_TOKEN",
             "WHATSAPP_PHONE_NUMBER_ID", "FERNET_ENCRYPTION_KEY", "ADMIN_PASSWORD",

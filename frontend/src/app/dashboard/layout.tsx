@@ -2,29 +2,47 @@
 
 import { useAuth } from '@/lib/auth';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { apiGet } from '@/lib/api';
 import Link from 'next/link';
 
 const navItems = [
-    { href: '/admin', label: 'Overview', icon: '📊' },
-    { href: '/admin/onboarding', label: 'New Client', icon: '➕' },
-    { href: '/admin/pipeline', label: 'Pipeline', icon: '🔄' },
-    { href: '/admin/tenants', label: 'Tenants', icon: '🏨' },
-    { href: '/admin/tickets', label: 'Support', icon: '🎫' },
-    { href: '/admin/applications', label: 'Applications', icon: '📥' },
-    { href: '/admin/system', label: 'System', icon: '⚙️' },
+    { href: '/dashboard', label: 'Home', icon: '🏠' },
+    { href: '/dashboard/conversations', label: 'Conversations', icon: '💬' },
+    { href: '/dashboard/leads', label: 'Leads', icon: '🎯' },
+    { href: '/dashboard/analytics', label: 'Analytics', icon: '📊' },
+    { href: '/dashboard/settings', label: 'Settings', icon: '⚙️' },
 ];
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+interface PropertyInfo {
+    id: string;
+    name: string;
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { user, loading, logout } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
+    const [property, setProperty] = useState<PropertyInfo | null>(null);
 
     useEffect(() => {
         if (!loading && !user) {
             router.replace('/login');
         }
     }, [user, loading, router]);
+
+    useEffect(() => {
+        // Fetch the user's primary property for display and API calls
+        apiGet<any>('/analytics/dashboard')
+            .then((data) => {
+                if (data?.property_id && data?.property_name) {
+                    setProperty({ id: data.property_id, name: data.property_name });
+                }
+            })
+            .catch(() => {
+                // Try to get from the first property in the user's scope
+            });
+    }, []);
 
     if (loading) {
         return (
@@ -41,7 +59,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <aside className="sidebar">
                 <div className="sidebar-brand">
                     <h2>Nocturn AI</h2>
-                    <p>SheersSoft Admin</p>
+                    <p>{property?.name || 'Hotel Dashboard'}</p>
                 </div>
 
                 <nav className="sidebar-nav">
@@ -56,12 +74,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             {item.label}
                         </Link>
                     ))}
+
+                    {user.is_superadmin && (
+                        <>
+                            <span className="nav-section" style={{ marginTop: 16 }}>Admin</span>
+                            <Link href="/admin" className="nav-link">
+                                <span className="nav-icon">⚙️</span>
+                                Platform Admin
+                            </Link>
+                        </>
+                    )}
                 </nav>
 
                 <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border-subtle)' }}>
                     <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
                         <span className="text-sm">{user.full_name}</span>
-                        <span className="badge badge-info">{user.is_superadmin ? 'Admin' : 'Staff'}</span>
+                        <span className="badge badge-success">Staff</span>
                     </div>
                     <button className="btn btn-ghost btn-sm w-full" onClick={logout}>
                         Logout
