@@ -158,23 +158,33 @@ Onboarding progress score (0–100) computed from milestone flags, surfaced at `
 
 ### Authentication & Authorization
 
-**Current state (v0.3.0 — functional but incomplete, see `docs/auth_rbac_plan.md` for full plan):**
+**Current state (v0.3.0 — functional but incomplete):**
 
-- **SuperAdmin** (`require_superadmin()`): checks `User.is_superadmin`; protects all `/superadmin` and `/onboarding` routes. Intended for SheersSoft internal staff only.
+- **SuperAdmin** (`require_superadmin()`): checks `User.is_superadmin`; protects all `/superadmin` and `/onboarding` routes. Restricted to explicit `SUPERADMIN_EMAILS` list only — no domain wildcards. Bidirectional sync on every login.
 - **Tenant access** (`check_tenant_access()`): verifies `TenantMembership`; `is_superadmin` bypasses check
 - **Property access** (`check_property_access()`): legacy JWT property_id matching
 - **Supabase Auth**: Magic link via `POST /auth/v1/magiclink?redirect_to=...` → PKCE code exchange at `/auth/callback` (supabase-js) → backend issues own JWT via `POST /auth/supabase-callback`
 
-**User planes — intended separation:**
-1. **SheersSoft System Admin** (`is_superadmin=True`) → `/admin` portal
-2. **Tenant Owner/Admin** (`TenantMembership.role=owner|admin`) → `/portal` (not yet built)
-3. **Property Staff** (`TenantMembership.role=staff`) → `/dashboard`
-4. **First-time invited user** (no membership yet) → `/welcome` onboarding wizard (not yet built)
+**Auth callback routing (target state):**
+```
+is_superadmin=True                       → /admin
+role=owner AND onboarding_completed=false → /welcome
+role=owner AND onboarding_completed=true  → /portal
+role=admin                               → /portal
+role=staff                               → /dashboard
+no membership                            → /welcome (or access-denied if not invited)
+```
 
-**Known security gaps (P0 before first real client):**
+**User planes — intended separation (see `docs/portal_architecture.md`):**
+1. **SheersSoft System Admin** (`is_superadmin=True`) → `/admin` — ops, observability, maintenance controls
+2. **Tenant Owner/Admin** (`TenantMembership.role=owner|admin`) → `/portal` — configure business (KB, team, channels, billing)
+3. **Property Staff** (`TenantMembership.role=staff`) → `/dashboard` — day-to-day operations (conversations, leads, analytics)
+4. **First-time user** (no membership or `onboarding_completed=false`) → `/welcome` — onboarding wizard
+
+**Known security gaps (P0 before first real client, see `docs/auth_rbac_plan.md`):**
 - `SUPERADMIN_EMAILS` is currently in `cloudbuild.yaml` (should be in Secret Manager, not in repo)
 - Legacy `admin/password123` hardcoded in config — development only, must be removed before client onboarding
-- Auto-provisioning of unknown emails should be gated to invitation-only (currently creates a user record for any valid Supabase auth)
+- Auto-provisioning of unknown emails should be gated to invitation-only
 - `staff_tier` granularity within `role=staff` not yet implemented (manager vs revenue vs ops)
 
 ### Support Chatbot
@@ -318,6 +328,8 @@ Run in a separate terminal. Copy the printed `whsec_` and add to Secret Manager 
 
 ## Documentation
 
+- `docs/portal_architecture.md` — **Portal separation plan**: internal ops portal vs tenant portal vs property dashboard. Feature specs, new endpoints, data model changes, implementation phases.
+- `docs/auth_rbac_plan.md` — Security audit, user taxonomy (3 planes), process flows, P0/P1/P2 hardening tasks
 - `docs/architecture.md` — detailed system design rationale
 - `docs/prd.md` — product requirements
 - `docs/walkthrough_twilio_demo.md` — step-by-step live demo guide
