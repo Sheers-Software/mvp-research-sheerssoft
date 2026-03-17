@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     # Environment
     environment: str = "development"
     allowed_origins: str = "http://localhost:3000"
+    frontend_url: str = "http://localhost:3000"  # Used for magic link redirect; set to deployed frontend URL
 
     # Report scheduling
     daily_report_hour: int = 7

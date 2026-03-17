@@ -68,7 +68,7 @@ steps:
       - --memory=1Gi
       - --timeout=300
       - --cpu-throttling
-      - --set-env-vars=ENVIRONMENT=demo
+      - --set-env-vars=ENVIRONMENT=demo,FRONTEND_URL=https://nocturn-frontend-343745766874.asia-southeast1.run.app
       - --allow-unauthenticated
       - --port=8080
 

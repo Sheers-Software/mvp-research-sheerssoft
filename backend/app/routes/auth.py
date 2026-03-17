@@ -21,6 +21,10 @@ from app.schemas import (
     MagicLinkRequest, UserProfileResponse, TenantMembershipResponse,
     TokenResponse,
 )
+from pydantic import BaseModel
+
+class SupabaseCallbackRequest(BaseModel):
+    access_token: str
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -89,7 +93,7 @@ async def request_magic_link(body: MagicLinkRequest):
                 json={
                     "email": body.email,
                     "options": {
-                        "emailRedirectTo": settings.allowed_origins.split(",")[0]
+                        "emailRedirectTo": f"{settings.frontend_url.rstrip('/')}/auth/callback"
                     }
                 },
                 timeout=10.0,
@@ -107,6 +111,86 @@ async def request_magic_link(body: MagicLinkRequest):
     except httpx.RequestError as e:
         logger.error("Supabase Auth request failed", error=str(e))
         raise HTTPException(status_code=503, detail="Authentication service unavailable")
+
+
+@router.post("/auth/supabase-callback")
+async def supabase_token_exchange(
+    body: SupabaseCallbackRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Exchange a Supabase access token for a backend JWT.
+    Called by the frontend /auth/callback page after a magic link redirect.
+    """
+    settings = get_settings()
+
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        raise HTTPException(status_code=503, detail="Supabase not configured")
+
+    # Verify the Supabase token and retrieve the user profile
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{settings.supabase_url}/auth/v1/user",
+                headers={
+                    "apikey": settings.supabase_service_role_key,
+                    "Authorization": f"Bearer {body.access_token}",
+                },
+                timeout=10.0,
+            )
+    except httpx.RequestError as e:
+        logger.error("Supabase user lookup failed", error=str(e))
+        raise HTTPException(status_code=503, detail="Authentication service unavailable")
+
+    if resp.status_code != 200:
+        logger.warning("Supabase token rejected", status=resp.status_code)
+        raise HTTPException(status_code=401, detail="Invalid or expired magic link token")
+
+    supabase_user = resp.json()
+    supabase_id = supabase_user.get("id")
+    email = supabase_user.get("email")
+
+    # Look up user in our DB by Supabase UUID first, then by email
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.memberships))
+        .where(User.id == supabase_id)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user and email:
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.memberships))
+            .where(User.email == email)
+        )
+        user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="User account not found. Contact your administrator."
+        )
+
+    # Issue our own backend JWT
+    expire = datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expiry_hours)
+    property_ids: list = []
+    for m in user.memberships:
+        if m.accessible_property_ids:
+            property_ids.extend([str(p) for p in m.accessible_property_ids])
+    to_encode = {
+        "sub": str(user.id),
+        "exp": expire,
+        "is_admin": user.is_superadmin,
+        "property_ids": ["*"] if user.is_superadmin else property_ids,
+    }
+    token = jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+    user.last_login_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    logger.info("Supabase magic link exchange succeeded", email=email)
+    return {"access_token": token, "token_type": "bearer"}
 
 
 @router.get("/auth/me", response_model=UserProfileResponse)
