@@ -15,8 +15,8 @@ P0 product code is **complete**. The remaining blockers are infra tasks and fiel
 |---|---------|--------|-----------------|
 | 1 | **Dashboard home shows onboarding checklist, not revenue** | ✅ **RESOLVED** — v0.3.1. Dashboard home shows KPI cards as the landing screen. | — |
 | 2 | **Staff cannot reply from dashboard** | ✅ **RESOLVED** — v0.3.1. Reply box live in conversations view, replies forwarded to WhatsApp/web. | — |
-| 3 | **Daily email report blocked in production** | ❌ **INFRA TASK** — `SENDGRID_API_KEY` not in Secret Manager; Cloud Scheduler jobs not created. ~2h. | Add key to Secret Manager; create 4 Cloud Scheduler jobs. See `docs/p0_sendgrid_setup.md`. |
-| 4 | **`FERNET_ENCRYPTION_KEY` missing** | ❌ **INFRA TASK** — PII encryption bypassed — PDPA non-compliant. ~30min. | Generate key, add to Secret Manager, redeploy. |
+| 3 | **Daily email report blocked in production** | ✅ **RESOLVED** — `SENDGRID_API_KEY` + `SENDGRID_FROM_EMAIL` in Secret Manager. 4 Cloud Scheduler jobs created and verified (nocturn-daily-report, nocturn-followups, nocturn-insights, nocturn-keepalive). Manual trigger confirmed HTTP 200. | — |
+| 4 | **`FERNET_ENCRYPTION_KEY` missing** | ✅ **RESOLVED** — Key confirmed in Secret Manager. PII encryption active. | — |
 | 5 | **Bilingual (BM) responses untested end-to-end** | ❌ **FIELD WORK** — 50-question test suite written but not run. Half-day. | Run via Twilio sandbox → Vivatel test number. Must pass ≥80% (see `docs/bm_test_execution_plan.md`). |
 | 6 | **Vivatel KB not populated** | ❌ **FIELD WORK** — No KB ingested for Vivatel property. 1 day with Zul. | KB session: collect all 28 intake questions, ingest via `python backend/scripts/ingest_kb.py`. |
 | 7 | **"Lost" status missing from leads filter UI** | ✅ **RESOLVED** — v0.3.1. Lost filter live in leads view. | — |

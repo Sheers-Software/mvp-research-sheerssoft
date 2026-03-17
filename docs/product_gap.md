@@ -1,6 +1,6 @@
 # Product Gap Analysis
 ## Nocturn AI — What to Build, What to Drop, How to Get Paid
-### Version 1.2 · 18 Mar 2026
+### Version 1.3 · 18 Mar 2026
 ### Cross-referenced with: prd.md v2.0, portal_architecture.md, gtm_execution_plan.md, workflow_zero_to_paid.md, revenue_methodology.md
 
 ---
@@ -15,8 +15,8 @@
 | "Lost" filter in leads | ✅ Done |
 | Maintenance mode (backend + UI + banner) | ✅ Done — Phase 1.5 complete |
 | Magic link auth (Supabase PKCE) | ✅ Done — superadmin restricted to `a.basyir@sheerssoft.com` |
-| Daily email in production | ❌ Missing `SENDGRID_API_KEY` + Cloud Scheduler jobs |
-| FERNET encryption key | ❌ Not in Secret Manager |
+| Daily email in production | ✅ Done — `SENDGRID_API_KEY` configured, 4 Cloud Scheduler jobs live |
+| FERNET encryption key | ✅ Done — `FERNET_ENCRYPTION_KEY` in Secret Manager |
 | BM end-to-end test (50 questions) | ❌ Not run |
 | Vivatel KB population | ❌ Requires Zul session |
 | Service health dashboard (`/admin/health`) | ✅ Done — Phase 1.5 I1.2 |
@@ -40,7 +40,7 @@ The portal architecture has been designed and Phase 1.5 (SheersSoft internal con
 Step 1: GM opens dashboard → SEES revenue ✅ DONE
 Step 2: GM sees leads with full conversation context ✅ DONE
 Step 3: Staff replies from dashboard → guest receives it on WhatsApp ✅ DONE
-Step 4: GM gets email at 7am confirming last night's numbers ❌ BLOCKED (SendGrid + Scheduler)
+Step 4: GM gets email at 7am confirming last night's numbers ✅ DONE (SendGrid + Scheduler live)
 Step 5: BM test passes ≥80% ❌ NOT RUN
 Step 6: Vivatel KB populated ❌ NEEDS ZUL SESSION
 Step 7: GM says "this is working" → invoice paid ← TARGET
@@ -50,43 +50,21 @@ Step 7: GM says "this is working" → invoice paid ← TARGET
 
 ## 3. Remaining Obstacles to First Payment
 
-### Obstacle C: Daily Email Not Live in Production ← HIGHEST REMAINING PRIORITY
+### ~~Obstacle C: Daily Email Not Live in Production~~ — ✅ RESOLVED
 
-**Status:** SendGrid API key missing from Secret Manager. Cloud Scheduler jobs not created.
+**Status:** `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL` configured in Secret Manager. All 4 Cloud Scheduler jobs created and verified:
+- `nocturn-daily-report` — 7:30am MYT daily
+- `nocturn-followups` — every hour MYT
+- `nocturn-insights` — 8am MYT on 1st of each month
+- `nocturn-keepalive` — every 6 hours MYT (ping /health to prevent cold starts)
 
-**Why this is still fatal:** The 7am daily email is the retention hook. A GM who doesn't log in daily still stays engaged because the email shows up in their inbox. Without it, the AI is invisible between demos.
-
-**Fix (2 actions, ~2 hours):**
-```bash
-# Action 1: Add SendGrid API key
-echo -n "SG.xxxx" | gcloud secrets versions add SENDGRID_API_KEY \
-  --data-file=- --project=nocturn-ai-487207
-
-# Action 2: Create all 4 Cloud Scheduler jobs
-gcloud scheduler jobs create http nocturn-daily-report \
-  --location=asia-southeast1 --schedule="30 7 * * *" \
-  --time-zone="Asia/Kuala_Lumpur" \
-  --uri="https://nocturn-backend-owtn645vea-as.a.run.app/api/v1/internal/run-daily-report" \
-  --http-method=POST \
-  --headers="X-Internal-Secret=<from Secret Manager INTERNAL_SCHEDULER_SECRET>" \
-  --attempt-deadline=30s
-
-# Plus: nocturn-followups (0 * * * *), nocturn-insights (0 8 1 * *), nocturn-keepalive (0 12 */6 * * GET /health)
-```
+Manual trigger test passed (HTTP 200) on 18 Mar 2026. Old duplicate jobs (`daily-report`, `run-followups`, `run-insights`, `db-keepalive`) deleted.
 
 ---
 
-### Obstacle D: PII Encryption Key Missing
+### ~~Obstacle D: PII Encryption Key Missing~~ — ✅ RESOLVED
 
-**Status:** `FERNET_ENCRYPTION_KEY` not in Secret Manager. Encryption silently bypassed.
-
-**Fix (30 min):**
-```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-echo -n "<key>" | gcloud secrets versions add FERNET_ENCRYPTION_KEY \
-  --data-file=- --project=nocturn-ai-487207
-```
-Redeploy after adding. Verify: new lead captured → phone field encrypted in DB.
+**Status:** `FERNET_ENCRYPTION_KEY` confirmed in GCP Secret Manager. PII field-level encryption is active for new leads.
 
 ---
 
@@ -127,13 +105,13 @@ python backend/scripts/ingest_kb.py --property-slug vivatel-kl --file vivatel_kb
 
 | Task | Type | Effort | Owner |
 |------|------|--------|-------|
-| Add `SENDGRID_API_KEY` to Secret Manager | Infra | 15 min | Ahmad Basyir |
-| Create 4 Cloud Scheduler jobs | Infra | 45 min | Ahmad Basyir |
-| Add `FERNET_ENCRYPTION_KEY` to Secret Manager + redeploy | Infra | 30 min | Ahmad Basyir |
+| ~~Add `SENDGRID_API_KEY` to Secret Manager~~ | ✅ Done | — | — |
+| ~~Create 4 Cloud Scheduler jobs~~ | ✅ Done — `nocturn-daily-report`, `nocturn-followups`, `nocturn-insights`, `nocturn-keepalive` | — | — |
+| ~~Add `FERNET_ENCRYPTION_KEY` to Secret Manager~~ | ✅ Done | — | — |
 | BM 50-question end-to-end test | Field test | Half day | Ahmad Basyir |
 | Vivatel KB population session with Zul | Field work | 1 day | Ahmad Basyir + Zul |
 
-**Total: ~2 days. No remaining product code blocks the pilot.**
+**Total remaining: 1.5 days of field work. All infra and product code is complete.**
 
 ---
 
@@ -247,4 +225,4 @@ Cost Savings = AI-handled inquiries × 0.25 hrs × RM 25/hr
 
 ---
 
-*v1.2 update: Maintenance mode (I1.1) and service health dashboard (I1.2) complete. Phase 1.5 is 2/3 done — only announcements system (I1.3) remaining. Remaining pilot blockers are infra tasks (2h) and field work (1.5 days) — no product code blocks the pilot.*
+*v1.3 update: All infra tasks for P0 complete — SendGrid, FERNET, 4 Cloud Scheduler jobs live and verified. Daily report confirmed working (HTTP 200 on manual trigger). Remaining pilot blockers are field work only: BM test (half day) and Vivatel KB session (1 day with Zul). Phase 1.5 at 2/3: announcements system (I1.3) is next product task.*

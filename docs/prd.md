@@ -160,11 +160,11 @@ Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct
 |---|-----|--------|-----|
 | 1 | **Dashboard home shows onboarding checklist, not revenue KPIs** | ✅ **RESOLVED** — `/dashboard` home shows revenue KPI cards (inquiries, after-hours, leads, estimated revenue recovered). Rebuilt in v0.3.1. | — |
 | 2 | **Staff cannot reply to guest from dashboard** | ✅ **RESOLVED** — Staff reply input live in `/dashboard/conversations`. Replies forwarded to guest via original channel (WhatsApp/web). v0.3.1. | — |
-| 3 | **Daily email non-functional in production** | ❌ **OUTSTANDING** — `SENDGRID_API_KEY` missing from GCP Secret Manager. Cloud Scheduler `run-daily-report` job not created. This is the highest remaining infra task before pilot go-live. | Add `SENDGRID_API_KEY` to Secret Manager. Create 4 Cloud Scheduler jobs. ~2h. |
+| 3 | **Daily email non-functional in production** | ✅ **RESOLVED** — `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL` in Secret Manager. 4 Cloud Scheduler jobs live (`nocturn-daily-report` at 7:30am MYT, `nocturn-followups` hourly, `nocturn-insights` monthly, `nocturn-keepalive` every 6h). Manual trigger confirmed HTTP 200. | — |
 | 4 | **"Lost" status missing from leads UI** | ✅ **RESOLVED** — Lost filter tab live in `/dashboard/leads`. Staff can mark leads lost. v0.3.1. | — |
 | 5 | **Bilingual AI not formally tested** | ❌ **OUTSTANDING** — BM/Manglish support is live but the 50-question test suite has not been run. Must pass ≥80% before pilot go-live. | Run 50-question suite (see `docs/bm_test_suite.md`) via Twilio sandbox → Vivatel test number. Half-day field work. |
 
-**Summary: 3 of 5 gaps resolved. Remaining:** daily email infra (P0.3) and BM test (P0.6). No product code outstanding for P0.
+**Summary: 4 of 5 gaps resolved. Remaining:** BM test (P0.6) — half-day field work. No product code or infra outstanding for P0.
 
 ---
 
@@ -297,8 +297,8 @@ Targets aligned with `gtm_execution_plan.md` 90-day scorecard:
 - ✅ "Lost" status filter in leads UI (v0.3.1)
 - ✅ Maintenance mode — backend + admin toggle + tenant banner (v0.3.2)
 - ✅ Service health dashboard `/admin/health` (v0.3.2)
-- ❌ Daily email live in production — add `SENDGRID_API_KEY` + create 4 Cloud Scheduler jobs (~2h infra)
-- ❌ `FERNET_ENCRYPTION_KEY` in Secret Manager + redeploy (~30min infra)
+- ✅ Daily email live in production — `SENDGRID_API_KEY` + 4 Cloud Scheduler jobs confirmed (v0.3.2)
+- ✅ `FERNET_ENCRYPTION_KEY` in Secret Manager — PII encryption active (v0.3.2)
 - ❌ 50-question BM/Manglish test suite run at ≥80% pass rate (half-day field work)
 - ❌ Vivatel KB populated (1-day session with Zul)
 
