@@ -83,6 +83,7 @@ async def request_magic_link(body: MagicLinkRequest):
         )
 
     try:
+        redirect_to = f"{settings.frontend_url.rstrip('/')}/auth/callback"
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{settings.supabase_url}/auth/v1/magiclink",
@@ -90,14 +91,11 @@ async def request_magic_link(body: MagicLinkRequest):
                     "apikey": settings.supabase_anon_key,
                     "Content-Type": "application/json",
                 },
-                json={
-                    "email": body.email,
-                    "options": {
-                        "emailRedirectTo": f"{settings.frontend_url.rstrip('/')}/auth/callback"
-                    }
-                },
+                params={"redirect_to": redirect_to},
+                json={"email": body.email},
                 timeout=10.0,
             )
+            logger.info("Magic link sent", email=body.email, redirect_to=redirect_to)
             if response.status_code >= 400:
                 logger.warning("Magic link request failed", status=response.status_code, body=response.text)
                 raise HTTPException(
@@ -105,7 +103,6 @@ async def request_magic_link(body: MagicLinkRequest):
                     detail="Could not send magic link. Please check your email address."
                 )
 
-        logger.info("Magic link sent", email=body.email)
         return {"message": "Magic link sent. Check your email inbox.", "email": body.email}
 
     except httpx.RequestError as e:
