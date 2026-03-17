@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     admin_user: str = "admin"
     admin_password: str = "password123"
 
+    # Comma-separated list of emails that are always granted superadmin on magic link login
+    superadmin_emails: str = ""
+
     # Security
     fernet_encryption_key: str = ""  # PII field-level encryption key
     widget_api_key_strict: bool = False  # Enforce API key validation for widget

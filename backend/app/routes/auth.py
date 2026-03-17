@@ -163,10 +163,15 @@ async def supabase_token_exchange(
         )
         user = result.scalar_one_or_none()
 
+    # Determine if this email should be superadmin
+    superadmin_list = [e.strip().lower() for e in settings.superadmin_emails.split(",") if e.strip()]
+    is_super = (
+        (email.lower() in superadmin_list) or
+        email.endswith("@sheerssoft.com")
+    ) if email else False
+
     if not user:
         # Auto-provision: create a local User record for first-time magic link logins.
-        # Grant superadmin if email domain is @sheerssoft.com, otherwise regular user.
-        is_super = email.endswith("@sheerssoft.com") if email else False
         display_name = (supabase_user.get("user_metadata") or {}).get("full_name") or (email.split("@")[0] if email else "User")
         user = User(
             id=supabase_id,
@@ -184,6 +189,10 @@ async def supabase_token_exchange(
         )
         user = result.scalar_one()
         logger.info("Auto-provisioned user from magic link", email=email, is_superadmin=is_super)
+    elif user.is_superadmin != is_super and is_super:
+        # Upgrade to superadmin if email is now in the superadmin list
+        user.is_superadmin = True
+        logger.info("Upgraded user to superadmin", email=email)
 
     # Issue our own backend JWT
     expire = datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expiry_hours)
