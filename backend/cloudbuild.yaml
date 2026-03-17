@@ -24,6 +24,10 @@ steps:
       - build
       - --build-arg
       - NEXT_PUBLIC_API_URL=https://nocturn-backend-343745766874.asia-southeast1.run.app
+      - --build-arg
+      - NEXT_PUBLIC_SUPABASE_URL=https://ramenghkpvipxijhfptp.supabase.co
+      - --build-arg
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJhbWVuZ2hrcHZpcHhpamhmcHRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0MTg5MzAsImV4cCI6MjA4Nzk5NDkzMH0.DmskI__M8XyXKwkhgrYFsBwgDyUY7GeiMHOwlEWhAQw
       - -t
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$COMMIT_SHA
       - -t
