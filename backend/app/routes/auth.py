@@ -164,10 +164,26 @@ async def supabase_token_exchange(
         user = result.scalar_one_or_none()
 
     if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="User account not found. Contact your administrator."
+        # Auto-provision: create a local User record for first-time magic link logins.
+        # Grant superadmin if email domain is @sheerssoft.com, otherwise regular user.
+        is_super = email.endswith("@sheerssoft.com") if email else False
+        display_name = (supabase_user.get("user_metadata") or {}).get("full_name") or (email.split("@")[0] if email else "User")
+        user = User(
+            id=supabase_id,
+            email=email,
+            full_name=display_name,
+            is_superadmin=is_super,
         )
+        db.add(user)
+        await db.flush()
+        # Reload with memberships relationship
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.memberships))
+            .where(User.id == supabase_id)
+        )
+        user = result.scalar_one()
+        logger.info("Auto-provisioned user from magic link", email=email, is_superadmin=is_super)
 
     # Issue our own backend JWT
     expire = datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expiry_hours)
