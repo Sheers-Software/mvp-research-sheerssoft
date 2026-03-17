@@ -22,6 +22,8 @@ steps:
     id: build-frontend
     args:
       - build
+      - --build-arg
+      - NEXT_PUBLIC_API_URL=https://nocturn-backend-343745766874.asia-southeast1.run.app
       - -t
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$COMMIT_SHA
       - -t
