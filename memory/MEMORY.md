@@ -57,6 +57,14 @@ Secrets **still missing** (add from respective dashboards):
 - Pool: `pool_size=2, max_overflow=5` — fits Supabase free tier 60-connection limit
 - `INTERNAL_SCHEDULER_SECRET` fetched from Secret Manager; protects Cloud Scheduler HTTP endpoints
 
+## Docs State (17 Mar 2026)
+
+- **Active docs** in `docs/`: prd.md (v2.0), architecture.md (v2.0), build_plan.md (v2.0), **product_gap.md (v1.0 — new)**, opportunity_2_playbook.md, AI_Inquiry_Capture_Gap_Analysis.md, gap_analysis.md, product_context.md, alignment.md, building-successful-saas-guide.md, revenue_methodology.md, cost_analysis.md, product_stories.md, product_manual.md, sales_demo_script.md, website_design_brief.md + operational docs (deployment, onboarding, user_guide, testing, sit_uat_guide, walkthrough_twilio_demo)
+- **Archived** to `docs/archive/`: raw interview transcripts (Bernard, Shamsuridah, Shafar, Bob, Zul, Amsyar, Consultant), CRM_hotels.txt, blueprint_text.txt, .docx blueprint, architecture_audit.md, implementation_vs_saas_guide_audit.md, audit_remediation_walkthrough.md, product_alignment.md (duplicate of alignment.md)
+- Key doc corrections: all docs now research-aligned — Gemini primary LLM, 768-dim embeddings, no SaaS infrastructure in customer scope, dormant infrastructure clearly labelled, revenue formula standardized to revenue_methodology.md canonical
+- **product_gap.md**: "bridge/obstacle" analysis — 7 blockers to first payment, feature priority matrix (urgent/soon/drop), canonical revenue formula example for Vivatel
+- **gtm_execution_plan.md (v1.0 — new)**: Complete workflow from current state to first paying customer across all business functions. 5 phases: Fix Gaps (Days 1–5), Activate Vivatel (6–12), Capture Evidence (13–30), Convert to Paid (28–35), Replicate (35–60), Scale to 10 (55–90). Includes 7 product tasks, Vivatel activation sequence, case study build, objection handling scripts, marketing alignment track, weekly review ritual, North Star Metric (GM dashboard logins), 90-day scorecard, and a stop-doing list.
+
 ## Architecture Changes Made This Session
 
 1. **Redis graceful fallback** (`app/core/redis.py`): If Redis unavailable/localhost, all ops use in-memory dict with TTL. `publish()` is a no-op. No crash on startup.
@@ -88,22 +96,29 @@ docker-compose up -d
 cd backend && pytest tests/test_channels.py -v
 ```
 
-## Pending Next Steps (Priority Order)
+## Pending Next Steps (Priority Order — Blockers to First Payment)
 
-1. **Cloud Scheduler jobs** — create 4 jobs to replace APScheduler in production:
-   - Daily report: `POST /api/v1/internal/run-daily-report` @ `30 7 * * *` MYT
-   - Follow-ups: `POST /api/v1/internal/run-followups` @ `0 * * * *`
-   - Monthly insights: `POST /api/v1/internal/run-insights` @ `0 8 1 * *`
-   - DB keep-alive: `GET https://nocturn-backend-owtn645vea-as.a.run.app/api/v1/health` @ `0 12 */6 * *`
-   - All internal jobs need header: `X-Internal-Secret: <value from Secret Manager>`
+1. **Dashboard home fix** — rebuild `frontend/src/app/dashboard/page.tsx` to show KPI cards (revenue, leads, inquiries) instead of onboarding checklist. The analytics data is at `/dashboard/analytics` — move it to the landing screen. **#1 critical gap.**
 
-2. **Stripe live webhook** — add `https://nocturn-backend-owtn645vea-as.a.run.app/api/v1/billing/webhook` in Stripe dashboard, update `STRIPE_WEBHOOK_SECRET` in Secret Manager
+2. **Staff reply from dashboard** — add text input + send button to conversations view. Backend already supports `POST /api/v1/conversations/{id}/messages` with `role: "staff"`.
 
-3. **FERNET_ENCRYPTION_KEY** — generate and add to Secret Manager for PII field encryption
+3. **Daily email report (production)** — (a) add `SENDGRID_API_KEY` to Secret Manager, (b) create Cloud Scheduler job: `POST /api/v1/internal/run-daily-report` @ `30 7 * * *` MYT with `X-Internal-Secret` header.
 
-4. **Custom domain** (optional) — `api.sheerssoft.com` → backend, `app.sheerssoft.com` → frontend via Cloud Run domain mapping
+4. **FERNET_ENCRYPTION_KEY** — generate and add to Secret Manager: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
 
-5. **Supabase Pro upgrade** — before first paying tenant goes live ($25/month, eliminates auto-pause)
+5. **"Lost" status filter** — add "Lost" chip to leads filter dropdown in `dashboard/leads/page.tsx`
+
+6. **BM end-to-end test** — run 10 BM conversations via Twilio sandbox → Vivatel test number with native speaker review
+
+7. **Vivatel KB population** — KB build session with Zul: collect rate card, FAQs, room types, facilities
+
+8. **Cloud Scheduler jobs** (remaining 3): run-followups @ `0 * * * *`, run-insights @ `0 8 1 * *`, db-keepalive @ `0 12 */6 * *`
+
+9. **Custom domain** (optional) — `api.sheerssoft.com` → backend, `app.sheerssoft.com` → frontend
+
+10. **Supabase Pro upgrade** — before first paying tenant ($25/month, eliminates auto-pause)
+
+**DO NOT** activate Stripe, Tenant SaaS hierarchy, Supabase Auth, SuperAdmin dashboard, or support chatbot until ≥3 paying tenants confirmed. See docs/product_gap.md Section 4.3.
 
 ## New PC Setup Checklist
 

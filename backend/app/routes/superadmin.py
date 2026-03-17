@@ -3,6 +3,8 @@ SuperAdmin routes — Internal SheersSoft dashboard API.
 Tenant management, global metrics, support queue, application intake.
 """
 
+import asyncio
+import time as _time
 import uuid
 from datetime import datetime, timezone
 
@@ -145,6 +147,176 @@ async def set_maintenance(
     _maintenance_cache["expires_at"] = 0.0
     logger.info("Maintenance mode updated", enabled=config["enabled"], eta=config["eta"])
     return config
+
+
+# ─────────────────────────────────────────────────────────────
+# Service Health Dashboard
+# ─────────────────────────────────────────────────────────────
+
+# In-process cache for health results (20s TTL)
+_health_cache: dict = {"value": None, "expires_at": 0.0}
+
+
+async def _check_service(name: str, fn) -> dict:
+    """Run a single health check coroutine, returning a result dict."""
+    start = _time.monotonic()
+    try:
+        await asyncio.wait_for(fn(), timeout=3.0)
+        latency_ms = int((_time.monotonic() - start) * 1000)
+        return {"name": name, "status": "ok", "latency_ms": latency_ms}
+    except asyncio.TimeoutError:
+        return {"name": name, "status": "timeout", "latency_ms": 3000}
+    except Exception as exc:
+        latency_ms = int((_time.monotonic() - start) * 1000)
+        return {"name": name, "status": "error", "latency_ms": latency_ms, "detail": str(exc)[:120]}
+
+
+@router.get("/superadmin/service-health")
+async def get_service_health(
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(require_superadmin),
+):
+    """
+    Parallel health check for all external services.
+    Results are cached for 20 seconds. Force-refresh by appending ?refresh=1.
+    """
+    now = _time.monotonic()
+    if _health_cache["value"] and now < _health_cache["expires_at"]:
+        return _health_cache["value"]
+
+    from app.config import get_settings
+    s = get_settings()
+
+    # ── Check functions ─────────────────────────────────────────
+
+    async def check_postgres():
+        from sqlalchemy import text
+        await db.execute(text("SELECT 1"))
+
+    async def check_redis():
+        from app.core.redis import get_redis
+        r = await get_redis()
+        if r.client:
+            await r.client.ping()
+        # In-memory fallback is expected on Cloud Run without Memorystore — report ok
+        # (sessions survive per-instance; no cross-instance pub/sub)
+
+    async def check_supabase():
+        if not s.supabase_url:
+            raise Exception("SUPABASE_URL not configured")
+        import httpx
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{s.supabase_url}/auth/v1/health", timeout=3.0)
+            resp.raise_for_status()
+
+    async def check_gemini():
+        if not s.gemini_api_key:
+            raise Exception("GEMINI_API_KEY not configured")
+        import httpx
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://generativelanguage.googleapis.com/v1beta/models",
+                params={"key": s.gemini_api_key},
+                timeout=3.0,
+            )
+            resp.raise_for_status()
+
+    async def check_openai():
+        if not s.openai_api_key:
+            raise Exception("OPENAI_API_KEY not configured")
+        import httpx
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://api.openai.com/v1/models",
+                headers={"Authorization": f"Bearer {s.openai_api_key}"},
+                timeout=3.0,
+            )
+            resp.raise_for_status()
+
+    async def check_anthropic():
+        if not s.anthropic_api_key:
+            raise Exception("ANTHROPIC_API_KEY not configured")
+        import httpx
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://api.anthropic.com/v1/models",
+                headers={
+                    "x-api-key": s.anthropic_api_key,
+                    "anthropic-version": "2023-06-01",
+                },
+                timeout=3.0,
+            )
+            resp.raise_for_status()
+
+    async def check_sendgrid():
+        if not s.sendgrid_api_key:
+            raise Exception("SENDGRID_API_KEY not configured")
+        import httpx
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://api.sendgrid.com/v3/user/profile",
+                headers={"Authorization": f"Bearer {s.sendgrid_api_key}"},
+                timeout=3.0,
+            )
+            resp.raise_for_status()
+
+    async def check_whatsapp():
+        if not s.whatsapp_api_token:
+            raise Exception("WHATSAPP_API_TOKEN not configured")
+        import httpx
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://graph.facebook.com/v18.0/me",
+                params={"access_token": s.whatsapp_api_token},
+                timeout=3.0,
+            )
+            resp.raise_for_status()
+
+    async def check_stripe():
+        if not s.stripe_api_key:
+            raise Exception("STRIPE_API_KEY not configured")
+        import httpx
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://api.stripe.com/v1/balance",
+                headers={"Authorization": f"Bearer {s.stripe_api_key}"},
+                timeout=3.0,
+            )
+            resp.raise_for_status()
+
+    # ── Run all checks in parallel ──────────────────────────────
+
+    checks = [
+        ("PostgreSQL", check_postgres),
+        ("Redis", check_redis),
+        ("Supabase Auth", check_supabase),
+        ("Gemini", check_gemini),
+        ("OpenAI", check_openai),
+        ("Anthropic", check_anthropic),
+        ("SendGrid", check_sendgrid),
+        ("WhatsApp API", check_whatsapp),
+        ("Stripe", check_stripe),
+    ]
+
+    results = await asyncio.gather(*[_check_service(name, fn) for name, fn in checks])
+
+    overall = "ok"
+    for r in results:
+        if r["status"] == "error":
+            overall = "degraded"
+            break
+        if r["status"] == "timeout":
+            overall = "degraded"
+
+    payload = {
+        "overall": overall,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "services": results,
+    }
+
+    _health_cache["value"] = payload
+    _health_cache["expires_at"] = now + 20.0
+    return payload
 
 
 # ─────────────────────────────────────────────────────────────

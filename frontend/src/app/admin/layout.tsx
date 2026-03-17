@@ -13,6 +13,7 @@ const navItems = [
     { href: '/admin/tickets', label: 'Support', icon: '🎫' },
     { href: '/admin/applications', label: 'Applications', icon: '📥' },
     { href: '/admin/system', label: 'System', icon: '⚙️' },
+    { href: '/admin/health', label: 'Service Health', icon: '🩺' },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
