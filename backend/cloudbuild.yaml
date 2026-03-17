@@ -59,14 +59,14 @@ steps:
       - --region=${_REGION}
       - --platform=managed
       - --service-account=${_SA}
-      - --min-instances=1
+      - --min-instances=0
       - --max-instances=5
       - --concurrency=80
       - --cpu=1
       - --memory=1Gi
       - --timeout=300
-      - --no-cpu-throttling
-      - --set-env-vars=ENVIRONMENT=production
+      - --cpu-throttling
+      - --set-env-vars=ENVIRONMENT=demo
       - --allow-unauthenticated
       - --port=8080
 
@@ -90,7 +90,7 @@ steps:
       - --memory=512Mi
       - --timeout=60
       - --cpu-throttling
-      - --set-env-vars=NEXT_PUBLIC_API_URL=https://nocturn-backend-owtn645vea-as.a.run.app
+      - --set-env-vars=NEXT_PUBLIC_API_URL=https://nocturn-backend-343745766874.asia-southeast1.run.app
       - --allow-unauthenticated
       - --port=3000
 
