@@ -290,9 +290,43 @@ For integration testing against live channels, see `docs/sit_uat_guide.md` and `
 
 ## Production Deployment (GCP Cloud Run)
 
-**Live URLs:**
+**Current state (as of 2026-03-18): SPUN DOWN to save cost.**
+- Cloud Run services (`nocturn-backend`, `nocturn-frontend`) have been deleted.
+- Cloud Scheduler jobs (all 4 `nocturn-*`) have been paused.
+- Latest images are cached locally (SHA `cf9e34c1ce009e8726f162cc7edce41048835a04`).
+- All secrets remain in Secret Manager. Database (Supabase) is unaffected.
+
+**Live URLs (when deployed):**
 - Backend: `https://nocturn-backend-owtn645vea-as.a.run.app`
 - Frontend: `https://nocturn-frontend-owtn645vea-as.a.run.app`
+
+**To spin back up (resume development):**
+```bash
+# 1. Deploy (rebuilds from source and recreates Cloud Run services)
+gcloud builds submit \
+  --config=backend/cloudbuild.yaml \
+  --project=nocturn-ai-487207 \
+  --region=asia-southeast1 \
+  --substitutions=COMMIT_SHA=$(git rev-parse HEAD) \
+  .
+
+# 2. Re-enable Cloud Scheduler jobs
+for job in nocturn-daily-report nocturn-followups nocturn-insights nocturn-keepalive; do
+  gcloud scheduler jobs resume $job --location=asia-southeast1 --project=nocturn-ai-487207
+done
+```
+
+**To spin down again:**
+```bash
+# Pause Scheduler jobs
+for job in nocturn-daily-report nocturn-followups nocturn-insights nocturn-keepalive; do
+  gcloud scheduler jobs pause $job --location=asia-southeast1 --project=nocturn-ai-487207
+done
+
+# Delete Cloud Run services
+gcloud run services delete nocturn-backend --project=nocturn-ai-487207 --region=asia-southeast1 --quiet
+gcloud run services delete nocturn-frontend --project=nocturn-ai-487207 --region=asia-southeast1 --quiet
+```
 
 **Deploy (manual trigger):**
 ```bash
@@ -321,9 +355,9 @@ gcloud auth configure-docker asia-southeast1-docker.pkg.dev
 Run in a separate terminal. Copy the printed `whsec_` and add to Secret Manager as `STRIPE_WEBHOOK_SECRET`.
 
 **Pending infra tasks:**
-1. Create Cloud Scheduler jobs (daily-report, run-followups, run-insights, db-keepalive)
+1. ✅ Cloud Scheduler jobs created (nocturn-daily-report, nocturn-followups, nocturn-insights, nocturn-keepalive)
 2. Add live Stripe webhook in Stripe dashboard → update `STRIPE_WEBHOOK_SECRET`
-3. Add `FERNET_ENCRYPTION_KEY` to Secret Manager
+3. ✅ `FERNET_ENCRYPTION_KEY` added to Secret Manager
 4. Custom domain mapping (optional): `api.sheerssoft.com` / `app.sheerssoft.com`
 
 ## Documentation
