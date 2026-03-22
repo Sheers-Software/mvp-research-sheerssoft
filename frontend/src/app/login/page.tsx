@@ -24,6 +24,20 @@ export default function LoginPage() {
         e.preventDefault();
         setError('');
         setSubmitting(true);
+
+        // DEMO BYPASS: Instantly authenticate demo account to simulate magic link flow locally
+        if (email.toLowerCase() === 'demo@nocturnai.com') {
+            try {
+                await login('demo@nocturnai.com', 'demo2026');
+                router.push('/dashboard');
+                return;
+            } catch (err: any) {
+                setError(err.message || 'Demo auto-login failed');
+                setSubmitting(false);
+            }
+            return;
+        }
+
         try {
             await requestMagicLink(email);
             setSent(true);

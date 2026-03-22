@@ -150,58 +150,51 @@ export default function LeadsPage() {
                     </p>
                 </div>
             ) : (
-                <div className="table-container animate-in">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Guest</th>
-                                <th>Contact</th>
-                                <th>Intent</th>
-                                <th>Est. Value</th>
-                                <th>Status</th>
-                                <th>Priority</th>
-                                <th>Captured</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {leads.map((l, i) => (
-                                <tr
-                                    key={l.id}
-                                    className="animate-slide-up"
-                                    style={{ animationDelay: `${i * 30}ms`, animationFillMode: 'backwards' }}
-                                >
-                                    <td><strong>{l.guest_name || '—'}</strong></td>
-                                    <td>
-                                        {l.guest_email && <div className="text-sm">{l.guest_email}</div>}
-                                        {l.guest_phone && <div className="text-sm text-muted">{l.guest_phone}</div>}
-                                        {!l.guest_email && !l.guest_phone && <span className="text-muted">—</span>}
-                                    </td>
-                                    <td>
-                                        {l.intent ? (
-                                            <span className={`badge ${intentBadge[l.intent] || 'badge-neutral'}`}>{l.intent}</span>
-                                        ) : '—'}
-                                    </td>
-                                    <td>
-                                        {l.estimated_value ? (
-                                            <span style={{ fontWeight: 600 }}>RM {l.estimated_value.toLocaleString()}</span>
-                                        ) : '—'}
-                                    </td>
-                                    <td>
-                                        <span className={`badge ${statusBadge[l.status] || 'badge-neutral'}`}>{l.status}</span>
-                                    </td>
-                                    <td>
-                                        {l.priority ? (
-                                            <span className={`badge ${l.priority === 'high' ? 'badge-danger' : l.priority === 'medium' ? 'badge-warning' : 'badge-neutral'}`}>
-                                                {l.priority}
-                                            </span>
-                                        ) : '—'}
-                                    </td>
-                                    <td className="text-sm text-muted">
-                                        {new Date(l.captured_at).toLocaleDateString()}
-                                    </td>
-                                    <td>
-                                        {l.status !== 'converted' && (
+                <div className="grid grid-3 animate-in">
+                    {leads.map((l, i) => {
+                        // Highlight leads captured $>24h$ ago that aren't converted/lost
+                        const isStale = ['new', 'contacted', 'qualified'].includes(l.status) && (Date.now() - new Date(l.captured_at).getTime() > 24 * 60 * 60 * 1000);
+                        return (
+                            <div
+                                key={l.id}
+                                className="card animate-slide-up"
+                                style={{ animationDelay: `${i * 30}ms`, animationFillMode: 'backwards', position: 'relative', overflow: 'hidden' }}
+                            >
+                                {isStale && (
+                                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, background: 'var(--warning-bg)', color: 'var(--warning)', padding: '4px 12px', fontSize: 11, fontWeight: 600, textAlign: 'center', borderBottom: '1px solid rgba(251, 191, 36, 0.2)' }}>
+                                        ⚠️ Needs Follow-up
+                                    </div>
+                                )}
+                                <div style={{ paddingTop: isStale ? 24 : 0 }}>
+                                    <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+                                        <h3 style={{ fontSize: 16, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            {l.guest_name || 'Anonymous Guest'}
+                                        </h3>
+                                        <span className={`badge ${statusBadge[l.status] || 'badge-neutral'}`} style={{ flexShrink: 0 }}>
+                                            {l.status}
+                                        </span>
+                                    </div>
+                                    
+                                    <div className="text-sm text-muted" style={{ marginBottom: 16, minHeight: 40 }}>
+                                        {l.guest_email && <div>📧 {l.guest_email}</div>}
+                                        {l.guest_phone && <div>📱 {l.guest_phone}</div>}
+                                        {!l.guest_email && !l.guest_phone && <div>No contact info</div>}
+                                    </div>
+
+                                    <div className="flex items-center gap-sm" style={{ marginBottom: 16 }}>
+                                        {l.intent && <span className={`badge ${intentBadge[l.intent] || 'badge-neutral'}`}>{l.intent}</span>}
+                                        {l.priority && <span className={`badge ${l.priority === 'high' ? 'badge-danger' : l.priority === 'medium' ? 'badge-warning' : 'badge-neutral'}`}>{l.priority}</span>}
+                                    </div>
+
+                                    <div style={{ padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: 16 }}>
+                                        <div className="text-sm text-muted">Estimated Pipeline Value</div>
+                                        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>
+                                            {l.estimated_value ? `RM ${l.estimated_value.toLocaleString()}` : '—'}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col gap-sm">
+                                        {l.status !== 'converted' && l.status !== 'lost' && (
                                             <>
                                                 {convertingId === l.id ? (
                                                     <div className="flex gap-sm items-center">
@@ -211,28 +204,41 @@ export default function LeadsPage() {
                                                             placeholder="Revenue (RM)"
                                                             value={revenue}
                                                             onChange={(e) => setRevenue(e.target.value)}
-                                                            style={{ width: 120, fontSize: 12 }}
+                                                            style={{ flex: 1, fontSize: 13 }}
                                                         />
                                                         <button className="btn btn-sm btn-primary" onClick={() => convertLead(l.id)}>✓</button>
                                                         <button className="btn btn-sm btn-ghost" onClick={() => setConvertingId(null)}>✕</button>
                                                     </div>
                                                 ) : (
-                                                    <button className="btn btn-sm btn-secondary" onClick={() => setConvertingId(l.id)}>
-                                                        Convert
-                                                    </button>
+                                                    <div className="flex gap-sm w-full">
+                                                        <button className="btn btn-sm btn-primary w-full" onClick={() => setConvertingId(l.id)}>
+                                                            Convert to Booking
+                                                        </button>
+                                                        <button className="btn btn-sm btn-secondary w-full" onClick={() => window.location.href=`/dashboard/conversations`}>
+                                                            Message
+                                                        </button>
+                                                    </div>
                                                 )}
                                             </>
                                         )}
                                         {l.status === 'converted' && l.actual_revenue && (
-                                            <span className="text-sm" style={{ color: 'var(--success)' }}>
-                                                RM {l.actual_revenue.toLocaleString()}
-                                            </span>
+                                            <div className="text-center" style={{ color: 'var(--success)', fontWeight: 500, padding: '8px 0', background: 'var(--success-bg)', borderRadius: 'var(--radius-sm)' }}>
+                                                🎉 Won: RM {l.actual_revenue.toLocaleString()}
+                                            </div>
                                         )}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                        {l.status === 'lost' && (
+                                            <div className="text-center" style={{ color: 'var(--danger)', fontWeight: 500, padding: '8px 0', background: 'var(--danger-bg)', borderRadius: 'var(--radius-sm)' }}>
+                                                ❌ Lost Request
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="text-muted text-center" style={{ fontSize: 11, marginTop: 12 }}>
+                                        Captured {new Date(l.captured_at).toLocaleDateString()}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </div>

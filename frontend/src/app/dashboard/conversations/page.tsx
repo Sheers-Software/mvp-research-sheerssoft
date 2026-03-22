@@ -74,7 +74,7 @@ function TimeAgo({ date }: { date: string | null }) {
 export default function ConversationsPage() {
     const [conversations, setConversations] = useState<ConversationItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('');
+    const [filter, setFilter] = useState('handed_off');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [detail, setDetail] = useState<ConversationDetail | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
@@ -82,11 +82,13 @@ export default function ConversationsPage() {
     const [actionLoading, setActionLoading] = useState('');
     const [replyText, setReplyText] = useState('');
     const [replySending, setReplySending] = useState(false);
+    const [stats, setStats] = useState<any>(null);
 
-    // Resolve property ID from dashboard stats
+    // Resolve property ID and stats from dashboard analytics
     useEffect(() => {
         apiGet<any>('/analytics/dashboard')
             .then((data) => {
+                setStats(data);
                 if (data?.property_id) {
                     setPropertyId(data.property_id);
                 }
@@ -170,11 +172,32 @@ export default function ConversationsPage() {
                             className={`btn btn-sm ${filter === f ? 'btn-primary' : 'btn-ghost'}`}
                             onClick={() => { setFilter(f); }}
                         >
-                            {f === '' ? 'All' : f === 'handed_off' ? 'Handoff' : f.charAt(0).toUpperCase() + f.slice(1)}
+                            {f === '' ? 'All' : f === 'handed_off' ? '⚠️ Action Needed' : f.charAt(0).toUpperCase() + f.slice(1)}
                         </button>
                     ))}
                 </div>
             </div>
+
+            {/* RM Inbox: Morning Summary Banner */}
+            {stats && (
+                <div className="card animate-slide-up" style={{ marginBottom: 32, padding: '24px', background: 'linear-gradient(135deg, rgba(var(--accent-rgb, 99,102,241), 0.08), rgba(var(--primary-rgb, 14,165,233), 0.05))', border: '1px solid rgba(var(--accent-rgb, 99, 102, 241), 0.2)' }}>
+                    <h3 style={{ fontSize: 18, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-primary)' }}>
+                        <span>🌅</span> Morning RM Summary
+                    </h3>
+                    <p className="text-muted" style={{ marginBottom: 20, fontSize: 15, lineHeight: 1.5 }}>
+                        Overnight and today, AI successfully handled <strong>{stats.inquiries_handled_by_ai || 0}</strong> inquiries without human intervention. <br/>
+                        You currently have <strong>{stats.handed_off_conversations || 0}</strong> conversations flagged for {stats.handed_off_conversations === 1 ? 'review' : 'reviews'} and <strong>{stats.leads_captured || 0}</strong> hot {stats.leads_captured === 1 ? 'lead' : 'leads'} captured.
+                    </p>
+                    <div className="flex gap-md">
+                        <button className="btn btn-primary" onClick={() => setFilter('handed_off')}>
+                            Review Action Needed ({stats.handed_off_conversations || 0})
+                        </button>
+                        <a href="/dashboard/leads" className="btn btn-secondary">
+                            View Hot Leads ({stats.leads_captured || 0})
+                        </a>
+                    </div>
+                </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: selectedId ? '1fr 1fr' : '1fr', gap: 24 }}>
                 {/* Conversation List */}

@@ -2,294 +2,396 @@
 
 import { useEffect, useState } from 'react';
 import { apiGet } from '@/lib/api';
-import Link from 'next/link';
 
-interface LiveStats {
-    property_id: string;
-    property_name: string;
-    report_date: string;
+export interface Property {
+    id: string;
+    name: string;
+    adr: number;
+    ota_commission_pct: number;
+}
+export interface AnalyticsSummary {
     total_inquiries: number;
     after_hours_inquiries: number;
     after_hours_responded: number;
     leads_captured: number;
-    avg_response_time_sec: number;
-    estimated_revenue_recovered: number;
-    actual_revenue_recovered: number;
-    active_conversations: number;
-    handed_off_conversations: number;
-    inquiries_handled_by_ai: number;
-    inquiries_handled_manually: number;
-    cost_savings: number;
-}
-
-interface PeriodTotals {
-    total_inquiries: number;
-    after_hours_inquiries: number;
-    leads_captured: number;
     handoffs: number;
     inquiries_handled_by_ai: number;
-    avg_response_time_sec: number;
     estimated_revenue_recovered: number;
     cost_savings: number;
+    avg_response_time_sec: number;
+    channel_breakdown: Record<string, number>;
+}
+export interface Conversation {
+    id: string;
+    channel: string;
+    guest_name: string;
+    guest_identifier: string;
+    started_at: string;
+    message_count: number;
+    status: string;
 }
 
-interface AnalyticsData {
-    property_id: string;
-    period: { from: string; to: string };
-    totals: PeriodTotals;
-}
-
-function KpiCard({
-    label,
-    value,
-    sub,
-    color,
-    icon,
-}: {
-    label: string;
-    value: string;
-    sub?: string;
-    color: string;
-    icon: string;
-}) {
-    return (
-        <div className="stat-card">
-            <div className="stat-icon">{icon}</div>
-            <div className="stat-label">{label}</div>
-            <div className="stat-value" style={{ color }}>{value}</div>
-            {sub && <div className="text-xs text-muted" style={{ marginTop: 2 }}>{sub}</div>}
-        </div>
-    );
-}
+import { VolumeChart, ChannelChart } from '@/components/DashboardCharts';
+import html2pdf from 'html2pdf.js';
 
 export default function DashboardPage() {
-    const [live, setLive] = useState<LiveStats | null>(null);
-    const [period, setPeriod] = useState<AnalyticsData | null>(null);
+    const [stats, setStats] = useState<AnalyticsSummary | null>(null);
+    const [daily, setDaily] = useState<any[]>([]);
+    const [recentConvos, setRecentConvos] = useState<Conversation[]>([]);
+    const [property, setProperty] = useState<Property | null>(null);
     const [loading, setLoading] = useState(true);
-    const [noProperty, setNoProperty] = useState(false);
+
+    const [dateFilter, setDateFilter] = useState<'today' | '7d' | '30d' | '90d' | 'year' | 'custom'>('30d');
+    const [customRange, setCustomRange] = useState({ from: '', to: '' });
 
     useEffect(() => {
-        apiGet<LiveStats>('/analytics/dashboard')
-            .then((data) => {
-                setLive(data);
-                const to = new Date().toISOString().split('T')[0];
-                const from = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
-                return apiGet<AnalyticsData>(
-                    `/properties/${data.property_id}/analytics?from_date=${from}&to_date=${to}`
-                );
-            })
-            .then(setPeriod)
-            .catch((err) => {
-                if (err?.status === 404) setNoProperty(true);
-            })
-            .finally(() => setLoading(false));
-    }, []);
+        loadDashboard();
+    }, [dateFilter, customRange]);
 
-    if (loading) {
-        return (
-            <div className="flex justify-center" style={{ padding: 80 }}>
-                <div className="loader" />
-            </div>
-        );
-    }
+    async function loadDashboard() {
+        setLoading(true);
+        try {
+            const props = await apiGet<Property[]>('/properties');
+            if (props.length > 0) {
+                setProperty(props[0]);
 
-    if (noProperty || !live) {
-        return (
-            <div className="empty-state" style={{ marginTop: 80 }}>
-                <div className="empty-icon">🏨</div>
-                <p>No property configured yet.</p>
-                <p className="text-sm text-muted" style={{ marginTop: 8 }}>
-                    Your account manager is setting up your property. You&apos;ll see live data here once your AI concierge goes live.
-                </p>
-            </div>
-        );
+                let from = '';
+                let to = new Date().toISOString().split('T')[0];
+                const d = new Date();
+
+                if (dateFilter === 'today') {
+                    from = to;
+                } else if (dateFilter === '7d') {
+                    d.setDate(d.getDate() - 7);
+                    from = d.toISOString().split('T')[0];
+                } else if (dateFilter === '30d') {
+                    d.setDate(d.getDate() - 30);
+                    from = d.toISOString().split('T')[0];
+                } else if (dateFilter === '90d') {
+                    d.setDate(d.getDate() - 90);
+                    from = d.toISOString().split('T')[0];
+                } else if (dateFilter === 'year') {
+                    d.setDate(d.getDate() - 365);
+                    from = d.toISOString().split('T')[0];
+                } else if (dateFilter === 'custom') {
+                    from = customRange.from;
+                    to = customRange.to;
+                    if (!from || !to) return; // Don't fetch until range is valid
+                }
+
+                const summary = await apiGet<AnalyticsSummary>(`/properties/${props[0].id}/analytics/summary?from_date=${from}&to_date=${to}`);
+                setStats(summary);
+
+                const range = await apiGet<any>(`/properties/${props[0].id}/analytics?from_date=${from}&to_date=${to}`);
+                setDaily(range?.daily || []);
+
+                // Fetch recent conversations for live feed
+                const convos = await apiGet<Conversation[]>(`/properties/${props[0].id}/conversations`);
+                setRecentConvos(convos.slice(0, 5));
+            }
+        } catch (err) {
+            console.error('Failed to load dashboard:', err);
+        } finally {
+            setLoading(false);
+        }
     }
 
     const today = new Date().toLocaleDateString('en-MY', {
-        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
     });
 
-    const hasActivity = live.total_inquiries > 0 || live.leads_captured > 0;
-    const t = period?.totals;
+    if (loading) {
+        return (
+            <div>
+                <div className="page-header">
+                    <div className="skeleton" style={{ width: 300, height: 32, marginBottom: 8 }} />
+                    <div className="skeleton" style={{ width: 200, height: 20 }} />
+                </div>
+                <div className="stat-grid">
+                    {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="skeleton" style={{ height: 140, borderRadius: 'var(--radius-lg)' }} />
+                    ))}
+                </div>
+            </div>
+        );
+    }
 
-    const aiPct = live.total_inquiries > 0
-        ? Math.round((live.inquiries_handled_by_ai / live.total_inquiries) * 100)
+    const afterHoursRate = stats && stats.after_hours_inquiries > 0
+        ? Math.round((stats.after_hours_responded / stats.after_hours_inquiries) * 100)
         : 0;
 
+    const leadCaptureRate = stats && stats.total_inquiries > 0
+        ? Math.round((stats.leads_captured / stats.total_inquiries) * 100)
+        : 0;
+
+    const aiHandledRate = stats && stats.total_inquiries > 0
+        ? Math.round((stats.inquiries_handled_by_ai / stats.total_inquiries) * 100)
+        : 0;
+
+    // Prepare chart data
+    const chartData = {
+        labels: daily.map(d => new Date(d.date).toLocaleDateString('en-MY', { month: 'short', day: 'numeric' })),
+        inquiries: daily.map(d => d.total_inquiries),
+        leads: daily.map(d => d.leads_captured)
+    };
+
+    function formatTime(iso: string) {
+        return new Date(iso).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // ─── Export Features ───
+
+    const handleExportCSV = () => {
+        if (!daily || daily.length === 0) return;
+
+        const headers = ['Date', 'Inquiries', 'Leads Captured', 'AI Handled', 'Handoffs', 'After Hours', 'Estimated Rev', 'Ops Savings'];
+        const csvContent = [
+            headers.join(','),
+            ...daily.map(d => [
+                d.date,
+                d.total_inquiries,
+                d.leads_captured,
+                d.inquiries_handled_by_ai,
+                d.handoffs,
+                d.after_hours_inquiries,
+                d.estimated_revenue_recovered,
+                d.cost_savings
+            ].join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `nocturn-analytics_${dateFilter}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleExportPDF = () => {
+        const element = document.getElementById('dashboard-content');
+        if (!element) return;
+
+        const opt: any = {
+            margin: 0.5,
+            filename: `nocturn-dashboard_${dateFilter}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+        };
+        html2pdf().from(element).set(opt).save();
+    };
+
     return (
-        <div>
-            {/* Header */}
-            <div className="flex items-center justify-between" style={{ marginBottom: 32 }}>
+        <div className="animate-in" id="dashboard-content">
+            <div className="page-header flex justify-between items-end flex-wrap gap-4">
                 <div>
-                    <h1>{live.property_name}</h1>
-                    <p className="text-muted text-sm" style={{ marginTop: 4 }}>
-                        Today · {today}
-                    </p>
+                    <h1 className="page-title">{property?.name || 'Dashboard'}</h1>
+                    <p className="page-subtitle">{today} &middot; Analytics Overview</p>
                 </div>
-                {live.handed_off_conversations > 0 && (
-                    <Link href="/dashboard/conversations" className="btn btn-primary btn-sm">
-                        ⚡ {live.handed_off_conversations} pending handoff{live.handed_off_conversations !== 1 ? 's' : ''}
-                    </Link>
-                )}
+
+                {/* Date Filter & Export Controls */}
+                <div className="flex flex-col items-end gap-2" data-html2canvas-ignore="true">
+                    <div className="flex gap-2">
+                        <button onClick={handleExportCSV} className="btn btn-secondary btn-sm flex items-center gap-1" title="Export tabular data to CSV" disabled={daily.length === 0}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            CSV
+                        </button>
+                        <button onClick={handleExportPDF} className="btn btn-secondary btn-sm flex items-center gap-1" title="Export graphical report to PDF">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            PDF
+                        </button>
+                    </div>
+
+                    <div className="flex gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                        <button className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${dateFilter === 'today' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`} onClick={() => setDateFilter('today')}>Today</button>
+                        <button className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${dateFilter === '7d' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`} onClick={() => setDateFilter('7d')}>7 Days</button>
+                        <button className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${dateFilter === '30d' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`} onClick={() => setDateFilter('30d')}>30 Days</button>
+                        <button className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${dateFilter === '90d' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`} onClick={() => setDateFilter('90d')}>Quarter</button>
+                        <button className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${dateFilter === 'year' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`} onClick={() => setDateFilter('year')}>Year</button>
+                        <button className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${dateFilter === 'custom' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`} onClick={() => setDateFilter('custom')}>Custom</button>
+                    </div>
+
+                    {dateFilter === 'custom' && (
+                        <div className="flex gap-2 items-center text-sm animate-in fade-in slide-in-from-top-1">
+                            <input type="date" className="input py-1 px-2 h-8 text-xs" value={customRange.from} onChange={e => setCustomRange({ ...customRange, from: e.target.value })} />
+                            <span className="text-slate-400">to</span>
+                            <input type="date" className="input py-1 px-2 h-8 text-xs" value={customRange.to} onChange={e => setCustomRange({ ...customRange, to: e.target.value })} />
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* Today's live KPIs — the money slide */}
-            {hasActivity ? (
-                <>
-                    <div className="grid grid-4 animate-in" style={{ marginBottom: 8 }}>
-                        <KpiCard
-                            label="Revenue Recovered"
-                            value={`RM ${live.estimated_revenue_recovered.toLocaleString('en-MY', { maximumFractionDigits: 0 })}`}
-                            sub={live.actual_revenue_recovered > 0 ? `RM ${live.actual_revenue_recovered.toLocaleString('en-MY', { maximumFractionDigits: 0 })} confirmed` : 'estimated'}
-                            color="var(--success)"
-                            icon="💰"
-                        />
-                        <KpiCard
-                            label="Leads Captured"
-                            value={live.leads_captured.toString()}
-                            sub="from AI conversations"
-                            color="var(--warning)"
-                            icon="🎯"
-                        />
-                        <KpiCard
-                            label="Inquiries Handled"
-                            value={live.total_inquiries.toString()}
-                            sub={`${aiPct}% by AI`}
-                            color="var(--accent)"
-                            icon="💬"
-                        />
-                        <KpiCard
-                            label="After-Hours"
-                            value={live.after_hours_inquiries.toString()}
-                            sub={live.after_hours_inquiries > 0 ? `${live.after_hours_responded} responded` : 'no overnight inquiries yet'}
-                            color="var(--info)"
-                            icon="🌙"
-                        />
-                    </div>
-
-                    <div className="grid grid-4 animate-in" style={{ marginBottom: 32 }}>
-                        <KpiCard
-                            label="Cost Savings"
-                            value={`RM ${live.cost_savings.toLocaleString('en-MY', { maximumFractionDigits: 0 })}`}
-                            sub="vs. manual handling"
-                            color="var(--info)"
-                            icon="📉"
-                        />
-                        <KpiCard
-                            label="Avg Response"
-                            value={live.avg_response_time_sec > 0 ? `${live.avg_response_time_sec.toFixed(1)}s` : '—'}
-                            sub="end-to-end"
-                            color="var(--success)"
-                            icon="⚡"
-                        />
-                        <KpiCard
-                            label="AI Handled"
-                            value={live.inquiries_handled_by_ai.toString()}
-                            sub={`${live.inquiries_handled_manually} needed staff`}
-                            color="var(--success)"
-                            icon="🤖"
-                        />
-                        <KpiCard
-                            label="Active Now"
-                            value={live.active_conversations.toString()}
-                            sub={live.active_conversations > 0 ? 'conversations in progress' : 'no active conversations'}
-                            color="var(--accent)"
-                            icon="🔴"
-                        />
-                    </div>
-                </>
-            ) : (
-                <div className="card animate-in" style={{ textAlign: 'center', padding: '48px 32px', marginBottom: 32, borderColor: 'rgba(99,102,241,0.15)' }}>
-                    <div style={{ fontSize: 48, marginBottom: 16 }}>📡</div>
-                    <h3 style={{ marginBottom: 8 }}>AI concierge is live and listening</h3>
-                    <p className="text-muted text-sm">
-                        No inquiries yet today. When guests message on WhatsApp or your web widget, their conversations and leads will appear here in real time.
-                    </p>
+            {/* ─── The Money Slide ─── */}
+            <div className="stat-grid" style={{ marginBottom: 32 }}>
+                <div className="stat-card">
+                    <div className="stat-value">{stats?.total_inquiries ?? 0}</div>
+                    <div className="stat-label">Inquiries Handled</div>
                 </div>
-            )}
 
-            {/* 30-day summary */}
-            {t && (t.total_inquiries > 0 || t.leads_captured > 0) && (
-                <div className="card animate-in" style={{ marginBottom: 32 }}>
-                    <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
-                        <h3 style={{ fontSize: 14, color: 'var(--text-muted)' }}>Last 30 Days</h3>
-                        <Link href="/dashboard/analytics" className="text-sm text-accent" style={{ textDecoration: 'none' }}>
-                            Full Analytics →
-                        </Link>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24 }}>
-                        <div>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--success)' }}>
-                                RM {t.estimated_revenue_recovered.toLocaleString('en-MY', { maximumFractionDigits: 0 })}
-                            </div>
-                            <div className="text-xs text-muted" style={{ marginTop: 2 }}>Revenue Recovered</div>
-                        </div>
-                        <div>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--warning)' }}>
-                                {t.leads_captured}
-                            </div>
-                            <div className="text-xs text-muted" style={{ marginTop: 2 }}>Leads Captured</div>
-                        </div>
-                        <div>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent)' }}>
-                                {t.total_inquiries}
-                            </div>
-                            <div className="text-xs text-muted" style={{ marginTop: 2 }}>Total Inquiries</div>
-                        </div>
-                        <div>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--info)' }}>
-                                {t.avg_response_time_sec > 0 ? `${t.avg_response_time_sec.toFixed(1)}s` : '—'}
-                            </div>
-                            <div className="text-xs text-muted" style={{ marginTop: 2 }}>Avg Response</div>
-                        </div>
-                    </div>
+                <div className="stat-card">
+                    <div className="stat-value">{stats?.after_hours_responded ?? 0}</div>
+                    <div className="stat-label">After-Hours Recovered</div>
                 </div>
-            )}
 
-            {/* Quick actions */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                <Link href="/dashboard/conversations" style={{ textDecoration: 'none' }}>
-                    <div className="card" style={{ padding: '20px 24px', cursor: 'pointer', transition: 'border-color 0.2s', borderColor: live.handed_off_conversations > 0 ? 'var(--accent)' : undefined }}>
-                        <div style={{ fontSize: 24, marginBottom: 8 }}>💬</div>
-                        <h4>Conversations</h4>
-                        <p className="text-sm text-muted" style={{ marginTop: 4 }}>
-                            {live.active_conversations > 0
-                                ? `${live.active_conversations} active · ${live.handed_off_conversations} need attention`
-                                : 'View all guest conversations'}
-                        </p>
-                    </div>
-                </Link>
+                <div className="stat-card">
+                    <div className="stat-value">{stats?.leads_captured ?? 0}</div>
+                    <div className="stat-label">Leads Captured</div>
+                </div>
 
-                <Link href="/dashboard/leads" style={{ textDecoration: 'none' }}>
-                    <div className="card" style={{ padding: '20px 24px', cursor: 'pointer' }}>
-                        <div style={{ fontSize: 24, marginBottom: 8 }}>🎯</div>
-                        <h4>Leads</h4>
-                        <p className="text-sm text-muted" style={{ marginTop: 4 }}>
-                            {live.leads_captured > 0
-                                ? `${live.leads_captured} captured today — follow up now`
-                                : 'Track and convert captured leads'}
-                        </p>
+                <div className="stat-card">
+                    <div className="stat-value gold">
+                        RM {(stats?.estimated_revenue_recovered ?? 0).toLocaleString()}
                     </div>
-                </Link>
+                    <div className="stat-label">Revenue Recovered</div>
+                </div>
 
-                <Link href="/dashboard/analytics" style={{ textDecoration: 'none' }}>
-                    <div className="card" style={{ padding: '20px 24px', cursor: 'pointer' }}>
-                        <div style={{ fontSize: 24, marginBottom: 8 }}>📊</div>
-                        <h4>Analytics</h4>
-                        <p className="text-sm text-muted" style={{ marginTop: 4 }}>
-                            Full 7, 30, 90-day charts and revenue breakdown
-                        </p>
+                <div className="stat-card">
+                    <div className="stat-value gold" style={{ color: 'var(--success)' }}>
+                        RM {(stats?.cost_savings ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
-                </Link>
+                    <div className="stat-label">Ops Cost Savings</div>
+                </div>
             </div>
 
-            {/* Revenue formula transparency */}
-            <p className="text-xs text-muted" style={{ marginTop: 24, textAlign: 'center' }}>
-                Revenue estimated as: leads captured × property ADR × 20% conversion rate.{' '}
-                <Link href="/dashboard/analytics" className="text-accent" style={{ textDecoration: 'none' }}>
-                    See full breakdown →
-                </Link>
-            </p>
+            {/* ─── Secondary Stats ─── */}
+            <div className="card" style={{ marginBottom: 24 }}>
+                <div className="flex justify-between items-center" style={{ flexWrap: 'wrap', gap: 24 }}>
+                    <div>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Avg Response Time</span>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 600 }}>
+                            {(stats?.avg_response_time_sec ?? 0).toFixed(0)}s
+                        </div>
+                    </div>
+
+                    <div>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Handoff Rate</span>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 600 }}>
+                            {stats && stats.total_inquiries > 0
+                                ? Math.round((stats.handoffs / stats.total_inquiries) * 100)
+                                : 0}%
+                        </div>
+                    </div>
+
+                    <div>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>AI Handled</span>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 600 }}>
+                            {aiHandledRate}%
+                            <div style={{
+                                marginTop: 6, height: 6, borderRadius: 3, background: 'var(--bg-input)',
+                                width: 120, overflow: 'hidden'
+                            }}>
+                                <div style={{
+                                    height: '100%', borderRadius: 3, width: `${aiHandledRate}%`,
+                                    background: 'linear-gradient(90deg, var(--accent), var(--accent-hover))'
+                                }} />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>After-Hours Recovery</span>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 600 }}>{afterHoursRate}%</div>
+                    </div>
+
+                    <div>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Lead Capture Rate</span>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 600 }}>{leadCaptureRate}%</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ─── Charts & Live Feed Row ─── */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6" style={{ marginBottom: 24 }}>
+                <div className="xl:col-span-2 flex flex-col gap-6">
+                    <div className="card">
+                        <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: 16, fontSize: '1.1rem' }}>
+                            Conversation Trend (30 Days)
+                        </h3>
+                        <div style={{ height: 300 }}>
+                            {daily.length > 0 ? (
+                                <VolumeChart data={chartData} />
+                            ) : (
+                                <div className="flex h-full items-center justify-center text-sm" style={{ color: 'var(--text-muted)' }}>
+                                    No trend data available
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="card">
+                        <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: 16, fontSize: '1.1rem' }}>
+                            Channel Breakdown
+                        </h3>
+                        <div style={{ height: 300 }}>
+                            {stats?.channel_breakdown && Object.keys(stats.channel_breakdown).length > 0 ? (
+                                <ChannelChart data={stats.channel_breakdown} />
+                            ) : (
+                                <div className="flex h-full items-center justify-center text-sm" style={{ color: 'var(--text-muted)' }}>
+                                    No channel data available
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Live Conversation Feed */}
+                <div className="card flex flex-col h-full bg-slate-50 border-slate-200 shadow-inner">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Live Conversation Feed
+                        </h3>
+                        <a href="/dashboard/conversations" className="text-sm text-blue-600 hover:underline">View All</a>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                        {recentConvos.map(conv => (
+                            <a
+                                key={conv.id}
+                                href={`/dashboard/conversations/${conv.id}`}
+                                className="bg-white border text-sm border-slate-200 rounded-lg p-3 hover:border-blue-300 transition-colors shadow-sm flex flex-col gap-2"
+                            >
+                                <div className="flex justify-between items-start">
+                                    <div className="flex items-center gap-2">
+                                        <span className={`badge badge-channel-${conv.channel} text-xs py-0.5 px-1.5 min-w-0`}>
+                                            {conv.channel === 'whatsapp' ? '💬 WA' : conv.channel === 'web' ? '🌐 Web' : '📧 Email'}
+                                        </span>
+                                        <span className="font-semibold text-slate-700 truncate max-w-[120px]">
+                                            {conv.guest_name || conv.guest_identifier || 'Guest'}
+                                        </span>
+                                    </div>
+                                    <span className="text-xs text-slate-400 whitespace-nowrap">{formatTime(conv.started_at)}</span>
+                                </div>
+                                <div className="flex justify-between items-center mt-1">
+                                    <span className="text-xs text-slate-500">{conv.message_count} msgs</span>
+                                    <span className={`badge badge-${conv.status === 'handed_off' ? 'handoff' : conv.status} text-xs bg-opacity-70 py-0 px-1.5`}>
+                                        {conv.status.replace('_', ' ')}
+                                    </span>
+                                </div>
+                            </a>
+                        ))}
+                        {recentConvos.length === 0 && (
+                            <div className="text-center py-8 text-sm text-slate-400">
+                                No active conversations
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* ROI Explanation Footer */}
+            <div className="card bg-slate-50 border border-slate-100 p-4">
+                <h4 className="font-semibold text-sm mb-2 text-slate-700">How is ROI calculated?</h4>
+                <p className="text-sm text-slate-500">
+                    Revenue recovered is estimated dynamically based on captured booking leads using an ADR of RM {(property?.adr || 230).toLocaleString()} and an average length of stay contextually extracted by the AI. Savings also factor in OTA commission reduction at {property?.ota_commission_pct || 20}%.
+                </p>
+            </div>
         </div>
     );
 }

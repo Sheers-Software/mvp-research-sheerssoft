@@ -21,7 +21,9 @@ An AI-powered hotel inquiry capture system that recovers revenue lost after hour
 3. **Gamified Onboarding Flow:** SuperAdmin provisions a new tenant in one API call — creates Tenant, Property, User (via Supabase Auth), TenantMembership, and OnboardingProgress. Magic link sent automatically. Channel setup runs asynchronously. Progress score 0–100.
 4. **Stripe Billing:** One-time $150 setup fee via Stripe Checkout. Webhook activates tenant subscription on payment.
 5. **SuperAdmin Platform Dashboard (`/admin`):** Global KPIs, tenant pipeline (Provisioned → Channels Setup → Live → Fully Onboarded), support ticket queue, application intake from `ai.sheerssoft.com/apply`, service health dashboard, system announcements.
-6. **Property Dashboard (`/dashboard`):** Staff reply inbox, lead triage (with lost lead filtering), analytics with CSV/PDF export, settings, ROI metrics.
+6. **Property Dashboard (`/dashboard`):** Tailored views for specific roles:
+    - **General Manager:** Executive ROI summary, revenue recovery, and cost savings.
+    - **Reservation Manager:** "Action Needed" prioritized inbox and Hot Leads CRM tracker with follow-up nudges.
 7. **Maintenance Mode & Announcements:** SheersSoft can toggle platform maintenance (with ETA message) and broadcast typed announcements (maintenance / incident / feature / billing) scoped by tier or individual tenant.
 8. **Service Health Dashboard:** 9 parallel health checks (DB, Redis, Gemini, OpenAI, Anthropic, SendGrid, Twilio, Meta WhatsApp, Supabase) with 20s cache and auto-refresh.
 9. **Support Chatbot:** Reuses the core AI engine on a dedicated `nocturn-ai-support` property. Detects handoff intent and escalates to SheersSoft staff.
@@ -66,6 +68,12 @@ docker-compose -f docker-compose.demo.yml up -d --build
 .\start_demo.ps1           # Standard demo
 .\start_live_demo.ps1      # Live Twilio WhatsApp demo (requires Cloudflare Tunnel)
 ```
+
+### Magic Link Demo Bypass
+For the local demo stack, you can bypass the email requirement by using the registered demo account:
+- **Email:** `demo@nocturnai.com`
+- **Password:** `demo2026` (only needed for SheersSoft Admin login)
+- **Magic Link:** Just enter the email and click "Send Magic Link" to be instantly logged in.
 
 ### GCP Deployment
 
@@ -255,6 +263,7 @@ cd backend && python seed_demo_data.py
 - [x] Phase 15: Multi-Tenant SaaS — Stripe Billing, Supabase Auth, Onboarding Flow, SuperAdmin Dashboard
 - [x] Phase 16: Auth & Integration Hardening — Magic Link Redirect, SendGrid SMTP, Tenant Detail Dashboard, Twilio Sandbox Linking
 - [x] Phase 1.5: Internal Controls — Maintenance Mode, Service Health Dashboard, Announcements System
+- [x] Phase 17: ICP Dashboards — GM Executive ROI, RM Action-Priority Inbox, Lead Follow-up Nudges
 
 ## Database & Supabase Notes
 
