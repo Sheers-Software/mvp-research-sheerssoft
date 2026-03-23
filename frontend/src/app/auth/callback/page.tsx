@@ -69,7 +69,17 @@ export default function AuthCallbackPage() {
                 });
                 const user = await profileRes.json();
                 // Full reload so AuthProvider re-reads the token from localStorage
-                window.location.replace(user.is_superadmin ? '/admin' : '/dashboard');
+                let dest = '/dashboard';
+                if (user.is_superadmin) {
+                    dest = '/admin';
+                } else if (user.role === 'owner' || user.role === 'admin') {
+                    dest = user.onboarding_completed ? '/portal' : '/welcome';
+                } else if (user.role === 'staff') {
+                    dest = '/dashboard';
+                } else {
+                    dest = '/welcome';
+                }
+                window.location.replace(dest);
             } catch (err: any) {
                 setError(err.message || 'Sign-in failed. Please request a new magic link.');
             }

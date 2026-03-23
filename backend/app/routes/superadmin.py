@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.auth import require_superadmin
+from app.auth import require_superadmin, get_current_user
 from app.models import (
     Tenant, Property, User, TenantMembership,
     Conversation, Lead, SupportTicket, Application,
@@ -911,3 +911,67 @@ def _ann_dict(ann: Announcement) -> dict:
         "created_at": ann.created_at.isoformat(),
         "updated_at": ann.updated_at.isoformat(),
     }
+
+
+# ─────────────────────────────────────────────────────────────
+# Active Announcements (Tenant-facing)
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/announcements/active")
+async def get_active_announcements(
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """
+    Return active announcements scoped to the current user's tenant/tier.
+    Accessible by any authenticated user — not superadmin-only.
+    Superadmins (no TenantMembership) receive all active announcements.
+    """
+    # Determine the user's tenant_id and subscription_tier
+    tenant_id: uuid.UUID | None = None
+    tenant_tier: str | None = None
+
+    # Legacy dict user (no memberships)
+    if isinstance(user, dict):
+        pass
+    elif user.memberships:
+        sorted_memberships = sorted(user.memberships, key=lambda m: m.created_at)
+        primary = sorted_memberships[0]
+        tenant_id = primary.tenant_id
+
+        # Load tenant tier
+        tenant_result = await db.execute(
+            select(Tenant).where(Tenant.id == tenant_id)
+        )
+        tenant = tenant_result.scalar_one_or_none()
+        if tenant:
+            tenant_tier = tenant.subscription_tier
+
+    # Load all active announcements
+    stmt = select(Announcement).where(Announcement.status == "active")
+    result = await db.execute(stmt)
+    all_active = result.scalars().all()
+
+    # Scope by target_type
+    visible = []
+    for ann in all_active:
+        if tenant_id is None:
+            # Superadmin / no membership: see all
+            visible.append(ann)
+        elif ann.target_type == "all":
+            visible.append(ann)
+        elif ann.target_type == "tier" and ann.target_tier == tenant_tier:
+            visible.append(ann)
+        elif ann.target_type == "tenant" and ann.target_tenant_id == tenant_id:
+            visible.append(ann)
+
+    return [
+        {
+            "id": str(a.id),
+            "type": a.type,
+            "title": a.title,
+            "body": a.body,
+            "created_at": a.created_at.isoformat(),
+        }
+        for a in visible
+    ]

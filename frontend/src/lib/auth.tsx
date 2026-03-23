@@ -19,6 +19,10 @@ export interface User {
     is_superadmin: boolean;
     last_login_at: string | null;
     memberships: Membership[];
+    // Derived from primary membership (returned by /auth/me)
+    role: string | null;
+    tenant_id: string | null;
+    onboarding_completed: boolean;
 }
 
 interface AuthContextType {

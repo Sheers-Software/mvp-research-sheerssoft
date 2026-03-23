@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.config import get_settings
 from app.auth import get_current_user
-from app.models import User, TenantMembership
+from app.models import User, TenantMembership, OnboardingProgress
 from app.schemas import (
     MagicLinkRequest, UserProfileResponse, TenantMembershipResponse,
     TokenResponse,
@@ -212,6 +212,29 @@ async def supabase_token_exchange(
     return {"access_token": token, "token_type": "bearer"}
 
 
+def _compute_onboarding_score(progress: OnboardingProgress) -> int:
+    """Compute onboarding completion score (0-100) from OnboardingProgress record."""
+    score = 10  # account_created always true
+    # channels_connected: all statuses in active/skipped
+    channels_connected = all(
+        s in ("active", "skipped")
+        for s in [progress.whatsapp_status, progress.email_status, progress.website_status]
+    )
+    if channels_connected:
+        score += 20
+    if progress.kb_populated:
+        score += 20
+    if progress.first_inquiry_received:
+        score += 15
+    if progress.first_morning_report_sent:
+        score += 15
+    if progress.first_lead_captured:
+        score += 10
+    if progress.owner_first_login:
+        score += 10
+    return score
+
+
 @router.get("/auth/me", response_model=UserProfileResponse)
 async def get_my_profile(
     user=Depends(get_current_user),
@@ -243,6 +266,29 @@ async def get_my_profile(
             accessible_property_ids=m.accessible_property_ids,
         ))
 
+    # Derive primary membership role, tenant_id, and onboarding_completed
+    primary_role: str | None = None
+    primary_tenant_id = None
+    onboarding_completed = False
+
+    if user.memberships:
+        # Primary membership: first one ordered by created_at
+        sorted_memberships = sorted(user.memberships, key=lambda m: m.created_at)
+        primary = sorted_memberships[0]
+        primary_role = primary.role
+        primary_tenant_id = primary.tenant_id
+
+        # Load OnboardingProgress for this tenant
+        progress_result = await db.execute(
+            select(OnboardingProgress)
+            .where(OnboardingProgress.tenant_id == primary.tenant_id)
+            .order_by(OnboardingProgress.created_at)
+        )
+        progress = progress_result.scalar_one_or_none()
+        if progress:
+            score = _compute_onboarding_score(progress)
+            onboarding_completed = score >= 60
+
     return UserProfileResponse(
         id=user.id,
         email=user.email,
@@ -251,4 +297,7 @@ async def get_my_profile(
         is_superadmin=user.is_superadmin,
         last_login_at=user.last_login_at,
         memberships=memberships,
+        role=primary_role,
+        tenant_id=primary_tenant_id,
+        onboarding_completed=onboarding_completed,
     )

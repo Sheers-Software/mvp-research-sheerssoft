@@ -2,9 +2,11 @@
 
 An AI-powered hotel inquiry capture system that recovers revenue lost after hours, tracks granular ROI, and is a fully multi-tenant SaaS platform built by SheersSoft.
 
+**v0.4.0** — Self-service onboarding, tenant portal, and KB management. Any hotel can now onboard, configure their AI concierge, and go live without SheersSoft engineer involvement.
+
 ## Architecture
 
-- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.3.3
+- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.4.0
 - **Frontend:** Next.js 14 + TypeScript
 - **Database:** Supabase PostgreSQL 17 + pgvector — user `nocturn_app`, transaction pooler (port 6543, ap-southeast-2)
 - **Auth:** Supabase Auth (magic links) + local JWT fallback
@@ -19,10 +21,12 @@ An AI-powered hotel inquiry capture system that recovers revenue lost after hour
 
 1. **AI Conversation Engine (RAG):** Answers guest inquiries using a per-property knowledge base, captures leads, and escalates to human staff when needed. Three behavioral modes: Concierge → Lead Capture → Handoff.
 2. **Multi-Tenant SaaS Architecture:** Hotel groups (Tenants) own multiple Properties. Staff access is scoped per-property via TenantMembership roles (`owner` / `admin` / `staff`).
-3. **Gamified Onboarding Flow:** SuperAdmin provisions a new tenant in one API call — creates Tenant, Property, User (via Supabase Auth), TenantMembership, and OnboardingProgress. Magic link sent automatically. Channel setup runs asynchronously. Progress score 0–100.
-4. **Stripe Billing:** One-time $150 setup fee via Stripe Checkout. Webhook activates tenant subscription on payment.
-5. **SuperAdmin Platform Dashboard (`/admin`):** Global KPIs, tenant pipeline (Provisioned → Channels Setup → Live → Fully Onboarded), support ticket queue, application intake from `ai.sheerssoft.com/apply`, service health dashboard, system announcements.
-6. **Property Dashboard (`/dashboard`):** Staff reply inbox, lead triage (with lost lead filtering), analytics with CSV/PDF export, settings, ROI metrics.
+3. **Self-Service Onboarding Wizard (`/welcome`):** Five-step guided setup for new clients — confirm property details, enter knowledge base (rooms, rates, FAQs, policies), verify channels, invite team, activate AI. No SheersSoft engineer required after provisioning.
+4. **Tenant Management Portal (`/portal`):** Owner/admin layer for configuring the business — manage KB documents, team members (invite/remove), channel status, billing, and support tickets. Separate from the day-to-day operations dashboard.
+5. **Gamified Onboarding Flow:** SuperAdmin provisions a new tenant in one API call — creates Tenant, Property, User (via Supabase Auth), TenantMembership, and OnboardingProgress. Magic link sent automatically. Channel setup runs asynchronously. Progress score 0–100.
+6. **Stripe Billing:** One-time $150 setup fee via Stripe Checkout. Webhook activates tenant subscription on payment.
+7. **SuperAdmin Platform Dashboard (`/admin`):** Global KPIs, tenant pipeline (Provisioned → Channels Setup → Live → Fully Onboarded), support ticket queue, application intake from `ai.sheerssoft.com/apply`, service health dashboard, system announcements, KB ingestion tool.
+8. **Property Dashboard (`/dashboard`):** Staff reply inbox, lead triage (with lost lead filtering), analytics with CSV/PDF export, settings, ROI metrics, AI insights (monthly guest topics + KB gap suggestions).
 7. **Maintenance Mode & Announcements:** SheersSoft can toggle platform maintenance (with ETA message) and broadcast typed announcements (maintenance / incident / feature / billing) scoped by tier or individual tenant.
 8. **Service Health Dashboard:** 9 parallel health checks (DB, Redis, Gemini, OpenAI, Anthropic, SendGrid, Twilio, Meta WhatsApp, Supabase) with 20s cache and auto-refresh.
 9. **Support Chatbot:** Reuses the core AI engine on a dedicated `nocturn-ai-support` property. Detects handoff intent and escalates to SheersSoft staff.
@@ -159,6 +163,13 @@ SystemConfig (key-value store for maintenance mode, platform settings)
 | `GET /api/v1/superadmin/service-health` | 9-service health check dashboard |
 | `GET/POST/PATCH /api/v1/superadmin/announcements` | Announcement broadcast CRUD |
 | `GET /api/v1/superadmin/system-config` | Platform-wide config (maintenance mode) |
+| `GET /api/v1/portal/home` | Multi-property summary for tenant owner/admin |
+| `GET /api/v1/portal/team` | List team members for tenant |
+| `DELETE /api/v1/portal/team/{id}` | Remove team member |
+| `GET /api/v1/portal/channels` | Channel status + web widget embed code per property |
+| `GET/POST/PUT/DELETE /api/v1/properties/{id}/kb` | KB document CRUD (tenant self-service) |
+| `POST /api/v1/properties/{id}/kb/ingest-wizard` | Structured bulk KB ingestion (rooms/FAQs/policies) |
+| `POST /api/v1/onboarding/complete/{property_id}` | Activate property (finish onboarding wizard) |
 | `GET /api/v1/announcements/active` | Active announcements for authenticated tenant |
 | `GET /api/v1/system/info` | Environment info + maintenance status (no auth) |
 | `POST /api/v1/staff/reply` | Staff reply to a guest conversation |
@@ -188,7 +199,8 @@ SystemConfig (key-value store for maintenance mode, platform settings)
 │   │   │   ├── billing.py           # Stripe checkout + webhook
 │   │   │   ├── channels.py          # Guest channel webhooks (WhatsApp, Email, Web Chat)
 │   │   │   ├── internal.py          # Cloud Scheduler endpoints (X-Internal-Secret)
-│   │   │   ├── onboarding.py        # Tenant provisioning + progress tracking
+│   │   │   ├── onboarding.py        # Tenant provisioning, progress tracking, onboarding/complete
+│   │   │   ├── portal.py            # Tenant self-service: home, team, channels, KB CRUD, KB wizard
 │   │   │   ├── staff.py             # Staff reply + conversation inbox
 │   │   │   ├── superadmin.py        # Platform dashboard, tenants, service-health, announcements CRUD
 │   │   │   └── support.py           # Support chatbot + ticket CRUD
@@ -211,15 +223,25 @@ SystemConfig (key-value store for maintenance mode, platform settings)
 │   └── requirements.txt
 ├── frontend/
 │   └── src/app/
-│       ├── admin/                   # SheersSoft internal ops portal
+│       ├── admin/                   # SheersSoft internal ops portal (/admin)
 │       │   ├── announcements/       # Announcement broadcast management
 │       │   ├── health/              # Service health dashboard
+│       │   ├── kb-ingestion/        # KB setup tool for client properties
 │       │   ├── system/              # Maintenance mode toggle
-│       │   ├── tenants/             # Tenant management
+│       │   ├── tenants/             # Tenant management + detail
 │       │   ├── pipeline/            # Onboarding pipeline kanban
 │       │   └── tickets/             # Support ticket queue
-│       └── dashboard/               # Property staff dashboard
+│       ├── portal/                  # Tenant owner/admin portal (/portal)
+│       │   ├── kb/[propertyId]/     # KB document management (tabbed by category)
+│       │   ├── team/                # Team management + invite
+│       │   ├── channels/            # Channel status + web widget embed code
+│       │   ├── properties/          # Property list + add property
+│       │   ├── billing/             # Subscription tier + Stripe checkout
+│       │   └── support/             # Support ticket submit/view
+│       ├── welcome/                 # Onboarding wizard (/welcome — 5 steps)
+│       └── dashboard/               # Property staff operations (/dashboard)
 │           ├── conversations/       # Guest inbox + staff reply
+│           ├── insights/            # Monthly AI insights + KB gap suggestions
 │           ├── leads/               # Lead triage + lost lead filter
 │           ├── analytics/           # ROI metrics, CSV/PDF export
 │           └── settings/            # Property configuration
@@ -274,6 +296,7 @@ cd backend && python seed_demo_data.py
 - [x] Phase 16: Auth & Integration Hardening — Magic Link Redirect, SendGrid SMTP, Tenant Detail Dashboard, Twilio Sandbox Linking
 - [x] Phase 1.5: Internal Controls — Maintenance Mode, Service Health Dashboard, Announcements System
 - [x] Phase 1.6: Infra Migration — Supabase-only DB, GCP Secret Manager–only secrets, Cloud SQL removed
+- [x] **v0.4.0: Self-Service Onboarding & Tenant Portal** — `/welcome` wizard, `/portal` owner layer, KB self-service, role-based auth routing, generic ICP (not Vivatel-specific)
 
 ## Database & Supabase Notes
 

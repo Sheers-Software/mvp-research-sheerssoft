@@ -8,7 +8,7 @@
 
 ## 1. Problem Statement
 
-Malaysian hotels receive **90% of bookings through manual channels** — WhatsApp, phone, email, and walk-ins. After 6pm, reservations desks close and inquiries are dropped. At properties like Novotel KLCC, a team handles 200–300 touchpoints on busy days with 30% needing manual follow-up — a pattern confirmed across the target segment. **Revenue literally falls on the floor every night.**
+Malaysian hotels receive **90% of bookings through manual channels** — WhatsApp, phone, email, and walk-ins. After 6pm, reservations desks close and inquiries are dropped. At mid-tier properties, a team handles 200–300 touchpoints on busy days with 30% needing manual follow-up — a pattern confirmed across the target segment. **Revenue literally falls on the floor every night.**
 
 Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct inquiry they fail to answer pushes the guest toward Booking.com or Agoda — where the hotel pays for what should have been free.
 
@@ -83,7 +83,7 @@ Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct
 | **Language** | English and Bahasa Malaysia. Auto-detect from guest input. Respond in the language the guest uses. |
 | **Guardrails** | Never fabricate rates. Never confirm "availability" unless KB has real-time data. Default to human handoff when confidence < 70%. |
 | **Knowledge Source** | Property-specific knowledge base: rates, room descriptions, facilities, FAQs, policies. |
-| **Acceptance Criteria** | >80% accuracy on 50 sample questions per property. Response latency < 30 seconds. Correctly identifies and responds in Bahasa Malaysia including basic Manglish code-switching — **50-question BM/Manglish test suite must pass at ≥80% before 1st pilot go-live** (Phase 0 blocker). Full test suite documented and re-run before each new pilot property onboarded. |
+| **Acceptance Criteria** | >80% accuracy on 50 sample questions per property. Response latency < 30 seconds. Correctly identifies and responds in Bahasa Malaysia including basic Manglish code-switching — **50-question BM/Manglish test suite must pass at ≥80% before 1st pilot go-live** (Phase 0 blocker). Full test suite documented and re-run before each new property onboarded. |
 
 #### F2: WhatsApp AI Responder
 | Attribute | Detail |
@@ -162,7 +162,7 @@ Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct
 | 2 | **Staff cannot reply to guest from dashboard** | ✅ **RESOLVED** — Staff reply input live in `/dashboard/conversations`. Replies forwarded to guest via original channel (WhatsApp/web). v0.3.1. | — |
 | 3 | **Daily email non-functional in production** | ✅ **RESOLVED (code + infra confirmed)** — `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL` in Secret Manager. Cloud Scheduler jobs were created, verified (HTTP 200), and later deleted as part of GCP cleanup on 2026-03-23. **Must be recreated** on next production deploy before daily reports resume. Internal endpoints (`/api/v1/internal/*`) are live and tested. | Recreate 4 Cloud Scheduler jobs on next deploy. |
 | 4 | **"Lost" status missing from leads UI** | ✅ **RESOLVED** — Lost filter tab live in `/dashboard/leads`. Staff can mark leads lost. v0.3.1. | — |
-| 5 | **Bilingual AI not formally tested** | ❌ **OUTSTANDING** — BM/Manglish support is live but the 50-question test suite has not been run. Must pass ≥80% before pilot go-live. | Run 50-question suite (see `docs/bm_test_suite.md`) via Twilio sandbox → Vivatel test number. Half-day field work. |
+| 5 | **Bilingual AI not formally tested** | ❌ **OUTSTANDING** — BM/Manglish support is live but the 50-question test suite has not been run. Must pass ≥80% before pilot go-live. | Run 50-question suite (see `docs/bm_test_suite.md`) via Twilio sandbox. Half-day field work. |
 
 **Summary: 4 of 5 gaps resolved. Remaining:** BM test (P0.6) — half-day field work. No product code or infra outstanding for P0.
 
@@ -179,12 +179,7 @@ Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct
 | Voice call handling | Requires telephony integration. Phase 2. |
 | Guest profile / loyalty | That's Opportunity #3. Future upsell layer. |
 | Mobile app for staff | Web dashboard is sufficient for v1. Mobile-responsive design. |
-| Multi-tenant SaaS hierarchy (Tenant model, TenantMembership, OnboardingProgress) | Billing infrastructure for a future SaaS. Not validated by interviews. Single-property pilot first. |
-| Stripe billing and subscription management | Payment infrastructure follows proven value, not precedes it. Pilot pricing is manual invoicing. |
-| Supabase Auth, magic links, admin provisioning API | Over-engineered for pilot. JWT auth per property is sufficient. |
-| SuperAdmin dashboard (platform metrics, tenant CRUD) | SheersSoft internal tooling. Not a hotel-facing feature. |
-| Gamified onboarding milestone tracker | Not a hotel need validated by interviews. SheersSoft onboards properties manually for v1. |
-| Support chatbot and ticket system | At pilot scale, support is handled directly by the SheersSoft team. |
+| Stripe billing and subscription management | Payment infrastructure follows proven value, not precedes it. Pilot pricing is manual invoicing. UI in `/portal/billing` is live but Stripe activation is gated on ≥3 paying tenants. |
 | Public application intake form | Self-serve signup. Not needed until sales motion is established. |
 
 ---
@@ -200,7 +195,7 @@ Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct
 | **Response Latency** | Guest message → AI first response | <30 seconds |
 | **Human Handoff Rate** | % escalated to staff | <20% |
 | **Lead Capture Rate** | % of conversations with contact info collected | >60% |
-| **Estimated Revenue Recovered** | `(lead nights × ADR, default 1 night) × 20%` | RM 3,000–5,000+/month per property (based on RM 230 ADR × 20 after-hours leads/day × 20% conversion). Vivatel pilot will establish the first verified benchmark. |
+| **Estimated Revenue Recovered** | `(lead nights × ADR, default 1 night) × 20%` | RM 3,000–5,000+/month per property (based on RM 230 ADR × 20 after-hours leads/day × 20% conversion). First pilot property will establish the first verified benchmark. |
 
 ### Business KPIs (Internal — What We Track)
 
@@ -208,12 +203,12 @@ Targets aligned with `gtm_execution_plan.md` 90-day scorecard:
 
 | Metric | Day-35 Target | Day-60 Target | Day-90 Target | Red Flag |
 |---|---|---|---|---|
-| Active Pilots | 1 (Vivatel live) | 3–4 | 5+ | — |
+| Active Pilots | 1 (first pilot live) | 3–4 | 5+ | — |
 | Paying Customers | 1 | 2–3 | 10 | <5 by Day 90 = value prop issue |
 | MRR | RM 1,500 | RM 4,500–9,000 | RM 15,000–30,000 | — |
 | Pilot → Paid Conversion | — | First data point | >60% | Below 50% = value prop weak |
 | Monthly Churn | — | <5% | <5% | >10% = product problem, not sales |
-| NPS (hotel staff) | — | >40 (Vivatel) | >40 | — |
+| NPS (hotel staff) | — | >40 (first pilot) | >40 | — |
 
 ### Unit Economics (Survival Metrics)
 
@@ -262,7 +257,7 @@ Targets aligned with `gtm_execution_plan.md` 90-day scorecard:
 | AI hallucinations / wrong rate quotes | Destroys trust with hotel and guest | Never state rates unless in KB. Default to handoff if unsure. |
 | PDPA compliance gaps | Legal risk | Encrypt PII at rest. Data isolation per property. Privacy policy. Data retention controls. |
 | Hotel IT blocks widget | Can't deploy on property website | Single `<script>` tag. Offer to install directly. Most hotel sites are WordPress. |
-| Low inquiry volume at pilot property | Can't prove ROI | Pre-qualify: >20 inquiries/day. Vivatel (30+/day confirmed). |
+| Low inquiry volume at pilot property | Can't prove ROI | Pre-qualify: >20 inquiries/day confirmed before onboarding any new client. |
 | AI chatbot market is crowded | Prospects have already evaluated generic chatbots and dismissed them | Differentiation must be explicit in every demo: this is **after-hours revenue recovery tied to a GM dashboard** — not a chatbot. Lead with the RM number, not the AI feature. |
 | **"Build it and they will come"** | No customers despite product | Distribution strategy from day one. Case study → demos. 3–5 customer calls/week. |
 | **CAC > LTV** | Buying revenue at a loss | Track unit economics from first customer. Stop scaling if LTV:CAC < 3. |
@@ -275,11 +270,11 @@ Targets aligned with `gtm_execution_plan.md` 90-day scorecard:
 
 ### Launch Sequence
 
-1. **Vivatel KL (Zul)** — Design partner #1. 90% manual, 30+ daily touchpoints, zero after-hours coverage. Deploy first. Do things that don't scale.
-2. **SKS Hospitality (Bob's referral)** — **Highest priority after Vivatel.** Referrals convert 10× better than cold outreach. Use Bob's name. Activate in parallel with Vivatel pilot, not after.
-3. **Novotel KLCC (Shamsuridah)** — 100 emails/day. Relationship established. Longer sales cycle (chain hotel).
-4. **Ibis Styles KL, Melia KL, Tamu Hotel** — Warm pipeline. Book demos once Vivatel data is in hand.
-5. **Cold expansion** — Only after Vivatel case study with real numbers. Proof, not promises.
+1. **Pilot property (design partner #1)** — 90% manual, 30+ daily touchpoints, zero after-hours coverage. Deploy first. Do things that don't scale. Establish the first verified benchmark.
+2. **Referral pipeline** — Referrals convert 10× better than cold outreach. Activate in parallel with first pilot, not after.
+3. **Warm prospects** — Properties with established relationships. Longer sales cycle (chain hotels need procurement sign-off).
+4. **Warm pipeline** — Book demos once first pilot data is in hand.
+5. **Cold expansion** — Only after first case study with real numbers. Proof, not promises.
 
 ### The 60-Second Pitch
 
@@ -287,11 +282,60 @@ Targets aligned with `gtm_execution_plan.md` 90-day scorecard:
 
 ---
 
+## 9.3 Client Dashboard Hierarchy
+
+Nocturn AI presents a different experience depending on the user's role and onboarding state:
+
+```
+New client login
+       │
+       ▼
+/welcome  ─── 5-step Onboarding Wizard (first-time owner)
+       │       Step 1: Property details
+       │       Step 2: Add KB content
+       │       Step 3: Test a channel
+       │       Step 4: Invite team members
+       │       Step 5: Go live
+       │
+       ▼ (onboarding_completed = true)
+/portal   ─── Tenant Owner / Admin self-service
+       │       /portal/home         — multi-property summary, health
+       │       /portal/kb           — add/edit/delete KB documents
+       │       /portal/team         — manage staff, send invites
+       │       /portal/channels     — channel status, widget embed code
+       │       /portal/properties   — property list, add property
+       │       /portal/billing      — subscription tier, Stripe checkout
+       │       /portal/support      — submit / view support tickets
+       │
+       ▼ (role = staff)
+/dashboard ── Property Staff daily operations
+               /dashboard           — revenue KPI cards (the money slide)
+               /dashboard/conversations — live conversations + handoff queue
+               /dashboard/leads     — lead list, status updates, CSV export
+               /dashboard/analytics — charts, trends, AI vs human rate
+               /dashboard/insights  — monthly Gemini-powered sentiment summary
+```
+
+**ICP Workflow — what hotel GMs care about:**
+
+| Cadence | What They Check |
+|---------|-----------------|
+| **Daily** | Overnight leads, revenue recovered, active conversations, pending handoffs |
+| **Weekly** | Inquiry trends, lead conversion rate, AI vs human handling rate |
+| **Monthly** | Revenue by channel, KB gaps, cost savings, sentiment summary |
+| **Quarterly** | ROI, guest satisfaction trends, plan utilization |
+
+**SheersSoft operator tools:**
+- `/admin` — platform ops, tenant management, maintenance mode, service health (superadmin only)
+- `/admin/kb-ingestion` — KB setup tool for doing client onboarding on their behalf
+
+---
+
 ## 9. Roadmap
 
 ### 9.1 Validated v1.x Roadmap
 
-**Pre-pilot deliverables** — status as of v2.1:
+**Pre-pilot deliverables** — status as of v2.2:
 - ✅ Dashboard home shows revenue KPI cards (rebuilt v0.3.1)
 - ✅ Staff reply input in conversations view (v0.3.1)
 - ✅ "Lost" status filter in leads UI (v0.3.1)
@@ -299,9 +343,12 @@ Targets aligned with `gtm_execution_plan.md` 90-day scorecard:
 - ✅ Service health dashboard `/admin/health` (v0.3.2)
 - ✅ Daily email live in production — `SENDGRID_API_KEY` + 4 Cloud Scheduler jobs confirmed (v0.3.2)
 - ✅ `FERNET_ENCRYPTION_KEY` in Secret Manager — PII encryption active (v0.3.2)
-- ❌ 50-question BM/Manglish test suite run at ≥80% pass rate (half-day field work)
-- ❌ Vivatel KB populated (1-day session with Zul)
-- ✅ Infra migration: Supabase-only DB, GCP Secret Manager–only secrets, Cloud SQL removed, all GCP compute spun down (v0.3.3)
+- ✅ Infra migration: Supabase-only DB, GCP Secret Manager–only secrets, Cloud SQL removed (v0.3.3)
+- ✅ `/portal` self-service — KB, team, channels, billing, support (v0.4)
+- ✅ `/welcome` 5-step onboarding wizard (v0.4)
+- ✅ Role-based auth callback routing (v0.4)
+- ✅ `/admin/kb-ingestion` tool for SheersSoft operators (v0.4)
+- ❌ 50-question BM/Manglish test suite run at ≥80% pass rate (half-day field work — P0 blocker)
 
 **Post-pilot roadmap** (after first real-world data):
 
@@ -321,13 +368,13 @@ The codebase contains infrastructure built ahead of validation. This table track
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Multi-tenant hierarchy (Tenant, TenantMembership, OnboardingProgress) | ✅ **Active (SheersSoft-internal)** | Used by admin provisioning and the `/admin` portal. Not customer-facing until Phase 4. |
-| Supabase Auth (magic links, admin provisioning) | ✅ **Active** | Magic link login live. Restricted to `a.basyir@sheerssoft.com` for superadmin. Hotel staff use property JWT. |
+| Multi-tenant hierarchy (Tenant, TenantMembership, OnboardingProgress) | ✅ **Active** | Used by admin provisioning, `/portal`, and `/welcome`. |
+| Supabase Auth (magic links, admin provisioning) | ✅ **Active** | Magic link login live. Role-based auth callback routing implemented. |
 | SuperAdmin dashboard (`/admin`) | ✅ **Active (internal ops)** | SheersSoft ops tool — tenant management, scheduler config, maintenance mode, service health. Never shown to hotel clients. |
 | Stripe billing (checkout, subscriptions) | ❌ **Dormant** | Activate when pilot-to-paid conversion is proven; manual invoicing until ≥3 paying tenants. |
-| Support chatbot + ticket system | ❌ **Dormant** | Support is handled directly by SheersSoft. Activate when ticket volume exceeds direct handling. |
+| Support chatbot + ticket system | ✅ **Active** | `/portal/support` allows tenant users to submit and view tickets. Backend ticket CRUD live. |
 | Application intake form | ❌ **Dormant** | Self-serve GTM motion not yet validated. Activate when inbound demand justifies it. |
-| Tenant self-service portal (`/portal`, `/welcome`) | ❌ **Not yet built** | Phase 4 deliverable. Required before onboarding 3rd+ tenant without SheersSoft engineer in the loop. |
+| Tenant self-service portal (`/portal`, `/welcome`) | ✅ **Active** | Full portal built in v0.4: KB self-management, team management, channel status, billing, support. `/welcome` 5-step onboarding wizard live. |
 
 **Rule for activating dormant features:** Follow the decision tree in `product_gap.md` Section 7. A feature unlocks only when its release condition is met — not when it is technically ready.
 

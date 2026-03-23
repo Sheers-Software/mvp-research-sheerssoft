@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { apiGet } from '@/lib/api';
 
 interface Property {
@@ -26,6 +27,16 @@ interface OnboardingProgress {
     kb_populated: boolean;
     first_inquiry_received: boolean;
     channel_errors: Record<string, string> | null;
+}
+
+interface KbDoc {
+    category: string;
+}
+
+interface KbStatus {
+    property_id: string;
+    total: number;
+    by_category: Record<string, number>;
 }
 
 interface TenantDetails {
@@ -78,12 +89,31 @@ export default function TenantDetailsPage() {
     const [tenant, setTenant] = useState<TenantDetails | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [kbStatuses, setKbStatuses] = useState<KbStatus[]>([]);
 
     useEffect(() => {
         if (!params.id) return;
-        
+
         apiGet<TenantDetails>(`/superadmin/tenants/${params.id}`)
-            .then(setTenant)
+            .then((data) => {
+                setTenant(data);
+                // Load KB status for each property
+                (data.properties || []).forEach((prop) => {
+                    apiGet<{ documents: KbDoc[] }>(`/properties/${prop.id}/kb`)
+                        .then((kb) => {
+                            const docs = kb.documents || [];
+                            const by_category: Record<string, number> = {};
+                            docs.forEach((d) => {
+                                by_category[d.category] = (by_category[d.category] || 0) + 1;
+                            });
+                            setKbStatuses((prev) => [
+                                ...prev.filter((s) => s.property_id !== prop.id),
+                                { property_id: prop.id, total: docs.length, by_category },
+                            ]);
+                        })
+                        .catch(() => {});
+                });
+            })
             .catch((err) => setError(err.message || 'Failed to load tenant details'))
             .finally(() => setLoading(false));
     }, [params.id]);
@@ -125,13 +155,28 @@ export default function TenantDetailsPage() {
                             {tenant.slug} · Created {tenant.created_at ? new Date(tenant.created_at).toLocaleDateString() : 'Unknown'}
                         </p>
                     </div>
-                    <div className="flex gap-sm">
+                    <div className="flex items-center gap-sm" style={{ flexWrap: 'wrap' }}>
                         <span className={`badge ${tierBadge[tenant.subscription_tier] || 'badge-neutral'}`}>
                             {tenant.subscription_tier.toUpperCase()}
                         </span>
                         <span className={`badge ${statusBadge[tenant.subscription_status] || 'badge-neutral'}`}>
                             {tenant.subscription_status.toUpperCase()}
                         </span>
+                        <Link
+                            href={`/admin/kb-ingestion?tenantId=${tenant.id}`}
+                            className="btn btn-primary btn-sm"
+                            style={{ marginLeft: 8 }}
+                        >
+                            Open KB Ingestion →
+                        </Link>
+                        {tenant.properties.length > 0 && tenant.users.length === 0 && (
+                            <Link
+                                href={`/admin/tenants/${tenant.id}/invite`}
+                                className="btn btn-ghost btn-sm"
+                            >
+                                Provision User
+                            </Link>
+                        )}
                     </div>
                 </div>
             </div>
@@ -189,6 +234,51 @@ export default function TenantDetailsPage() {
                                     )}
                                 </tbody>
                             </table>
+                        </div>
+                    </section>
+
+                    {/* KB Status Section */}
+                    <section>
+                        <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>KB Status</h3>
+                        <div className="flex flex-col gap-sm">
+                            {tenant.properties.map((prop) => {
+                                const kb = kbStatuses.find((s) => s.property_id === prop.id);
+                                const cats = ['faqs', 'rooms', 'facilities', 'policies'];
+                                return (
+                                    <div key={prop.id} className="card" style={{ padding: 16 }}>
+                                        <div className="flex items-center justify-between" style={{ marginBottom: kb ? 12 : 0 }}>
+                                            <strong className="text-sm">{prop.name}</strong>
+                                            <div className="flex gap-sm">
+                                                <Link
+                                                    href={`/admin/kb-ingestion?tenantId=${tenant.id}&propertyId=${prop.id}`}
+                                                    className="btn btn-ghost btn-sm"
+                                                >
+                                                    Ingest KB
+                                                </Link>
+                                            </div>
+                                        </div>
+                                        {kb ? (
+                                            <div>
+                                                <div className="flex gap-sm" style={{ flexWrap: 'wrap', marginBottom: 8 }}>
+                                                    {cats.map((cat) => (
+                                                        <span key={cat} className="badge badge-neutral" style={{ fontSize: 11 }}>
+                                                            {cat}: {kb.by_category[cat] || 0}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                                <p className="text-muted text-sm">
+                                                    {kb.total} total embedding{kb.total !== 1 ? 's' : ''}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <p className="text-muted text-sm">Loading KB data…</p>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                            {tenant.properties.length === 0 && (
+                                <p className="text-muted text-sm">No properties to show KB status for.</p>
+                            )}
                         </div>
                     </section>
 
@@ -250,12 +340,48 @@ export default function TenantDetailsPage() {
                         <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>Onboarding Status</h3>
                         {tenant.onboarding.map((obs, idx) => {
                             const propName = tenant.properties.find(p => p.id === obs.property_id)?.name || 'Unknown Property';
+
+                            // Compute progress score from channel statuses + milestone flags
+                            const channelPoints: Record<string, number> = { active: 20, skipped: 10, configuring: 5, pending: 0, failed: 0 };
+                            const waPoints = channelPoints[obs.whatsapp_status] ?? 0;
+                            const emailPoints = channelPoints[obs.email_status] ?? 0;
+                            const webPoints = channelPoints[obs.website_status] ?? 0;
+                            const kbPoints = obs.kb_populated ? 20 : 0;
+                            const inquiryPoints = obs.first_inquiry_received ? 20 : 0;
+                            const score = Math.min(100, waPoints + emailPoints + webPoints + kbPoints + inquiryPoints);
+                            const filledBlocks = Math.round(score / 10);
+                            const progressBar = '█'.repeat(filledBlocks) + '░'.repeat(10 - filledBlocks);
+
+                            const failedChannels: Record<string, string> = {};
+                            if (obs.whatsapp_status === 'failed') failedChannels['whatsapp'] = obs.channel_errors?.whatsapp || 'Setup failed';
+                            if (obs.email_status === 'failed') failedChannels['email'] = obs.channel_errors?.email || 'Setup failed';
+                            if (obs.website_status === 'failed') failedChannels['website'] = obs.channel_errors?.website || 'Setup failed';
+
                             return (
                                 <div key={idx} className="card" style={{ padding: 20, marginBottom: 16 }}>
-                                    <h4 style={{ fontSize: 14, marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
+                                    <h4 style={{ fontSize: 14, marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
                                         {propName}
                                     </h4>
-                                    
+
+                                    {/* Enhancement A: Progress Bar */}
+                                    <div style={{ marginBottom: 16 }}>
+                                        <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
+                                            <span className="text-sm text-muted">Setup Progress</span>
+                                            <span className="text-sm" style={{ fontWeight: 600 }}>{score}%</span>
+                                        </div>
+                                        <div style={{
+                                            fontFamily: 'monospace',
+                                            fontSize: 13,
+                                            letterSpacing: 1,
+                                            color: score === 100 ? 'var(--success)' : score >= 60 ? 'var(--warning)' : 'var(--danger)',
+                                            background: 'var(--surface-raised)',
+                                            padding: '6px 10px',
+                                            borderRadius: 4,
+                                        }}>
+                                            [{progressBar}] {score}%
+                                        </div>
+                                    </div>
+
                                     <div className="flex flex-col gap-sm text-sm">
                                         <div className="flex justify-between items-center">
                                             <span className="text-muted">WhatsApp Channel</span>
@@ -263,19 +389,40 @@ export default function TenantDetailsPage() {
                                                 {obs.whatsapp_status}
                                             </span>
                                         </div>
+                                        {/* Enhancement C: failed channel error + contact support note */}
+                                        {obs.whatsapp_status === 'failed' && (
+                                            <div style={{ padding: '8px 12px', background: 'var(--danger-light)', borderRadius: 4, fontSize: 12 }}>
+                                                <span className="text-danger">{failedChannels['whatsapp']}</span>
+                                                <span className="text-muted" style={{ marginLeft: 8 }}>— Contact SheersSoft support to retry.</span>
+                                            </div>
+                                        )}
+
                                         <div className="flex justify-between items-center">
                                             <span className="text-muted">Email Channel</span>
                                             <span className={`badge ${channelBadge[obs.email_status] || 'badge-neutral'}`}>
                                                 {obs.email_status}
                                             </span>
                                         </div>
+                                        {obs.email_status === 'failed' && (
+                                            <div style={{ padding: '8px 12px', background: 'var(--danger-light)', borderRadius: 4, fontSize: 12 }}>
+                                                <span className="text-danger">{failedChannels['email']}</span>
+                                                <span className="text-muted" style={{ marginLeft: 8 }}>— Contact SheersSoft support to retry.</span>
+                                            </div>
+                                        )}
+
                                         <div className="flex justify-between items-center">
                                             <span className="text-muted">Website Widget</span>
                                             <span className={`badge ${channelBadge[obs.website_status] || 'badge-neutral'}`}>
                                                 {obs.website_status}
                                             </span>
                                         </div>
-                                        
+                                        {obs.website_status === 'failed' && (
+                                            <div style={{ padding: '8px 12px', background: 'var(--danger-light)', borderRadius: 4, fontSize: 12 }}>
+                                                <span className="text-danger">{failedChannels['website']}</span>
+                                                <span className="text-muted" style={{ marginLeft: 8 }}>— Contact SheersSoft support to retry.</span>
+                                            </div>
+                                        )}
+
                                         <div className="flex justify-between items-center" style={{ marginTop: 8 }}>
                                             <span className="text-muted">Knowledge Base</span>
                                             <span>{obs.kb_populated ? '✅ Ready' : '⏳ Pending'}</span>
@@ -286,13 +433,16 @@ export default function TenantDetailsPage() {
                                         </div>
                                     </div>
 
-                                    {obs.channel_errors && Object.keys(obs.channel_errors).length > 0 && (
+                                    {/* Existing channel_errors block (non-failed extra errors) */}
+                                    {obs.channel_errors && Object.keys(obs.channel_errors).filter(k => !['whatsapp','email','website'].includes(k)).length > 0 && (
                                         <div style={{ marginTop: 16, padding: 12, backgroundColor: 'var(--danger-light)', borderRadius: 6 }}>
-                                            <p className="text-danger text-sm" style={{ fontWeight: 600, marginBottom: 4 }}>Setup Errors:</p>
+                                            <p className="text-danger text-sm" style={{ fontWeight: 600, marginBottom: 4 }}>Additional Setup Errors:</p>
                                             <ul className="text-danger text-sm" style={{ paddingLeft: 16, margin: 0 }}>
-                                                {Object.entries(obs.channel_errors).map(([chan, err]) => (
-                                                    <li key={chan}><strong>{chan}:</strong> {err as string}</li>
-                                                ))}
+                                                {Object.entries(obs.channel_errors)
+                                                    .filter(([k]) => !['whatsapp','email','website'].includes(k))
+                                                    .map(([chan, err]) => (
+                                                        <li key={chan}><strong>{chan}:</strong> {err as string}</li>
+                                                    ))}
                                             </ul>
                                         </div>
                                     )}

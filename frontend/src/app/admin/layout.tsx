@@ -12,6 +12,7 @@ const navItems = [
     { href: '/admin/tenants', label: 'Tenants', icon: '🏨' },
     { href: '/admin/tickets', label: 'Support', icon: '🎫' },
     { href: '/admin/applications', label: 'Applications', icon: '📥' },
+    { href: '/admin/kb-ingestion', label: 'KB Ingestion', icon: '📚' },
     { href: '/admin/system', label: 'System', icon: '⚙️' },
     { href: '/admin/announcements', label: 'Announcements', icon: '📢' },
     { href: '/admin/health', label: 'Service Health', icon: '🩺' },

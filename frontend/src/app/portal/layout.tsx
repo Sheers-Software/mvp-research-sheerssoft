@@ -5,20 +5,17 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { apiGet } from '@/lib/api';
 import Link from 'next/link';
+import { TenantProvider, useTenant } from '@/lib/tenant-context';
 
 const navItems = [
-    { href: '/dashboard', label: 'Home', icon: '🏠' },
-    { href: '/dashboard/conversations', label: 'Conversations', icon: '💬' },
-    { href: '/dashboard/leads', label: 'Leads', icon: '🎯' },
-    { href: '/dashboard/analytics', label: 'Analytics', icon: '📊' },
-    { href: '/dashboard/insights', label: 'Insights', icon: '💡' },
-    { href: '/dashboard/settings', label: 'Settings', icon: '⚙️' },
+    { href: '/portal', label: 'Overview', icon: '🏠' },
+    { href: '/portal/properties', label: 'Properties', icon: '🏨' },
+    { href: '/portal/kb', label: 'Knowledge Base', icon: '📚' },
+    { href: '/portal/team', label: 'Team', icon: '👥' },
+    { href: '/portal/channels', label: 'Channels', icon: '📡' },
+    { href: '/portal/billing', label: 'Billing', icon: '💳' },
+    { href: '/portal/support', label: 'Support', icon: '🎧' },
 ];
-
-interface PropertyInfo {
-    id: string;
-    name: string;
-}
 
 interface MaintenanceInfo {
     enabled: boolean;
@@ -34,11 +31,11 @@ interface ActiveAnnouncement {
     created_at: string;
 }
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+function PortalLayoutInner({ children }: { children: React.ReactNode }) {
     const { user, loading, logout } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
-    const [property, setProperty] = useState<PropertyInfo | null>(null);
+    const { tenantName } = useTenant();
     const [maintenance, setMaintenance] = useState<MaintenanceInfo | null>(null);
     const [bannerDismissed, setBannerDismissed] = useState(false);
     const [announcements, setAnnouncements] = useState<ActiveAnnouncement[]>([]);
@@ -48,27 +45,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (!loading && !user) {
             router.replace('/login');
         }
+        if (!loading && user && user.role === 'staff' && !user.is_superadmin) {
+            router.replace('/dashboard');
+        }
     }, [user, loading, router]);
 
     useEffect(() => {
-        // Fetch the user's primary property for display and API calls
-        apiGet<any>('/analytics/dashboard')
-            .then((data) => {
-                if (data?.property_id && data?.property_name) {
-                    setProperty({ id: data.property_id, name: data.property_name });
-                }
-            })
-            .catch(() => {});
-    }, []);
-
-    useEffect(() => {
-        // Poll for maintenance mode — check on load and every 60s
         const checkMaintenance = () => {
-            apiGet<any>('/system/info')
+            apiGet<{ maintenance?: MaintenanceInfo }>('/system/info')
                 .then((info) => {
                     if (info?.maintenance) {
                         setMaintenance(info.maintenance);
-                        // Re-show banner if maintenance just became active
                         if (info.maintenance.enabled) setBannerDismissed(false);
                     }
                 })
@@ -80,7 +67,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }, []);
 
     useEffect(() => {
-        // Fetch active announcements on load (no polling needed — staff refresh is sufficient)
         apiGet<ActiveAnnouncement[]>('/announcements/active')
             .then((data) => setAnnouncements(data || []))
             .catch(() => {});
@@ -96,16 +82,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     if (!user) return null;
 
+    const roleMap: Record<string, string> = { owner: 'Owner', admin: 'Admin', staff: 'Staff' };
+    const tierLabel = user?.role ? (roleMap[user.role] ?? user.role) : null;
+
     return (
         <div className="layout">
             <aside className="sidebar">
                 <div className="sidebar-brand">
-                    <h2>Nocturn AI</h2>
-                    <p>{property?.name || 'Hotel Dashboard'}</p>
+                    <h2>AI Concierge</h2>
+                    <p>{tenantName || 'Property Portal'}</p>
                 </div>
 
                 <nav className="sidebar-nav">
-                    <span className="nav-section">Dashboard</span>
+                    <span className="nav-section">Portal</span>
                     {navItems.map((item) => (
                         <Link
                             key={item.href}
@@ -117,15 +106,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         </Link>
                     ))}
 
-                    {(user.role === 'owner' || user.role === 'admin') && (
-                        <>
-                            <span className="nav-section" style={{ marginTop: 16 }}>Management</span>
-                            <Link href="/portal" className="nav-link">
-                                <span className="nav-icon">🏢</span>
-                                Property Portal
-                            </Link>
-                        </>
-                    )}
+                    <span className="nav-section" style={{ marginTop: 16 }}>Operations</span>
+                    <Link href="/dashboard" className="nav-link">
+                        <span className="nav-icon">📊</span>
+                        Staff Dashboard
+                    </Link>
 
                     {user.is_superadmin && (
                         <>
@@ -141,7 +126,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border-subtle)' }}>
                     <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
                         <span className="text-sm">{user.full_name}</span>
-                        <span className="badge badge-success">Staff</span>
+                        {tierLabel && <span className="badge badge-warning">{tierLabel}</span>}
                     </div>
                     <button className="btn btn-ghost btn-sm w-full" onClick={logout}>
                         Logout
@@ -150,7 +135,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </aside>
 
             <main className="main-content">
-                {/* Active announcements from SheersSoft */}
                 {announcements
                     .filter((a) => !dismissedAnnIds.has(a.id))
                     .map((ann) => {
@@ -188,7 +172,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         );
                     })}
 
-                {/* Maintenance mode banner */}
                 {maintenance?.enabled && !bannerDismissed && (
                     <div style={{
                         background: 'rgba(245, 158, 11, 0.12)',
@@ -220,5 +203,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {children}
             </main>
         </div>
+    );
+}
+
+export default function PortalLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <TenantProvider>
+            <PortalLayoutInner>{children}</PortalLayoutInner>
+        </TenantProvider>
     );
 }

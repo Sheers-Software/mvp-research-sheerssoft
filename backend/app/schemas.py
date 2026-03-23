@@ -260,6 +260,9 @@ class UserProfileResponse(BaseModel):
     is_superadmin: bool
     last_login_at: datetime | None
     memberships: list["TenantMembershipResponse"]
+    role: str | None = None              # primary membership role: "owner"|"admin"|"staff"
+    tenant_id: uuid.UUID | None = None   # primary tenant id
+    onboarding_completed: bool = False   # derived: OnboardingProgress score >= 60
 
     class Config:
         from_attributes = True

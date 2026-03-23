@@ -182,22 +182,62 @@ Design the API as if external customers will use it from day one. This forces go
 
 ## 4.5 SaaS Infrastructure — Activation Status
 
-> **Status:** Multi-tenant SaaS hierarchy is built. The SheersSoft internal portal (`/admin`) is now active. The tenant self-service portals (`/portal`, `/welcome`) are not yet built. Do not activate customer-facing features until release conditions in PRD Section 9.2 are met. Full portal spec: [portal_architecture.md](./portal_architecture.md).
+> **Status:** Multi-tenant SaaS hierarchy is built and active. All four portals are now live. Full portal spec: [portal_architecture.md](./portal_architecture.md).
 
 ### Four-Portal Architecture
 
 The frontend is structured as four distinct route groups in a single Next.js app:
 
-| Portal | Route | Users | GTM Phase |
-|--------|-------|-------|-----------|
-| **Property Operations** | `/dashboard` | Hotel staff (daily use) | Phase 0 — must be right before any demo |
-| **Internal Ops** | `/admin` | SheersSoft team only | Phase 1.5 — operational controls before multi-tenant scale |
-| **Tenant Management** | `/portal` | Hotel owners/admins | Phase 4 — tenant self-service onboarding |
-| **Onboarding Wizard** | `/welcome` | New hotel owners (first login) | Phase 4 — replaces manual SheersSoft-led setup |
+| Portal | Route | Users | Status |
+|--------|-------|-------|--------|
+| **Property Operations** | `/dashboard` | Hotel staff (daily use) | ✅ Active |
+| **Internal Ops** | `/admin` | SheersSoft team only | ✅ Active |
+| **Tenant Management** | `/portal` | Hotel owners/admins | ✅ Active (v0.4) |
+| **Onboarding Wizard** | `/welcome` | New hotel owners (first login) | ✅ Active (v0.4) |
 
-Security boundary is enforced at the API level: `require_superadmin()` for `/admin`, `check_tenant_access()` for `/portal`, `check_property_access()` for `/dashboard`. Route separation is cosmetic until the client list grows.
+Security boundary is enforced at the API level: `require_superadmin()` for `/admin`, `check_tenant_access()` for `/portal`, `check_property_access()` for `/dashboard`. Auth callback routing is fully role-based — see auth routing table below.
 
-The original design targeted a single-property pilot (Vivatel). Separately, the system was extended with a full multi-tenant SaaS hierarchy. This section documents what exists but is dormant.
+### Portal Layer (v0.4)
+
+The `/portal` route group enables tenant owners and admins to self-manage without SheersSoft engineer involvement:
+
+| Route | Purpose |
+|-------|---------|
+| `/portal/home` | Multi-property summary — conversation volume, lead counts, channel health |
+| `/portal/kb/[propertyId]` | Add, edit, delete KB documents; backed by `GET/POST/PUT/DELETE /properties/{id}/kb` |
+| `/portal/team` | View team members, send invites, remove members; backed by `GET/DELETE /portal/team` |
+| `/portal/channels` | Channel status (WhatsApp, web widget, email) + widget embed code snippet |
+| `/portal/properties` | Property list; add additional properties |
+| `/portal/billing` | Subscription tier display + Stripe checkout (dormant until ≥3 paying tenants) |
+| `/portal/support` | Submit and view support tickets |
+
+**Admin KB Ingestion Tool:** SheersSoft operators use `/admin/kb-ingestion` to build out a client's KB on their behalf during white-glove onboarding.
+
+### Onboarding Flow
+
+```
+SheersSoft SuperAdmin → POST /api/v1/onboarding/provision-tenant
+  → Creates Tenant + Property + User (Supabase Auth Admin API)
+  → Creates TenantMembership (role=owner) + OnboardingProgress
+  → Sends magic link to client's email
+  → Background: _setup_channels_async() → updates OnboardingProgress per channel
+
+Client clicks magic link
+  → Supabase PKCE exchange → POST /auth/supabase-callback → JWT issued
+  → role=owner AND onboarding_completed=false → redirect to /welcome
+
+Client completes /welcome wizard (5 steps):
+  Step 1: Confirm property details
+  Step 2: Add initial KB content (ingest-wizard endpoint)
+  Step 3: Test a channel (WhatsApp sandbox or web widget)
+  Step 4: Invite team members
+  Step 5: Go live → POST /onboarding/complete/{property_id}
+
+After wizard completion:
+  → onboarding_completed = true
+  → role=owner/admin → redirect to /portal
+  → role=staff → redirect to /dashboard
+```
 
 ### Tenant Hierarchy
 
@@ -237,15 +277,16 @@ SuperAdmin → POST /api/v1/onboarding/provision-tenant
 | `check_tenant_access()` | TenantMembership, is_superadmin bypasses | ⚠️ Partially active — used in onboarding routes; full enforcement deferred to Phase 4 `/portal` | Tenant-level routes |
 | `check_property_access()` | JWT property_id matching | ✅ Active | All property data routes (`/dashboard`) |
 
-**Auth callback routing (target state — full implementation in Phase 4):**
+**Auth callback routing (implemented in v0.4):**
 ```
-is_superadmin=True          →  /admin
-role=owner, onboarding=false →  /welcome
-role=owner, onboarding=true  →  /portal
-role=admin                   →  /portal
-role=staff                   →  /dashboard
+is_superadmin=True                        →  /admin
+role=owner AND onboarding_completed=false →  /welcome
+role=owner AND onboarding_completed=true  →  /portal
+role=admin                                →  /portal
+role=staff                                →  /dashboard
+no membership                             →  /welcome (or access-denied if not invited)
 ```
-Current: `is_superadmin → /admin`, else → `/dashboard`. Full routing requires `onboarding_completed` flag on `User` (data model change — Phase 4).
+`/auth/me` returns `role` and `onboarding_completed` so the frontend can route correctly after token refresh.
 
 ### Internal Scheduler (Production)
 
@@ -625,7 +666,23 @@ GET    /api/v1/superadmin/service-health         # Parallel health check of all 
 POST   /api/v1/superadmin/announcements          # Create announcement          [Phase 1.5 I1.3]
 GET    /api/v1/superadmin/announcements          # List all announcements       [Phase 1.5 I1.3]
 PATCH  /api/v1/superadmin/announcements/{id}     # Update/resolve announcement  [Phase 1.5 I1.3]
-GET    /api/v1/announcements/active              # Active announcements (tenant-scoped) [Phase 1.5 I1.3]
+GET    /api/v1/announcements/active              # Active announcements (tenant-scoped) ✅
+
+# ─── Portal (Tenant Owner/Admin — check_tenant_access) ──────────────────────
+GET    /api/v1/portal/home                     # Multi-property summary ✅
+GET    /api/v1/portal/team                     # List team members ✅
+DELETE /api/v1/portal/team/{id}                # Remove team member ✅
+GET    /api/v1/portal/channels                 # Channel status per property ✅
+
+# ─── KB Self-Service (Portal + Admin ingestion tool) ────────────────────────
+GET    /api/v1/properties/{id}/kb              # List KB documents ✅
+POST   /api/v1/properties/{id}/kb              # Create KB document ✅
+PUT    /api/v1/properties/{id}/kb/{doc_id}     # Update KB document ✅
+DELETE /api/v1/properties/{id}/kb/{doc_id}     # Delete KB document ✅
+POST   /api/v1/properties/{id}/kb/ingest-wizard # Bulk ingest from onboarding wizard ✅
+
+# ─── Onboarding Completion ──────────────────────────────────────────────────
+POST   /api/v1/onboarding/complete/{property_id} # Mark onboarding done, flip flag ✅
 ```
 
 ### 8.2 Authentication Model

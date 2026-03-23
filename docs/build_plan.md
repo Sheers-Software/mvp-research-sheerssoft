@@ -7,7 +7,7 @@
 
 ---
 
-## Remaining Blockers to Pilot Go-Live (as of 18 Mar 2026)
+## Remaining Blockers to Pilot Go-Live (as of 23 Mar 2026)
 
 P0 product code is **complete**. The remaining blockers are infra tasks and field work only.
 
@@ -15,17 +15,47 @@ P0 product code is **complete**. The remaining blockers are infra tasks and fiel
 |---|---------|--------|-----------------|
 | 1 | **Dashboard home shows onboarding checklist, not revenue** | ✅ **RESOLVED** — v0.3.1. Dashboard home shows KPI cards as the landing screen. | — |
 | 2 | **Staff cannot reply from dashboard** | ✅ **RESOLVED** — v0.3.1. Reply box live in conversations view, replies forwarded to WhatsApp/web. | — |
-| 3 | **Daily email report blocked in production** | ✅ **RESOLVED** — `SENDGRID_API_KEY` + `SENDGRID_FROM_EMAIL` in Secret Manager. 4 Cloud Scheduler jobs created and verified (nocturn-daily-report, nocturn-followups, nocturn-insights, nocturn-keepalive). Manual trigger confirmed HTTP 200. | — |
+| 3 | **Daily email report blocked in production** | ✅ **RESOLVED** — `SENDGRID_API_KEY` + `SENDGRID_FROM_EMAIL` in Secret Manager. 4 Cloud Scheduler jobs created and verified. Note: deleted in 2026-03-23 GCP cleanup — recreate on next deploy. | Recreate 4 Cloud Scheduler jobs on next production deploy. |
 | 4 | **`FERNET_ENCRYPTION_KEY` missing** | ✅ **RESOLVED** — Key confirmed in Secret Manager. PII encryption active. | — |
-| 5 | **Bilingual (BM) responses untested end-to-end** | ❌ **FIELD WORK** — 50-question test suite written but not run. Half-day. | Run via Twilio sandbox → Vivatel test number. Must pass ≥80% (see `docs/bm_test_execution_plan.md`). |
-| 6 | **Vivatel KB not populated** | ❌ **FIELD WORK** — No KB ingested for Vivatel property. 1 day with Zul. | KB session: collect all 28 intake questions, ingest via `python backend/scripts/ingest_kb.py`. |
+| 5 | **Bilingual (BM) responses untested end-to-end** | ❌ **FIELD WORK** — 50-question test suite written but not run. Half-day. **P0 blocker — must pass ≥80% before first client go-live.** | Run via Twilio sandbox. Must pass ≥80% (see `docs/bm_test_execution_plan.md`). |
+| 6 | **Pilot property KB not populated** | ❌ **FIELD WORK** — No KB ingested for first pilot property. 1 day on-site or via admin KB ingestion tool. | KB session: collect rate card, room types, FAQs, policies. Ingest via `/admin/kb-ingestion` or `python backend/scripts/ingest_kb.py`. |
 | 7 | **"Lost" status missing from leads filter UI** | ✅ **RESOLVED** — v0.3.1. Lost filter live in leads view. | — |
+| 8 | **Tenant self-service portal not built** | ✅ **RESOLVED** — v0.4. Full `/portal` + `/welcome` wizard shipped. | — |
+
+---
+
+## v0.4 — Self-Service Onboarding & Portal (Current Sprint)
+
+### What Was Built
+
+| Feature | Status |
+|---------|--------|
+| `/portal` layout + home page (multi-property summary) | ✅ Complete |
+| `/portal/kb/[propertyId]` — KB self-management | ✅ Complete |
+| `/portal/team` — Team member management + invite | ✅ Complete |
+| `/portal/channels` — Channel status + widget embed code | ✅ Complete |
+| `/portal/properties` — Property list + add property | ✅ Complete |
+| `/portal/billing` — Subscription tier + Stripe checkout | ✅ Complete |
+| `/portal/support` — Support ticket submit/view | ✅ Complete |
+| `/welcome` — 5-step onboarding wizard | ✅ Complete |
+| Backend `GET /portal/home` | ✅ Complete |
+| Backend `GET /portal/team`, `DELETE /portal/team/{id}` | ✅ Complete |
+| Backend `GET /portal/channels` | ✅ Complete |
+| Backend `GET/POST/PUT/DELETE /properties/{id}/kb` | ✅ Complete |
+| Backend `POST /properties/{id}/kb/ingest-wizard` | ✅ Complete |
+| Backend `POST /onboarding/complete/{property_id}` | ✅ Complete |
+| Backend `GET /announcements/active` (tenant-facing) | ✅ Complete |
+| Auth callback: role-based routing | ✅ Complete |
+| `/auth/me` returns role + onboarding_completed | ✅ Complete |
+| `/dashboard/insights` page | ✅ Complete |
+| Dashboard layout: Insights nav + Portal link for owners | ✅ Complete |
+| `/admin/kb-ingestion` tool for SheersSoft operators | ✅ Complete |
 
 ---
 
 ## 1. Plan Overview
 
-**Objective:** Ship a production-ready AI inquiry capture engine in **28 calendar days** (4 sprints × 7 days) and deploy the first live pilot at Vivatel KL.
+**Objective:** Ship a production-ready AI inquiry capture engine in **28 calendar days** (4 sprints × 7 days) and deploy the first live pilot at a hotel property in Malaysia.
 
 **Constraints:**
 - 2-person team (1 Lead Dev, 1 Product/Dev hybrid)
@@ -45,7 +75,7 @@ P0 product code is **complete**. The remaining blockers are infra tasks and fiel
 - [x] AI conversation engine (LLM + RAG pipeline): Gemini → OpenAI → Anthropic → template fallback chain
 - [x] Property + Conversation + Message + Lead + Analytics data models
 - [x] Basic API endpoints (conversations, messages, properties, leads, analytics)
-- [x] Vivatel pilot KB seeded
+- [x] Pilot KB seeded (demo data)
 - [x] Docker Compose local dev environment
 - [x] Cloud Run deployment pipeline (Cloud Build, not GitHub Actions)
 - [x] Rate limiting (SlowAPI)
@@ -132,20 +162,20 @@ This is not optional. This screen sells the product.
 
 ### Sprint 4: Polish + Deploy + Pilot Launch — "Make It Bulletproof" (Days 22–28)
 
-> **Goal:** Vivatel is live. AI is answering real guest inquiries. Dashboard shows real data. GM gets daily reports.
+> **Goal:** First pilot property is live. AI is answering real guest inquiries. Dashboard shows real data. GM gets daily reports.
 
 | Day | Task | Owner | Deliverable | Dependencies |
 |-----|------|-------|-------------|--------------|
 | **22** | Error handling & retry logic | Dev | Graceful LLM failures (fallback to template responses). Webhook retry handling. Circuit breaker for external APIs. | All services |
 | **22–23** | Property onboarding flow | Dev | Create property → ingest KB (markdown/JSON) → link WhatsApp → get widget snippet → go live. **Target: supports "Live in 48 hours"** (Day 1: KB build + channel connect; Day 2: live). SheersSoft team handles KB build; hotel spends ~30 min on channel setup. | Backend onboard endpoint |
-| **23** | Multi-tenant security audit | Dev | Verify: Property A cannot see Property B's data. RLS enforced. Vector search scoped. Test with 2+ properties. | Data isolation code |
+| **23** | Multi-tenant security audit | Dev | Verify: Property A cannot see Property B's data. RLS enforced. Vector search scoped. Test with 2+ properties. Must pass before any new client goes live. | Data isolation code |
 | **24** | PDPA compliance implementation | Dev | PII encryption at field level. Data retention auto-purge. Privacy policy page. Consent flow on widget. Right-to-delete endpoint. | Security requirements |
 | **24** | Churn tracking: exit reason capture | Dev | When customer churns: capture reason (product, price, budget, competitor). >5% monthly = product problem. | — |
 | **24–25** | Load testing | Dev | Simulate 500 concurrent conversations. Verify Cloud Run auto-scales. Identify and fix bottlenecks. Measure P50/P95/P99 latency. | Production-like environment |
-| **25–26** | Vivatel UAT (User Acceptance Testing) | Product | Deploy to production. Zul and team test for 2 days with real scenarios. Collect feedback. | All features complete |
-| **26–27** | Bug fixes from UAT | Dev | Address blockers found during Vivatel testing. | UAT feedback |
+| **25–26** | Pilot UAT (User Acceptance Testing) | Product | Deploy to production. Pilot client team tests for 2 days with real scenarios. Collect feedback. | All features complete |
+| **26–27** | Bug fixes from UAT | Dev | Address blockers found during pilot testing. | UAT feedback |
 | **27** | Property onboarding guide + FAQ | Product | One-pager: how to get started, what the AI can/can't do, how to update KB, how to read reports. | Onboarding flow finalized |
-| **28** | **🎉 GO LIVE AT VIVATEL** | Both | Vivatel's WhatsApp + website widget are live with real guests. Dashboard is online. GM receivesirst daily report the next morning. | All above |
+| **28** | **🎉 FIRST PILOT GO LIVE** | Both | First pilot property's WhatsApp + website widget are live with real guests. Dashboard is online. GM receives first daily report the next morning. | All above |
 
 **Quality Gates:**
 - [x] Graceful fallback for LLM failures (template response sent to guest)
@@ -153,24 +183,25 @@ This is not optional. This screen sells the product.
 - [x] PII encrypted at rest (Fernet field-level encryption on phone/email)
 - [ ] 500 concurrent conversations load test — pending
 - [ ] P95 response latency < 5 seconds — pending formal measurement
-- [ ] Vivatel team accepts the product (no critical bugs) — pilot scheduling in progress
-- [ ] First daily report email received by GM — pending Vivatel go-live
+- [ ] First pilot client team accepts the product (no critical bugs) — pilot scheduling in progress
+- [ ] First daily report email received by GM — pending first pilot go-live
 
-**Go-Live Checklist:**
+**Go-Live Checklist (per new client):**
 
-| # | Item | Status |
-|---|------|--------|
-| 1 | Vivatel KB fully populated (rooms, rates, facilities, FAQs, policies) | ○ Pending |
-| 2 | WhatsApp Business number verified and linked | ○ Pending |
-| 3 | Widget script installed on Vivatel website | ○ Pending |
-| 4 | SendGrid inbound parse configured for Vivatel email | ○ Pending |
-| 5 | Operating hours configured (affects after-hours tagging) | ○ Pending |
-| 6 | GM notification email set (daily reports) | ○ Pending |
-| 7 | Cloud Run deployed and accessible | ✅ Live: nocturn-backend-owtn645vea-as.a.run.app |
-| 8 | GCP Secret Manager secrets loaded | ✅ All critical secrets loaded. Still missing (optional): `ANTHROPIC_API_KEY`, `WHATSAPP_API_TOKEN`, `WHATSAPP_APP_SECRET` |
-| 9 | Cloud Scheduler jobs created | ⚠️ Jobs previously created and verified; **deleted during 2026-03-23 GCP cleanup** — recreate on next production deploy |
-| 10 | ~~Stripe webhook configured~~ | ⊘ Not required for pilot — invoicing is manual. Activate Stripe when ≥3 paying tenants confirmed. |
-| 11 | Rollback plan documented (disable AI, revert to manual) | ○ Pending |
+| # | Item | Notes |
+|---|------|-------|
+| 1 | Property KB fully populated (rooms, rates, facilities, FAQs, policies) | Via `/admin/kb-ingestion` or client self-serves via `/portal/kb` |
+| 2 | WhatsApp Business number verified and linked | Meta Business verification required; Twilio sandbox for testing |
+| 3 | Widget script installed on client website | One `<script>` tag; most hotel sites are WordPress |
+| 4 | SendGrid inbound parse configured for client email | Forward reservations email to SendGrid parse address |
+| 5 | Operating hours configured (affects after-hours tagging) | Set in property settings |
+| 6 | GM notification email set (daily reports) | Confirm recipient before Cloud Scheduler jobs are active |
+| 7 | Cloud Run deployed and accessible | Spun down as of 2026-03-23; redeploy via `gcloud builds submit` |
+| 8 | GCP Secret Manager secrets loaded | All critical secrets present. Still missing (optional): `ANTHROPIC_API_KEY`, `WHATSAPP_API_TOKEN`, `WHATSAPP_APP_SECRET` |
+| 9 | Cloud Scheduler jobs created | Deleted during 2026-03-23 GCP cleanup — recreate on next production deploy |
+| 10 | BM/Manglish 50-question test suite passed at ≥80% | One-time P0 gate; re-run before each new property if AI engine has changed |
+| 11 | Stripe webhook configured | Not required for pilot — manual invoicing. Activate when ≥3 paying tenants confirmed. |
+| 12 | Rollback plan documented (disable AI, revert to manual) | Maintenance mode toggle available from `/admin/system` |
 
 ---
 
@@ -192,9 +223,9 @@ This is not optional. This screen sells the product.
 | PII field-level encryption (Fernet) | ✅ Active | `FERNET_ENCRYPTION_KEY` confirmed in Secret Manager. |
 | Monthly Gemini-powered guest insights | ✅ Built | Activate via Cloud Scheduler when pilot data ≥30 days. |
 | Stripe billing — checkout + webhook stub | ❌ Dormant | Activate when pilot-to-paid conversion proven; manual invoicing until then. |
-| Support chatbot + ticket CRUD | ❌ Dormant | Activate when ticket volume exceeds direct handling. |
+| Support chatbot + ticket CRUD | ✅ Active | `/portal/support` live. Backend ticket CRUD active. |
 | Application intake form | ❌ Dormant | Activate when inbound demand justifies self-serve signup. |
-| Tenant self-service portal (`/portal`, `/welcome`) | ❌ Not yet built | Phase 4 deliverable. Needed before 3rd+ tenant without SheersSoft engineer. |
+| Tenant self-service portal (`/portal`, `/welcome`) | ✅ Active | Built in v0.4. Full portal + 5-step onboarding wizard live. |
 
 **Pending infra to complete before scaling:**
 1. ✅ `FERNET_ENCRYPTION_KEY`, `SENDGRID_API_KEY` confirmed in Secret Manager
@@ -226,11 +257,11 @@ This is not optional. This screen sells the product.
 
 | Action | Goal |
 |---|---|
-| Capture Vivatel's first 7 days of data | Real numbers: inquiries, after-hours recovery, leads |
-| Build the "Vivatel Case Study" one-pager | Target formula: 20 leads × RM 230 ADR × 20% conversion = RM 920 recovered in first week. Scale to 30-day case study. Do NOT use RM 12,400 until verified by real Vivatel data. |
-| Activate SKS Hospitality (Bob's referral) — **highest priority** | Referrals convert 10× better than cold. Use Bob's name. Start in parallel with Vivatel, not after. |
-| Share results with Novotel (Shamsuridah), Ibis Styles (Simon) | Book demo calls using Vivatel case study |
-| Deploy pilots at 3 more properties | Onboarding flow must work in < 2 hours |
+| Capture first pilot property's first 7 days of data | Real numbers: inquiries, after-hours recovery, leads |
+| Build the first case study one-pager | Target formula: 20 leads × RM 230 ADR × 20% conversion = RM 920 recovered in first week. Scale to 30-day case study. Do NOT publish estimates until verified by real data. |
+| Activate referral pipeline — **highest priority** | Referrals convert 10× better than cold. Start in parallel with first pilot, not after. |
+| Share results with warm prospects | Book demo calls using first pilot case study |
+| Deploy pilots at 3 more properties | Self-service `/welcome` wizard must let new clients go live in < 2 hours |
 
 ### Week 7–8: Convert
 
@@ -238,8 +269,8 @@ This is not optional. This screen sells the product.
 |---|---|
 | ROI report for each pilot property — real numbers from their dashboard | Proof, not promises |
 | Conversion calls: pilot → paid (Starter or Professional tier) | Target: 60%+ conversion |
-| Cold outreach to 10 new properties using Vivatel case study | Expand pipeline |
-| Leverage Bob's SKS Hospitality referral | Fresh properties = faster decisions |
+| Cold outreach to 10 new properties using first pilot case study | Expand pipeline |
+| Leverage referral network | Fresh properties = faster decisions |
 
 ### Week 9–10: Scale
 
@@ -272,13 +303,13 @@ This is not optional. This screen sells the product.
 |---|------|-------------|--------|------------|-------|
 | 1 | WhatsApp API approval delayed >7 days | Medium | High | Apply Day 8. Pilot with web widget + email first. | Product |
 | 2 | AI hallucination on rate quotes | Medium | High | Never state rates unless KB confidence > 0.85. Default to handoff. Monitor first 100 conversations manually. | Dev |
-| 3 | Vivatel UAT reveals critical UX issues | Medium | Medium | Reserve 2 days for fixes (Days 26–27). Reduce scope rather than delay launch. | Both |
+| 3 | Pilot UAT reveals critical UX issues | Medium | Medium | Reserve 2 days for fixes (Days 26–27). Reduce scope rather than delay launch. | Both |
 | 4 | LLM rate limiting during peak hours | Low | Medium | Implement queue with retry. Consider Claude Haiku as overflow provider. | Dev |
 | 5 | Hotel website blocks widget script (CSP) | Low | Medium | Provide iframe fallback. Offer to modify their CSP headers. | Dev |
 | 6 | Guest data breach / PDPA violation | Low | Critical | Field-level encryption. RLS. Penetration test before go-live. | Dev |
 | 7 | CAC > LTV (unit economics) | Medium | Critical | Track from first customer. Stop scaling acquisition if LTV:CAC < 3. | Product |
 | 8 | "Build it and they will come" (no distribution) | High | Critical | 3–5 customer calls/week. Case study → demos. Distribution strategy from day one. | Product |
-| 9 | Dashboard lands on onboarding checklist, not revenue | High | Critical | GM's first impression is a setup form, not the money slide. Rebuilding dashboard home is the #1 pre-pilot task. | Dev |
+| 9 | ~~Dashboard lands on onboarding checklist, not revenue~~ | — | — | ✅ **RESOLVED v0.3.1** — Dashboard home shows revenue KPI cards as the first screen. | — |
 
 ---
 
@@ -286,8 +317,8 @@ This is not optional. This screen sells the product.
 
 The product is **shipped** when ALL of these are true:
 
-- [ ] A guest sends a WhatsApp message to Vivatel at 11pm and gets a correct AI response in < 30 seconds
-- [ ] The web chat widget works on Vivatel's website on both mobile and desktop
+- [ ] A guest sends a WhatsApp message at 11pm and gets a correct AI response in < 30 seconds
+- [ ] The web chat widget works on a client website on both mobile and desktop
 - [ ] A guest email to reservations gets an AI response within 60 seconds
 - [ ] When AI can't help, the guest is seamlessly handed to staff with full context
 - [ ] Every conversation is captured as a lead (zero leakage)
@@ -296,11 +327,13 @@ The product is **shipped** when ALL of these are true:
 - [✓] Daily email infrastructure confirmed working — Cloud Scheduler jobs verified HTTP 200. Note: jobs deleted in 2026-03-23 GCP cleanup; recreate on next deploy.
 - [x] ✅ Property B cannot see Property A's data (verified — RLS + property_id scoping)
 - [ ] The system handles 500 concurrent conversations without degradation — load test pending
-- [ ] Zul (Vivatel Reservation Manager) says: *"Yes, this is live. We're using it."*
+- [ ] First client's reservations team accepts the product (no critical bugs) — pilot scheduling in progress
 - [x] ✅ GM sees revenue metrics (not an onboarding checklist) on first login (v0.3.1)
-- [ ] BM/Manglish 50-question test suite run via WhatsApp — ≥80% pass rate confirmed (pending field work P0.6)
+- [ ] BM/Manglish 50-question test suite run via WhatsApp — ≥80% pass rate confirmed (P0 blocker)
 - [x] ✅ `FERNET_ENCRYPTION_KEY` confirmed in Secret Manager. PII encryption active.
+- [x] ✅ Tenant owner can self-manage KB, team, channels via `/portal` without SheersSoft engineer (v0.4)
+- [x] ✅ New client can complete onboarding via `/welcome` wizard without manual handholding (v0.4)
 
 ---
 
-*Ship in 28 days. Prove ROI in 7. Close 10 customers in 60. The plan is tight, the scope is intentionally small, and every feature earns its place by answering one question: "Does this make the GM open the dashboard tomorrow morning?" Aligned with [product_context.md](./product_context.md).*
+*Ship in 28 days. Prove ROI in 7. Close 10 customers in 60. The plan is tight, the scope is intentionally small, and every feature earns its place by answering one question: "Does this make the GM open the dashboard tomorrow morning?" Self-service onboarding (v0.4) means each new client can go live without a SheersSoft engineer in the loop. Aligned with [product_context.md](./product_context.md).*
