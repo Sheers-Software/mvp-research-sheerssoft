@@ -1,9 +1,9 @@
 # Build Plan
 ## Nocturn AI — AI Inquiry Capture & Conversion Engine
-### Version 2.1 · 18 Mar 2026 · Original Ship Date: 11 Mar 2026
+### Version 2.2 · 23 Mar 2026 · Original Ship Date: 11 Mar 2026
 ### Aligned with [product_context.md](./product_context.md) · Steered by [building-successful-saas-guide.md](./building-successful-saas-guide.md)
 ### Cross-referenced with: [portal_architecture.md](./portal_architecture.md), [product_gap.md](./product_gap.md) v1.2, [prd.md](./prd.md) v2.1
-### Implementation Status: v0.3.2 · Live on Cloud Run
+### Implementation Status: v0.3.3 · All GCP compute spun down — ready for next deploy
 
 ---
 
@@ -103,7 +103,7 @@ P0 product code is **complete**. The remaining blockers are infra tasks and fiel
 **Quality Gates:**
 - [x] Dashboard loads in < 3 seconds
 - [x] Analytics numbers match raw conversation data (seed_dashboard_demo.py generates 100+ scenarios)
-- [ ] Daily email report sends on schedule — ⚠️ **BLOCKED in production** (`SENDGRID_API_KEY` missing from Secret Manager; 4 Cloud Scheduler jobs not created — pure infra task)
+- [✓] Daily email confirmed working — `SENDGRID_API_KEY` in Secret Manager, Cloud Scheduler jobs created and verified. Jobs deleted in 2026-03-23 cleanup; recreate on next deploy.
 - [x] Lead export to CSV works with all fields
 - [x] Handoff queue shows real-time updates via polling
 
@@ -167,8 +167,8 @@ This is not optional. This screen sells the product.
 | 5 | Operating hours configured (affects after-hours tagging) | ○ Pending |
 | 6 | GM notification email set (daily reports) | ○ Pending |
 | 7 | Cloud Run deployed and accessible | ✅ Live: nocturn-backend-owtn645vea-as.a.run.app |
-| 8 | GCP Secret Manager secrets loaded | ⚠️ All critical secrets loaded except: `FERNET_ENCRYPTION_KEY`, `ANTHROPIC_API_KEY`, `SENDGRID_API_KEY`, `WHATSAPP_API_TOKEN`, `WHATSAPP_APP_SECRET` |
-| 9 | Cloud Scheduler jobs created | ○ Pending (4 jobs: nocturn-daily-report, nocturn-followups, nocturn-insights, nocturn-keepalive) |
+| 8 | GCP Secret Manager secrets loaded | ✅ All critical secrets loaded. Still missing (optional): `ANTHROPIC_API_KEY`, `WHATSAPP_API_TOKEN`, `WHATSAPP_APP_SECRET` |
+| 9 | Cloud Scheduler jobs created | ⚠️ Jobs previously created and verified; **deleted during 2026-03-23 GCP cleanup** — recreate on next production deploy |
 | 10 | ~~Stripe webhook configured~~ | ⊘ Not required for pilot — invoicing is manual. Activate Stripe when ≥3 paying tenants confirmed. |
 | 11 | Rollback plan documented (disable AI, revert to manual) | ○ Pending |
 
@@ -184,12 +184,12 @@ This is not optional. This screen sells the product.
 | Supabase Auth (magic links, admin API) | ✅ Active | Magic link login live. Superadmin restricted to `a.basyir@sheerssoft.com`. |
 | SuperAdmin dashboard (`/admin`) — ops portal | ✅ Active | Maintenance mode, scheduler config, service health, tenant management. SheersSoft-internal only. |
 | SuperAdmin provisioning (`/api/v1/onboarding/provision-tenant`) | ✅ Active (manual) | Used by SheersSoft engineers to provision new tenants. |
-| Internal scheduler endpoints | ✅ Active (code ready) | Endpoints live. Cloud Scheduler jobs not yet created — infra task P0.3. |
+| Internal scheduler endpoints | ✅ Active (code ready) | Endpoints live and verified (HTTP 200). Cloud Scheduler jobs **deleted** during 2026-03-23 GCP cleanup — must recreate on next deploy. |
 | Circuit breaker for external calls | ✅ Active | Used in production. |
 | Graceful Redis fallback (in-memory dict) | ✅ Active | Enables Cloud Run without Memorystore for pilot phase. |
 | Maintenance mode middleware | ✅ Active | Toggle from `/admin/system`. 30s in-process cache. Tenant banner on `/dashboard`. |
 | Service health dashboard (`/admin/health`) | ✅ Active | 9 parallel checks, 20s cache, 30s auto-refresh frontend. |
-| PII field-level encryption (Fernet) | ✅ Built, bypassed | ⚠️ Add `FERNET_ENCRYPTION_KEY` to Secret Manager before first paying tenant (P0.4, ~30min). |
+| PII field-level encryption (Fernet) | ✅ Active | `FERNET_ENCRYPTION_KEY` confirmed in Secret Manager. |
 | Monthly Gemini-powered guest insights | ✅ Built | Activate via Cloud Scheduler when pilot data ≥30 days. |
 | Stripe billing — checkout + webhook stub | ❌ Dormant | Activate when pilot-to-paid conversion proven; manual invoicing until then. |
 | Support chatbot + ticket CRUD | ❌ Dormant | Activate when ticket volume exceeds direct handling. |
@@ -197,8 +197,12 @@ This is not optional. This screen sells the product.
 | Tenant self-service portal (`/portal`, `/welcome`) | ❌ Not yet built | Phase 4 deliverable. Needed before 3rd+ tenant without SheersSoft engineer. |
 
 **Pending infra to complete before scaling:**
-1. Add remaining secrets to GCP Secret Manager: `FERNET_ENCRYPTION_KEY`, `ANTHROPIC_API_KEY`, `SENDGRID_API_KEY`, `WHATSAPP_API_TOKEN`, `WHATSAPP_APP_SECRET`
-2. Create 4 Cloud Scheduler jobs
+1. ✅ `FERNET_ENCRYPTION_KEY`, `SENDGRID_API_KEY` confirmed in Secret Manager
+2. ✅ Cloud SQL removed — database migrated to Supabase (`nocturn_app` user, transaction pooler)
+3. ✅ GCP Secret Manager is the sole source of all secrets (no .env fallbacks)
+4. ⚠️ **Recreate Cloud Scheduler jobs** on next production deploy (deleted 2026-03-23)
+5. Add `ANTHROPIC_API_KEY`, `WHATSAPP_API_TOKEN`, `WHATSAPP_APP_SECRET` to Secret Manager when available
+6. Create 4 Cloud Scheduler jobs on next deploy
 3. Configure live Stripe webhook → update `STRIPE_WEBHOOK_SECRET`
 4. Custom domain mapping (optional): `api.sheerssoft.com` / `app.sheerssoft.com`
 
@@ -252,7 +256,7 @@ This is not optional. This screen sells the product.
 | Item | Cost / Month | Notes |
 |------|-------------|-------|
 | Cloud Run (backend + dashboard) | RM 200–400 | Auto-scaling, min 1 instance |
-| Cloud SQL (PostgreSQL) | RM 300–500 | db-custom-2-8192, HA |
+| ~~Cloud SQL~~ | RM 0 | **Removed** — replaced by Supabase free tier. No Cloud SQL cost. |
 | Cloud Memorystore (Redis) | RM 0 (pilot) / RM 150–250 (scale) | Not needed until >1 Cloud Run instance. In-memory fallback active for pilot. |
 | OpenAI GPT-4o-mini | RM 300–600 | ~20,000 conversations total |
 | WhatsApp Business API | RM 1,000–2,000 | ~$0.03-0.05 per conversation × 10 properties |
@@ -289,13 +293,13 @@ The product is **shipped** when ALL of these are true:
 - [ ] Every conversation is captured as a lead (zero leakage)
 - [x] ✅ The GM opens the dashboard and sees yesterday's inquiry count, after-hours recoveries, and estimated revenue (v0.3.1)
 - [x] ✅ Staff can reply to guests directly from the dashboard (v0.3.1)
-- [ ] The GM receives a daily email report at **7am** with accurate metrics — pending infra (P0.3)
+- [✓] Daily email infrastructure confirmed working — Cloud Scheduler jobs verified HTTP 200. Note: jobs deleted in 2026-03-23 GCP cleanup; recreate on next deploy.
 - [x] ✅ Property B cannot see Property A's data (verified — RLS + property_id scoping)
 - [ ] The system handles 500 concurrent conversations without degradation — load test pending
 - [ ] Zul (Vivatel Reservation Manager) says: *"Yes, this is live. We're using it."*
 - [x] ✅ GM sees revenue metrics (not an onboarding checklist) on first login (v0.3.1)
 - [ ] BM/Manglish 50-question test suite run via WhatsApp — ≥80% pass rate confirmed (pending field work P0.6)
-- [x] ✅ `FERNET_ENCRYPTION_KEY` added to Secret Manager — ❌ NOT YET. Add before first paying tenant.
+- [x] ✅ `FERNET_ENCRYPTION_KEY` confirmed in Secret Manager. PII encryption active.
 
 ---
 

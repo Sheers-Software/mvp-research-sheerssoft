@@ -1,9 +1,9 @@
 # System Architecture
 ## Nocturn AI — AI Inquiry Capture & Conversion Engine
-### Version 2.1 · 18 Mar 2026
+### Version 2.2 · 23 Mar 2026
 ### Aligned with [product_context.md](./product_context.md) · Steered by [building-successful-saas-guide.md](./building-successful-saas-guide.md)
 ### Cross-referenced with: [portal_architecture.md](./portal_architecture.md), [prd.md](./prd.md) v2.1
-### Implementation Status: v0.3.2 live on GCP Cloud Run · Backend: `https://nocturn-backend-owtn645vea-as.a.run.app`
+### Implementation Status: v0.3.3 · All GCP compute spun down (2026-03-23) · Database: Supabase PostgreSQL 17 (ap-southeast-2)
 
 ---
 
@@ -41,7 +41,7 @@ graph TB
     end
 
     subgraph "Data Layer"
-        PG["🐘 PostgreSQL 16<br/><i>+ pgvector</i><br/><i>Conversations · Leads · Analytics</i>"]
+        PG["🐘 Supabase PostgreSQL 17<br/><i>+ pgvector</i><br/><i>Conversations · Leads · Analytics</i>"]
         RD["⚡ Redis<br/><i>Session state</i><br/><i>Rate limiting</i><br/><i>Pub/Sub for handoff</i>"]
     end
 
@@ -163,7 +163,7 @@ Design the API as if external customers will use it from day one. This forces go
 | Layer | Technology | Justification |
 |---|---|---|
 | **Backend API** | Python 3.12 + FastAPI | Async-native. LLM ecosystem is Python-first. Implemented and live. |
-| **Database** | PostgreSQL 16 + pgvector | Battle-tested. Vector search built-in. Handles relational + vector in one engine. |
+| **Database** | Supabase PostgreSQL 17 + pgvector | Hosted on Supabase (`ramenghkpvipxijhfptp`, ap-southeast-2). App connects as `nocturn_app` via transaction pooler (port 6543). `DATABASE_URL` from GCP Secret Manager — no hardcoded credentials. pgvector enabled natively. |
 | **Cache / Sessions** | Redis 7 (graceful in-memory fallback) | Graceful dict-based fallback when Redis unavailable — allows Cloud Run to run without Memorystore for pilot phase. Sessions survive within a single instance. Pub/Sub is a no-op when Redis is absent. |
 | **LLM Primary** | Google Gemini 1.5 Flash | Cost-effective, fast. Primary provider for conversation engine. Gemini roles mapped: `"assistant"` → `"model"`. |
 | **LLM Fallback Chain** | OpenAI GPT-4o-mini → Anthropic Claude Haiku → template string | Ordered fallback. Empty responses from any provider fall through. Anthropic requires `system` prompt as separate param, not in messages array. |
@@ -175,7 +175,7 @@ Design the API as if external customers will use it from day one. This forces go
 | **WhatsApp** | Meta WhatsApp Business Cloud API + Twilio | Both providers implemented. `Property.whatsapp_provider = "meta" | "twilio"`. Multi-tenant sender uses `prop.twilio_phone_number` (not global settings). |
 | **Email** | SendGrid (Inbound Parse + Outbound) | Webhook for inbound. SMTP for outbound reports. Used by channel_setup, scheduler, onboarding. |
 | **Payments** | Stripe *(dormant in v1)* | Checkout session + webhook stub implemented in `services/stripe_service.py`. Not activated — pilot invoicing is manual. Activate when ≥3 paying tenants confirmed. |
-| **Infrastructure** | Google Cloud Run | Auto-scaling containers. Pay-per-use. Two services: backend + frontend. Min 1 instance to avoid cold starts. |
+| **Infrastructure** | Google Cloud Run | Auto-scaling containers. Pay-per-use. Two services: backend + frontend. **Current state: spun down (2026-03-23) to save cost.** No Cloud SQL — DB is Supabase. |
 | **CI/CD** | Google Cloud Build (`backend/cloudbuild.yaml`) | Builds both containers → Artifact Registry → deploys both Cloud Run services → runs Alembic migrations. Triggered manually or via Cloud Build GitHub trigger on `main`. |
 
 ---
@@ -249,7 +249,9 @@ Current: `is_superadmin → /admin`, else → `/dashboard`. Full routing require
 
 ### Internal Scheduler (Production)
 
-In production, APScheduler is **disabled**. Cloud Scheduler calls internal endpoints instead:
+In production, APScheduler is **disabled**. Cloud Scheduler calls internal endpoints instead.
+
+> **Current state (2026-03-23):** Cloud Scheduler jobs were deleted during GCP cleanup. Must be recreated on next production deploy before scheduled jobs resume. The `/internal/*` endpoints are live and tested.
 - `POST /api/v1/internal/run-daily-report`
 - `POST /api/v1/internal/run-followups`
 - `POST /api/v1/internal/run-insights`
@@ -654,7 +656,7 @@ Google Cloud Platform
 │   ├── Auto-scales 0 → N
 │   └── Serves SSR dashboard pages
 │
-├── Cloud SQL (PostgreSQL 16 + pgvector)
+├── Supabase PostgreSQL 17 + pgvector (hosted, no deploy needed)
 │   ├── db-custom-2-8192 (2 vCPU, 8GB RAM)
 │   ├── 100GB SSD
 │   ├── Automated backups (daily)
@@ -706,7 +708,7 @@ Attach a Cloud Build GitHub trigger on `main` for automatic deploys.
 | Requirement | Implementation |
 |---|---|
 | Consent for data collection | Widget shows privacy notice before first message. WhatsApp: business profile links to privacy policy. |
-| Data encryption at rest | PostgreSQL: TDE (Transparent Data Encryption) on Cloud SQL. |
+| Data encryption at rest | Supabase PostgreSQL: encryption at rest handled by Supabase infrastructure. Application-level Fernet encryption on PII fields (`FERNET_ENCRYPTION_KEY` in Secret Manager). |
 | Data encryption in transit | TLS 1.3 on all endpoints. Cloud Run enforces HTTPS. |
 | Data isolation | Row-Level Security per property. Separate vector indexes. |
 | Right to deletion | API endpoint to purge guest data by phone/email + cascade. |
@@ -726,7 +728,7 @@ Attach a Cloud Build GitHub trigger on `main` for automatic deploys.
 
 | Requirement | Implementation |
 |-------------|----------------|
-| Automated backups | Cloud SQL: daily automated backups with point-in-time recovery |
+| Automated backups | Supabase: daily automated backups with point-in-time recovery (free tier: 7-day retention). |
 | Restore testing | Quarterly test restores. *Companies lose everything because they had backups but never tested them.* |
 | Runbooks | Document as encountered: provision new customer, handle payment failure, investigate production issue |
 
@@ -757,7 +759,7 @@ Attach a Cloud Build GitHub trigger on `main` for automatic deploys.
 | Signal | Action |
 |---|---|
 | LLM latency > 3s consistently | Add Claude Haiku as parallel provider. Load balance across providers. |
-| Database CPU > 70% sustained | Scale up Cloud SQL. Add read replicas. |
+| Database CPU > 70% sustained | Upgrade Supabase plan. Enable read replicas. Consider connection pooler tuning. |
 | Redis memory > 80% | Scale up Memorystore. Or move cold sessions to PostgreSQL. |
 | > 500 concurrent conversations | Consider splitting conversation engine into a dedicated service. This is the first microservice extraction. |
 

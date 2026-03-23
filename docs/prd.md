@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD)
 ## Nocturn AI — AI Inquiry Capture & Conversion Engine
-### Version 2.1 · 18 Mar 2026
+### Version 2.2 · 23 Mar 2026
 ### Aligned with [product_context.md](./product_context.md) · Ground truth: [opportunity_2_playbook.md](./opportunity_2_playbook.md)
 ### Cross-referenced with: [portal_architecture.md](./portal_architecture.md), [product_gap.md](./product_gap.md), [gtm_execution_plan.md](./gtm_execution_plan.md)
 
@@ -160,7 +160,7 @@ Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct
 |---|-----|--------|-----|
 | 1 | **Dashboard home shows onboarding checklist, not revenue KPIs** | ✅ **RESOLVED** — `/dashboard` home shows revenue KPI cards (inquiries, after-hours, leads, estimated revenue recovered). Rebuilt in v0.3.1. | — |
 | 2 | **Staff cannot reply to guest from dashboard** | ✅ **RESOLVED** — Staff reply input live in `/dashboard/conversations`. Replies forwarded to guest via original channel (WhatsApp/web). v0.3.1. | — |
-| 3 | **Daily email non-functional in production** | ✅ **RESOLVED** — `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL` in Secret Manager. 4 Cloud Scheduler jobs live (`nocturn-daily-report` at 7:30am MYT, `nocturn-followups` hourly, `nocturn-insights` monthly, `nocturn-keepalive` every 6h). Manual trigger confirmed HTTP 200. | — |
+| 3 | **Daily email non-functional in production** | ✅ **RESOLVED (code + infra confirmed)** — `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL` in Secret Manager. Cloud Scheduler jobs were created, verified (HTTP 200), and later deleted as part of GCP cleanup on 2026-03-23. **Must be recreated** on next production deploy before daily reports resume. Internal endpoints (`/api/v1/internal/*`) are live and tested. | Recreate 4 Cloud Scheduler jobs on next deploy. |
 | 4 | **"Lost" status missing from leads UI** | ✅ **RESOLVED** — Lost filter tab live in `/dashboard/leads`. Staff can mark leads lost. v0.3.1. | — |
 | 5 | **Bilingual AI not formally tested** | ❌ **OUTSTANDING** — BM/Manglish support is live but the 50-question test suite has not been run. Must pass ≥80% before pilot go-live. | Run 50-question suite (see `docs/bm_test_suite.md`) via Twilio sandbox → Vivatel test number. Half-day field work. |
 
@@ -301,6 +301,7 @@ Targets aligned with `gtm_execution_plan.md` 90-day scorecard:
 - ✅ `FERNET_ENCRYPTION_KEY` in Secret Manager — PII encryption active (v0.3.2)
 - ❌ 50-question BM/Manglish test suite run at ≥80% pass rate (half-day field work)
 - ❌ Vivatel KB populated (1-day session with Zul)
+- ✅ Infra migration: Supabase-only DB, GCP Secret Manager–only secrets, Cloud SQL removed, all GCP compute spun down (v0.3.3)
 
 **Post-pilot roadmap** (after first real-world data):
 
