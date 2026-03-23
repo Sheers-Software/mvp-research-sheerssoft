@@ -153,12 +153,13 @@ class Settings(BaseSettings):
         if self.database_url.startswith("postgresql://"):
             self.database_url = self.database_url.replace("postgresql://", "postgresql+asyncpg://")
 
-        # Fallback for pure local dev without GCP ADC (no .env and no Secret Manager)
         if not self.database_url:
-            self.database_url = "postgresql+asyncpg://sheerssoft:sheerssoft_dev_password@localhost:5432/sheerssoft"
+            raise ValueError(
+                "DATABASE_URL could not be loaded from GCP Secret Manager and is not set as an environment variable. "
+                "Ensure GCP Application Default Credentials are configured and the secret exists in project nocturn-ai-487207."
+            )
 
     class Config:
-        env_file = ".env"
         case_sensitive = False
 
 

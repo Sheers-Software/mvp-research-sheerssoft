@@ -227,27 +227,23 @@ All require `X-Internal-Secret` header matching `settings.internal_scheduler_sec
 
 ## Configuration
 
-Copy `.env.example` to `.env`. Key variables:
+**All secrets are fetched exclusively from GCP Secret Manager (project `nocturn-ai-487207`) at startup. Do not use `.env` files for secrets — `config.py` will raise a `ValueError` at startup if `DATABASE_URL` is missing from Secret Manager.**
 
+Non-secret config (safe to set as env vars in docker-compose or Cloud Run):
 ```
-ENVIRONMENT=development
-DATABASE_URL=postgresql+asyncpg://...
-REDIS_URL=redis://localhost:6380/0
-GEMINI_API_KEY=...
-OPENAI_API_KEY=...        # fallback LLM
-ANTHROPIC_API_KEY=...     # fallback LLM
-JWT_SECRET=...
-ADMIN_USER=admin
-ADMIN_PASSWORD=...
-FERNET_ENCRYPTION_KEY=... # PII field-level encryption (PDPA)
-SUPABASE_URL=...          # optional; enables Supabase auth user creation + magic links
-SUPABASE_SERVICE_ROLE_KEY=...
-STRIPE_SECRET_KEY=...     # optional; needed for billing routes
+ENVIRONMENT=production        # development | demo | production
+REDIS_URL=redis://...         # defaults to localhost:6379/0
+ALLOWED_ORIGINS=...           # comma-separated CORS origins
+FRONTEND_URL=...              # for magic link redirects
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_EMBEDDING_MODEL=text-embedding-004
 ```
 
-For the demo stack, use `.env.demo` (already configured with Twilio/Gemini credentials).
+For the demo stack, only `.env.demo` is used, and it contains only non-secret config (ENVIRONMENT, REDIS_URL, model names). All secrets still come from Secret Manager.
 
-**GCP Secret Manager state** (project `nocturn-ai-487207`): All critical secrets are stored — `DATABASE_URL` (has BOM, stripped automatically), `GEMINI_API_KEY`, `OPENAI_API_KEY`, `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, `JWT_SECRET`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, all Twilio keys, `INTERNAL_SCHEDULER_SECRET`. Still missing: `FERNET_ENCRYPTION_KEY`, `ANTHROPIC_API_KEY`, `SENDGRID_API_KEY`, `WHATSAPP_API_TOKEN`, `WHATSAPP_APP_SECRET`. Secrets stored with BOM (`\ufeff`) are stripped in `config.py` automatically.
+**GCP Secret Manager state** (project `nocturn-ai-487207`): All critical secrets are stored — `DATABASE_URL` (Supabase connection string; has BOM, stripped automatically), `GEMINI_API_KEY`, `OPENAI_API_KEY`, `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, `JWT_SECRET`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, all Twilio keys, `INTERNAL_SCHEDULER_SECRET`. Still missing: `FERNET_ENCRYPTION_KEY`, `ANTHROPIC_API_KEY`, `SENDGRID_API_KEY`, `WHATSAPP_API_TOKEN`, `WHATSAPP_APP_SECRET`. Secrets stored with BOM (`\ufeff`) are stripped in `config.py` automatically.
+
+**Database:** Supabase PostgreSQL (no Cloud SQL). The `DATABASE_URL` in Secret Manager is the Supabase connection string. No Cloud SQL instance is created or attached during deployment. Local docker-compose stacks no longer spin up a local postgres — they connect to Supabase via the same Secret Manager-loaded URL.
 
 ## WhatsApp Channel — Key Patterns
 
@@ -290,11 +286,11 @@ For integration testing against live channels, see `docs/sit_uat_guide.md` and `
 
 ## Production Deployment (GCP Cloud Run)
 
-**Current state (as of 2026-03-18): SPUN DOWN to save cost.**
+**Current state (as of 2026-03-23): SPUN DOWN to save cost.**
 - Cloud Run services (`nocturn-backend`, `nocturn-frontend`) have been deleted.
 - Cloud Scheduler jobs (all 4 `nocturn-*`) have been paused.
-- Latest images are cached locally (SHA `cf9e34c1ce009e8726f162cc7edce41048835a04`).
 - All secrets remain in Secret Manager. Database (Supabase) is unaffected.
+- **No Cloud SQL instance** — database is Supabase-only. Re-deploy will not create any Cloud SQL instance.
 
 **Live URLs (when deployed):**
 - Backend: `https://nocturn-backend-owtn645vea-as.a.run.app`

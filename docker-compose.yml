@@ -1,23 +1,6 @@
 version: "3.9"
 
 services:
-  db:
-    image: pgvector/pgvector:pg16
-    restart: always
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-sheerssoft}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sheerssoft_dev_password}
-      POSTGRES_DB: ${POSTGRES_DB:-sheerssoft}
-    ports:
-      - "5433:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sheerssoft}" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   redis:
     image: redis:7-alpine
     restart: always
@@ -35,42 +18,43 @@ services:
       dockerfile: Dockerfile
     restart: always
     ports:
-      - "8000:8000"
+      - "8000:8080"
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sheerssoft}:${POSTGRES_PASSWORD:-sheerssoft_dev_password}@db:5432/${POSTGRES_DB:-sheerssoft}
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: ${ENVIRONMENT:-production}
-      # All API secrets are fetched from GCP Secret Manager at startup.
-      # On GCP (Cloud Run / GCE): workload identity handles auth automatically.
-      # Local Docker: mount GCP ADC credentials (see volumes below).
+      # All secrets (DATABASE_URL, API keys, JWT, etc.) are fetched from GCP Secret Manager
+      # at startup via config.py. No secrets are sourced from local env files.
+      #
+      # Authentication for Secret Manager:
+      #   - GCP (Cloud Run / GCE): workload identity / attached service account (automatic)
+      #   - Local Docker (Windows): GOOGLE_APPLICATION_CREDENTIALS_PATH defaults to
+      #     %APPDATA%/gcloud/application_default_credentials.json
+      #     Run `gcloud auth application-default login` on the host first.
       GOOGLE_APPLICATION_CREDENTIALS: /gcp/credentials.json
     volumes:
       # Mount GCP Application Default Credentials for local development.
-      # Run `gcloud auth application-default login` on the host first.
-      # On GCP deployments, this volume is unused (workload identity takes precedence).
-      - ${GOOGLE_APPLICATION_CREDENTIALS_PATH:-${HOME}/.config/gcloud/application_default_credentials.json}:/gcp/credentials.json:ro
+      # On GCP deployments this volume is unused — workload identity takes precedence.
+      # Windows (Git Bash / WSL2): $APPDATA resolves to C:\Users\<user>\AppData\Roaming
+      - ${GOOGLE_APPLICATION_CREDENTIALS_PATH:-$APPDATA/gcloud/application_default_credentials.json}:/gcp/credentials.json:ro
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
-    # Removed volume mount for code to use baked-in image code (production safe)
-    # create a docker-compose.override.yml for local dev to add it back
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* vars are baked in at build time by Next.js.
+        # Anon key is intentionally public (safe in source/build args).
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+        NEXT_PUBLIC_SUPABASE_URL: https://ramenghkpvipxijhfptp.supabase.co
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJhbWVuZ2hrcHZpcHhpamhmcHRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0MTg5MzAsImV4cCI6MjA4Nzk5NDkzMH0.DmskI__M8XyXKwkhgrYFsBwgDyUY7GeiMHOwlEWhAQw
     restart: always
     ports:
       - "3000:3000"
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
-      NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_URL:-https://ramenghkpvipxijhfptp.supabase.co}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
     depends_on:
       backend:
         condition: service_started
-
-volumes:
-  pgdata:

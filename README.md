@@ -4,14 +4,15 @@ An AI-powered hotel inquiry capture system that recovers revenue lost after hour
 
 ## Architecture
 
-- **Backend:** Python 3.11 + FastAPI (async SQLAlchemy, asyncpg)
+- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.3.3
 - **Frontend:** Next.js 14 + TypeScript
-- **Database:** PostgreSQL 16 + pgvector (Supabase-hosted)
+- **Database:** Supabase PostgreSQL 17 + pgvector — user `nocturn_app`, transaction pooler (port 6543, ap-southeast-2)
 - **Auth:** Supabase Auth (magic links) + local JWT fallback
 - **LLMs:** Google Gemini (primary), OpenAI GPT-4o-mini & Anthropic Claude Haiku (fallbacks)
 - **Channels:** WhatsApp (Meta Cloud API & Twilio), Web Chat Widget, Email (SendGrid)
 - **Billing:** Stripe (one-time setup fee + subscription management)
-- **Infra:** GCP Cloud Run (backend + frontend), GCP Secret Manager (`nocturn-ai-487207`), Cloud Scheduler (4 jobs)
+- **Infra:** GCP Cloud Run (backend + frontend), GCP Secret Manager (`nocturn-ai-487207`)
+- **Secrets:** All credentials exclusively from GCP Secret Manager — no `.env` files, no Cloud SQL
 - **PII Compliance:** Fernet field-level encryption (PDPA 2010), GDPR/PDPA right-to-delete endpoint
 
 ## Key Features
@@ -31,13 +32,23 @@ An AI-powered hotel inquiry capture system that recovers revenue lost after hour
 
 ## Getting Started
 
-### Prerequisites — Push to GCP Secret Manager
+### Prerequisites
 
-All credentials go into GCP Secret Manager project `nocturn-ai-487207`. Run `gcloud auth application-default login` for local ADC.
+#### 1. GCP credentials (required for Secret Manager access)
+
+All secrets are loaded exclusively from GCP Secret Manager at startup. No `.env` files are used.
+
+```bash
+gcloud auth login
+gcloud auth application-default login   # creates ADC credentials mounted into containers
+gcloud config set project nocturn-ai-487207
+```
+
+#### 2. Secrets in GCP Secret Manager (`nocturn-ai-487207`)
 
 | Secret | Where to get it |
 |--------|----------------|
-| `DATABASE_URL` | Supabase dashboard → Project Settings → Database → Connection String |
+| `DATABASE_URL` | Supabase dashboard → Connect → Transaction pooler URI |
 | `GEMINI_API_KEY` | Google AI Studio |
 | `OPENAI_API_KEY` | OpenAI platform |
 | `SUPABASE_URL` | Supabase dashboard → Project Settings → API |
@@ -47,17 +58,20 @@ All credentials go into GCP Secret Manager project `nocturn-ai-487207`. Run `gcl
 | `STRIPE_WEBHOOK_SECRET` | Stripe dashboard → Developers → Webhooks |
 | `JWT_SECRET` | Supabase dashboard → Project Settings → API → JWT Secret |
 | `FERNET_ENCRYPTION_KEY` | `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+| `ADMIN_PASSWORD` | Set a secure password for the legacy admin account |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | Twilio Console |
-| `SENDGRID_API_KEY` | SendGrid dashboard |
-| `INTERNAL_SCHEDULER_SECRET` | Any random string — used to authenticate Cloud Scheduler → Cloud Run calls |
+| `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`, `STAFF_NOTIFICATION_EMAIL` | SendGrid dashboard |
+| `INTERNAL_SCHEDULER_SECRET` | `openssl rand -hex 32` |
 
-### Launch (local)
+### Launch (local Docker)
+
+GCP ADC credentials (`~/.config/gcloud/application_default_credentials.json` on Linux/Mac, `%APPDATA%\gcloud\application_default_credentials.json` on Windows) are mounted into the container automatically. No local postgres — all containers connect to Supabase.
 
 ```bash
-# Production / dev stack (backend :8000, frontend :3000, postgres :5433, redis :6380)
+# Production stack (backend :8000, frontend :3000, redis :6380)
 docker-compose up -d --build
 
-# Demo stack — isolated DB and Redis (backend :8001, frontend :3001)
+# Demo stack (backend :8001, frontend :3001, redis :6381)
 docker-compose -f docker-compose.demo.yml up -d --build
 ```
 
@@ -69,32 +83,35 @@ docker-compose -f docker-compose.demo.yml up -d --build
 
 ### GCP Deployment
 
-**Current state:** Cloud Run services are spun down to save cost. Scheduler jobs are paused. Images are cached locally at commit `cf9e34c1ce009e8726f162cc7edce41048835a04`.
+**Current state (as of 2026-03-23):** All GCP compute resources are fully spun down.
+- Cloud Run services: deleted
+- Cloud Scheduler jobs: deleted
+- Artifact Registry: deleted
+- Cloud SQL: deleted (database is Supabase — no Cloud SQL ever needed)
+- Secret Manager: active, all secrets stored
 
-**Spin up (deploy and resume):**
+**Deploy (spin up):**
 ```bash
-# 1. Build + deploy both services
 gcloud builds submit \
   --config=backend/cloudbuild.yaml \
   --project=nocturn-ai-487207 \
   --region=asia-southeast1 \
   --substitutions=COMMIT_SHA=$(git rev-parse HEAD) \
   .
+```
 
-# 2. Resume Cloud Scheduler jobs
-for job in nocturn-daily-report nocturn-followups nocturn-insights nocturn-keepalive; do
-  gcloud scheduler jobs resume $job --location=asia-southeast1 --project=nocturn-ai-487207
-done
+After deploy, recreate Cloud Scheduler jobs if needed:
+```bash
+# Daily report (7:30am KL time)
+gcloud scheduler jobs create http nocturn-daily-report \
+  --location=asia-southeast1 --project=nocturn-ai-487207 \
+  --schedule="30 7 * * *" --time-zone="Asia/Kuala_Lumpur" \
+  --uri="https://nocturn-backend-<hash>-as.a.run.app/api/v1/internal/run-daily-report" \
+  --message-body='{}' --headers="X-Internal-Secret=<INTERNAL_SCHEDULER_SECRET>"
 ```
 
 **Spin down (save cost):**
 ```bash
-# Pause Scheduler jobs
-for job in nocturn-daily-report nocturn-followups nocturn-insights nocturn-keepalive; do
-  gcloud scheduler jobs pause $job --location=asia-southeast1 --project=nocturn-ai-487207
-done
-
-# Delete Cloud Run services (redeploy via cloudbuild to restore)
 gcloud run services delete nocturn-backend --project=nocturn-ai-487207 --region=asia-southeast1 --quiet
 gcloud run services delete nocturn-frontend --project=nocturn-ai-487207 --region=asia-southeast1 --quiet
 ```
@@ -161,7 +178,7 @@ SystemConfig (key-value store for maintenance mode, platform settings)
 ├── backend/
 │   ├── app/
 │   │   ├── main.py                  # FastAPI app, lifespan, startup migrations
-│   │   ├── config.py                # Settings + GCP Secret Manager fallback
+│   │   ├── config.py                # Settings — GCP Secret Manager only, no .env fallback
 │   │   ├── database.py              # Async SQLAlchemy engine + RLS context
 │   │   ├── models.py                # All ORM models
 │   │   ├── schemas.py               # Pydantic request/response schemas
@@ -182,7 +199,6 @@ SystemConfig (key-value store for maintenance mode, platform settings)
 │   │   │   ├── circuit_breaker.py   # Circuit breaker for external calls
 │   │   │   ├── email.py             # SendGrid delivery
 │   │   │   ├── insights.py          # Monthly 30-day transcript analysis
-│   │   │   ├── integration_registry.py # Integration status checks
 │   │   │   ├── pii_encryption.py    # Fernet field-level PII encryption
 │   │   │   ├── scheduler.py         # APScheduler (dev/demo only)
 │   │   │   ├── stripe_service.py    # Stripe checkout session
@@ -208,8 +224,10 @@ SystemConfig (key-value store for maintenance mode, platform settings)
 │           ├── analytics/           # ROI metrics, CSV/PDF export
 │           └── settings/            # Property configuration
 ├── docs/                            # Architecture, PRD, testing guides, build plan
-├── docker-compose.yml               # Production / dev stack
-└── docker-compose.demo.yml          # Isolated demo stack
+├── scripts/
+│   └── deploy_gcp.ps1               # Manual Cloud Run deploy (no Cloud SQL)
+├── docker-compose.yml               # Production / dev stack (Supabase DB, no local postgres)
+└── docker-compose.demo.yml          # Demo stack (Supabase DB, no local postgres)
 ```
 
 ## Development
@@ -227,7 +245,7 @@ cd backend && pytest                           # All tests
 cd backend && pytest tests/test_billing.py -v  # Billing (no DB required)
 cd backend && pytest tests/test_supabase.py -v # Supabase live (requires GCP ADC)
 
-# Database migrations
+# Database migrations (against Supabase — requires GCP ADC for DATABASE_URL)
 cd backend && alembic upgrade head
 cd backend && alembic revision --autogenerate -m "description"
 
@@ -255,15 +273,17 @@ cd backend && python seed_demo_data.py
 - [x] Phase 15: Multi-Tenant SaaS — Stripe Billing, Supabase Auth, Onboarding Flow, SuperAdmin Dashboard
 - [x] Phase 16: Auth & Integration Hardening — Magic Link Redirect, SendGrid SMTP, Tenant Detail Dashboard, Twilio Sandbox Linking
 - [x] Phase 1.5: Internal Controls — Maintenance Mode, Service Health Dashboard, Announcements System
+- [x] Phase 1.6: Infra Migration — Supabase-only DB, GCP Secret Manager–only secrets, Cloud SQL removed
 
 ## Database & Supabase Notes
 
-- **Hosted on Supabase** (`ramenghkpvipxijhfptp`). `DATABASE_URL` loaded from GCP Secret Manager — no hardcoded credentials.
-- **Free tier pause:** Supabase free tier projects auto-pause after 7 days of inactivity. Unpause from the Supabase dashboard.
+- **Hosted on Supabase** (`ramenghkpvipxijhfptp`, ap-southeast-2). App connects as `nocturn_app` via the transaction pooler (port 6543). `DATABASE_URL` is stored in GCP Secret Manager — never in `.env` files.
+- **Free tier pause:** Supabase free tier projects auto-pause after 7 days of inactivity. Unpause from the Supabase dashboard before running locally or deploying.
+- **pgvector:** Enabled natively on Supabase. `CREATE EXTENSION IF NOT EXISTS vector` runs at startup (idempotent).
 - **Startup migrations:** `main.py` lifespan runs idempotent `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` DDL on every cold start — safe to restart repeatedly.
 - **Connection pooling:** `pool_size=2, max_overflow=5, pool_recycle=300` to fit Supabase free tier's 60-connection limit.
 - **RLS:** Row-Level Security enabled. Call `set_db_context(session, property_id)` at the start of any session touching property-scoped data.
-- **Migrations:** Managed via Alembic. For DDL-heavy operations against the pooler, use `npx supabase db push` with the Supabase CLI.
+- **Migrations:** Managed via Alembic. Run `alembic upgrade head` with GCP ADC active to apply migrations against Supabase.
 - **Custom SMTP:** Supabase Auth uses SendGrid SMTP (`smtp.sendgrid.net:465`) to bypass free-tier email rate limits.
 
 ## WhatsApp Channel Notes
