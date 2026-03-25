@@ -975,3 +975,86 @@ async def get_active_announcements(
         }
         for a in visible
     ]
+
+
+# ─────────────────────────────────────────────────────────────
+# Shadow Pilot Management
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/superadmin/shadow-pilots")
+async def list_shadow_pilots(
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(require_superadmin),
+):
+    """
+    List all properties with their shadow pilot status.
+    Used by the /admin/shadow-pilots management page.
+    """
+    from sqlalchemy.orm import selectinload as _sil
+    result = await db.execute(
+        select(Property)
+        .options(_sil(Property.tenant))
+        .where(Property.deleted_at.is_(None))
+        .order_by(Property.audit_only_mode.desc(), Property.created_at.desc())
+    )
+    properties = result.scalars().all()
+
+    return [
+        {
+            "id": str(p.id),
+            "name": p.name,
+            "tenant_name": p.tenant.name if p.tenant else None,
+            "tenant_id": str(p.tenant_id) if p.tenant_id else None,
+            "audit_only_mode": p.audit_only_mode,
+            "shadow_pilot_phone": p.shadow_pilot_phone,
+            "shadow_pilot_start_date": p.shadow_pilot_start_date.isoformat() if p.shadow_pilot_start_date else None,
+            "notification_email": p.notification_email,
+            "is_active": p.is_active,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        }
+        for p in properties
+    ]
+
+
+@router.patch("/superadmin/shadow-pilots/{property_id}")
+async def update_shadow_pilot(
+    property_id: uuid.UUID,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(require_superadmin),
+):
+    """
+    Enable or disable shadow pilot mode for a property.
+    Accepts: audit_only_mode (bool), shadow_pilot_phone (str), shadow_pilot_start_date (str ISO).
+    Setting audit_only_mode=True auto-sets shadow_pilot_start_date to now if not provided.
+    """
+    result = await db.execute(select(Property).where(Property.id == property_id))
+    prop = result.scalar_one_or_none()
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    if "audit_only_mode" in body:
+        prop.audit_only_mode = bool(body["audit_only_mode"])
+        if prop.audit_only_mode and not prop.shadow_pilot_start_date:
+            prop.shadow_pilot_start_date = datetime.now(timezone.utc)
+
+    if "shadow_pilot_phone" in body:
+        prop.shadow_pilot_phone = body["shadow_pilot_phone"] or None
+
+    if "shadow_pilot_start_date" in body:
+        raw = body["shadow_pilot_start_date"]
+        if raw:
+            prop.shadow_pilot_start_date = datetime.fromisoformat(raw)
+        else:
+            prop.shadow_pilot_start_date = None
+
+    await db.commit()
+    await db.refresh(prop)
+
+    return {
+        "id": str(prop.id),
+        "name": prop.name,
+        "audit_only_mode": prop.audit_only_mode,
+        "shadow_pilot_phone": prop.shadow_pilot_phone,
+        "shadow_pilot_start_date": prop.shadow_pilot_start_date.isoformat() if prop.shadow_pilot_start_date else None,
+    }

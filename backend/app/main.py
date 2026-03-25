@@ -74,6 +74,12 @@ async def lifespan(app: FastAPI):
                 ADD COLUMN IF NOT EXISTS accessible_property_ids JSONB;
         """))
         await conn.execute(text("""
+            ALTER TABLE properties
+                ADD COLUMN IF NOT EXISTS audit_only_mode BOOLEAN NOT NULL DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS shadow_pilot_start_date TIMESTAMPTZ,
+                ADD COLUMN IF NOT EXISTS shadow_pilot_phone VARCHAR(20);
+        """))
+        await conn.execute(text("""
             CREATE TABLE IF NOT EXISTS announcements (
                 id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 type             VARCHAR(20) NOT NULL,

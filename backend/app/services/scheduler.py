@@ -360,6 +360,152 @@ async def generate_monthly_insights(db: AsyncSession = None):
             logger.error("Monthly insights job failed", error=str(e))
 
 
+async def run_weekly_audit_report():
+    """
+    Weekly job (Monday 08:00 MYT) for shadow pilot properties.
+
+    For each property with audit_only_mode=True, counts after-hours inquiries
+    from the past 7 days and sends the GM a plain-language email:
+    "Your hotel received X after-hours inquiries last week. Based on your ADR
+    of RM Y, you left approximately RM Z on the table."
+
+    This is the core value-delivery mechanism for Stage 2 of the sales funnel —
+    the GM sees their own real data before we ask them to commit to Stage 3.
+    """
+    from sqlalchemy import select
+    from app.models import Property, Conversation
+    from app.database import async_session
+
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+
+    async with async_session() as db:
+        try:
+            result = await db.execute(
+                select(Property).where(
+                    Property.audit_only_mode.is_(True),
+                    Property.is_active.is_(True),
+                    Property.deleted_at.is_(None),
+                )
+            )
+            shadow_properties = result.scalars().all()
+
+            if not shadow_properties:
+                logger.info("weekly_audit_report: no shadow pilot properties found")
+                return
+
+            for prop in shadow_properties:
+                try:
+                    # Count after-hours conversations in the past 7 days
+                    conv_result = await db.execute(
+                        select(func.count()).where(
+                            Conversation.property_id == prop.id,
+                            Conversation.is_after_hours.is_(True),
+                            Conversation.created_at >= week_ago,
+                        )
+                    )
+                    after_hours_count = conv_result.scalar() or 0
+
+                    # Count total conversations
+                    total_result = await db.execute(
+                        select(func.count()).where(
+                            Conversation.property_id == prop.id,
+                            Conversation.created_at >= week_ago,
+                        )
+                    )
+                    total_count = total_result.scalar() or 0
+
+                    # Revenue estimate: conservative (60% after-hours share × 20% conversion
+                    # × ADR × 2 nights avg stay × 60% conservative discount)
+                    adr = float(prop.adr) if prop.adr else 230.0
+                    lost_bookings = after_hours_count * 0.20
+                    revenue_estimate = lost_bookings * adr * 2.0 * 0.60
+
+                    # Days since shadow pilot started (for context)
+                    days_running = 7
+                    if prop.shadow_pilot_start_date:
+                        delta = datetime.now(timezone.utc) - prop.shadow_pilot_start_date.replace(
+                            tzinfo=timezone.utc if prop.shadow_pilot_start_date.tzinfo is None else None
+                        ) if prop.shadow_pilot_start_date.tzinfo is None else datetime.now(timezone.utc) - prop.shadow_pilot_start_date
+                        days_running = max(1, min(delta.days, 7))
+
+                    shadow_phone = prop.shadow_pilot_phone or "the test number"
+
+                    html_body = f"""
+<html>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto;">
+
+  <div style="background:#0f172a; color:white; padding:24px; border-radius:8px 8px 0 0; text-align:center;">
+    <h2 style="margin:0;">Weekly Shadow Pilot Report</h2>
+    <p style="margin:6px 0 0; opacity:0.75;">{prop.name} — Last 7 Days</p>
+  </div>
+
+  <div style="background:#f8fafc; border:1px solid #e2e8f0; border-top:0; padding:24px; border-radius:0 0 8px 8px;">
+
+    <p style="font-size:16px;">
+      Your hotel received <strong>{after_hours_count} after-hours {'inquiry' if after_hours_count == 1 else 'inquiries'}</strong>
+      ({total_count} total) via {shadow_phone} over the past {days_running} days.
+    </p>
+
+    <div style="background:#fef9c3; border-left:4px solid #eab308; padding:16px; border-radius:4px; margin:16px 0;">
+      <p style="margin:0; font-size:15px;">
+        Based on your ADR of <strong>RM {adr:,.0f}</strong>, you left approximately
+        <strong>RM {revenue_estimate:,.0f}</strong> on the table this week.
+      </p>
+      <p style="margin:8px 0 0; font-size:13px; color:#713f12;">
+        (Conservative estimate: 20% inquiry-to-booking rate × 2-night avg stay × 60% confidence discount)
+      </p>
+    </div>
+
+    <p>
+      These are real guest inquiries that arrived when your front desk was unavailable.
+      Each one was a potential booking that went unanswered.
+    </p>
+
+    <p style="color:#64748b; font-size:13px;">
+      This shadow pilot runs silently — your guests on the main number are unaffected.
+      When you're ready to turn on the AI and start capturing these bookings automatically,
+      reply to this email or contact your account manager.
+    </p>
+
+  </div>
+
+  <p style="text-align:center; color:#94a3b8; font-size:12px; margin-top:16px;">
+    Nocturn AI by SheersSoft · Unsubscribe by replying STOP
+  </p>
+
+</body>
+</html>"""
+
+                    recipient = prop.notification_email or settings.staff_notification_email
+                    if not recipient:
+                        logger.warning("weekly_audit_report: no recipient for property", property_id=str(prop.id))
+                        continue
+
+                    await send_email(
+                        to_email=recipient,
+                        subject=f"📊 Shadow Pilot Week {days_running}d: {after_hours_count} after-hours inquiries — {prop.name}",
+                        content=html_body,
+                        is_html=True,
+                    )
+                    logger.info(
+                        "weekly_audit_report sent",
+                        property_id=str(prop.id),
+                        property_name=prop.name,
+                        after_hours_count=after_hours_count,
+                        revenue_estimate=revenue_estimate,
+                    )
+
+                except Exception as e:
+                    logger.error(
+                        "weekly_audit_report: failed for property",
+                        property_id=str(prop.id),
+                        error=str(e),
+                    )
+
+        except Exception as e:
+            logger.error("weekly_audit_report job failed", error=str(e))
+
+
 async def start_scheduler():
     """Initialize and start the scheduler."""
     # Schedule daily report at configured time (default 7:30 AM)
@@ -399,7 +545,15 @@ async def start_scheduler():
         id="monthly_insights",
         replace_existing=True
     )
-    
+
+    # Schedule weekly audit report for shadow pilot properties (Monday 08:00 MYT)
+    scheduler.add_job(
+        run_weekly_audit_report,
+        trigger=CronTrigger(day_of_week="mon", hour=8, minute=0, timezone=settings.timezone),
+        id="weekly_audit_report",
+        replace_existing=True
+    )
+
     scheduler.start()
     logger.info(
         "Scheduler started", 

@@ -17,6 +17,7 @@ const navItems = [
     { href: '/admin/announcements', label: 'Announcements', icon: '📢' },
     { href: '/admin/health', label: 'Service Health', icon: '🩺' },
     { href: '/admin/tools/revenue-audit', label: 'Revenue Audit', icon: '💰' },
+    { href: '/admin/shadow-pilots', label: 'Shadow Pilots', icon: '👥' },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

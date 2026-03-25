@@ -335,6 +335,12 @@ class Property(Base):
     plan_tier: Mapped[str] = mapped_column(String(20), default="pilot", server_default="pilot")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Shadow Pilot / Audit-Only Mode (Stage 2 of three-stage sales funnel)
+    # When True: messages are logged but the AI does NOT send any reply.
+    # Used during the 7-day shadow pilot to capture real inquiry volume data.
+    audit_only_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    shadow_pilot_start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    shadow_pilot_phone: Mapped[str | None] = mapped_column(String(20))
 
     # Relationships
     tenant: Mapped["Tenant | None"] = relationship(back_populates="properties")

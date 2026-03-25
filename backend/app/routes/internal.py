@@ -24,6 +24,7 @@ from app.services.scheduler import (
     generate_monthly_insights,
     process_automated_follow_ups,
     run_daily_reports,
+    run_weekly_audit_report,
 )
 from app.services.system_config import is_job_enabled
 
@@ -91,6 +92,24 @@ async def run_insights(
         return {"status": "ok", "job": "monthly_insights"}
     except Exception as exc:
         logger.error("Insights job failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/run-weekly-audit-report", include_in_schema=False)
+async def run_weekly_audit_report_endpoint(
+    x_internal_secret: str | None = Header(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Triggered by Cloud Scheduler — sends weekly shadow pilot audit emails."""
+    _verify(x_internal_secret)
+    if not await is_job_enabled("weekly_audit_report", db):
+        logger.info("weekly_audit_report job skipped — disabled via system config")
+        return {"status": "skipped", "reason": "disabled"}
+    try:
+        await run_weekly_audit_report()
+        return {"status": "ok", "job": "weekly_audit_report"}
+    except Exception as exc:
+        logger.error("Weekly audit report job failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
 

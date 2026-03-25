@@ -145,6 +145,10 @@ async def _handle_whatsapp_message_async(
 
             await db.commit()
 
+            # Shadow pilot / audit-only mode: message logged, no reply sent
+            if result.get("audit_only"):
+                return
+
             response_text = result["response"]
 
             # Route reply based on property configuration

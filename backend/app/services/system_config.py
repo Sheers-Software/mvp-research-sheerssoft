@@ -27,6 +27,7 @@ _DEFAULT_JOBS = {
     "followups": True,
     "insights": True,
     "cleanup": True,
+    "weekly_audit_report": True,
 }
 
 _DEMO_DEFAULTS = {
@@ -34,6 +35,7 @@ _DEMO_DEFAULTS = {
     "followups": False,
     "insights": False,
     "cleanup": True,
+    "weekly_audit_report": False,
 }
 
 

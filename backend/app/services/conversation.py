@@ -410,6 +410,26 @@ async def process_guest_message(
     )
     prop = prop_result.scalar_one()
 
+    # 4b. Shadow Pilot / Audit-Only Mode — log message, skip AI response entirely.
+    # The weekly audit report job reads from Conversations to generate the
+    # "You received X after-hours inquiries" email. No reply is sent to the guest.
+    if prop.audit_only_mode:
+        await db.flush()
+        logger.info(
+            "audit_only_mode: message logged, AI response suppressed",
+            property_id=str(property_id),
+            conversation_id=str(conversation.id),
+        )
+        return {
+            "response": None,
+            "audit_only": True,
+            "conversation_id": str(conversation.id),
+            "mode": conversation.ai_mode,
+            "is_after_hours": conversation.is_after_hours,
+            "response_time_ms": 0,
+            "lead_created": False,
+        }
+
     # 5. RAG: Search knowledge base for relevant context
     kb_docs = await search_knowledge_base(db, property_id, message_text, limit=5)
     kb_context = "\n\n".join(
