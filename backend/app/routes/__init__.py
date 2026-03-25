@@ -18,6 +18,7 @@ from app.routes.superadmin import router as superadmin_router
 from app.routes.billing import router as billing_router
 from app.routes.internal import router as internal_router
 from app.routes.portal import router as portal_router
+from app.routes.audit import router as audit_router
 
 router = APIRouter(prefix="/api/v1")
 
@@ -34,3 +35,4 @@ router.include_router(superadmin_router, tags=["SuperAdmin"])
 router.include_router(billing_router, tags=["Billing"])
 router.include_router(internal_router, tags=["Internal"])
 router.include_router(portal_router, tags=["Portal"])
+router.include_router(audit_router, tags=["Audit"])

@@ -91,6 +91,36 @@ async def lifespan(app: FastAPI):
                 updated_at       TIMESTAMPTZ DEFAULT NOW()
             );
         """))
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS audit_records (
+                id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                hotel_name             VARCHAR(255),
+                contact_name           VARCHAR(255),
+                email                  VARCHAR(255),
+                phone                  VARCHAR(30),
+                room_count             INTEGER NOT NULL,
+                adr                    NUMERIC(10,2) NOT NULL,
+                daily_msgs             NUMERIC(8,1) NOT NULL,
+                front_desk_close       VARCHAR(10) NOT NULL DEFAULT '22:00',
+                ota_commission_rate    NUMERIC(5,2) NOT NULL DEFAULT 18.0,
+                revenue_lost_monthly   NUMERIC(12,2) NOT NULL,
+                ota_commission_monthly NUMERIC(12,2) NOT NULL,
+                total_monthly_leakage  NUMERIC(12,2) NOT NULL,
+                annual_leakage         NUMERIC(12,2) NOT NULL,
+                conservative_annual    NUMERIC(12,2) NOT NULL,
+                roi_multiple           NUMERIC(8,1) NOT NULL,
+                source                 VARCHAR(20) NOT NULL DEFAULT 'web',
+                status                 VARCHAR(20) NOT NULL DEFAULT 'submitted',
+                notes                  TEXT,
+                created_at             TIMESTAMPTZ DEFAULT NOW(),
+                updated_at             TIMESTAMPTZ DEFAULT NOW()
+            );
+        """))
+        # audit_records is not property-scoped — disable RLS so the backend
+        # service role can INSERT from the unauthenticated public endpoint.
+        await conn.execute(text(
+            "ALTER TABLE audit_records DISABLE ROW LEVEL SECURITY;"
+        ))
         logger.info("Incremental column migrations applied")
 
     # Seed default scheduler config (no-op if already seeded)

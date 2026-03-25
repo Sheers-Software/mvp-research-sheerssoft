@@ -627,3 +627,55 @@ class SystemConfig(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+# ─────────────────────────────────────────────────────────────
+# After-Hours Revenue Audit (public lead magnet)
+# ─────────────────────────────────────────────────────────────
+
+
+class AuditRecord(Base):
+    """
+    Stores a completed after-hours revenue audit submitted via the public
+    calculator at /audit or the internal admin tool.
+    """
+    __tablename__ = "audit_records"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+
+    # Contact info (filled after lead gate)
+    hotel_name: Mapped[str | None] = mapped_column(String(255))
+    contact_name: Mapped[str | None] = mapped_column(String(255))
+    email: Mapped[str | None] = mapped_column(String(255))
+    phone: Mapped[str | None] = mapped_column(String(30))
+
+    # Audit inputs
+    room_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    adr: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    daily_msgs: Mapped[Decimal] = mapped_column(Numeric(8, 1), nullable=False)
+    front_desk_close: Mapped[str] = mapped_column(String(10), nullable=False, server_default="22:00")
+    ota_commission_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, server_default="18.0")
+
+    # Computed results (RM)
+    revenue_lost_monthly: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    ota_commission_monthly: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    total_monthly_leakage: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    annual_leakage: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    conservative_annual: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    roi_multiple: Mapped[Decimal] = mapped_column(Numeric(8, 1), nullable=False)
+
+    # Pipeline tracking
+    source: Mapped[str] = mapped_column(String(20), nullable=False, server_default="web")
+    # "web" | "admin"
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="submitted")
+    # "calculated" | "submitted" | "contacted" | "qualified" | "converted" | "closed"
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
