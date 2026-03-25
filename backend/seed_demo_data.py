@@ -2,6 +2,7 @@ import asyncio
 import uuid
 import sys
 import os
+sys.stdout.reconfigure(encoding='utf-8')
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import datetime, timedelta, timezone
@@ -11,6 +12,7 @@ import random
 from sqlalchemy import delete, select
 from app.database import async_session, engine
 from app.models import Base, Property, KBDocument, Conversation, Message, Lead, AnalyticsDaily
+from app.services import ingest_document
 
 # Demo Config — mirrors the Vivatel KL pilot profile
 DEMO_PROPERTY_NAME = "Vivatel Kuala Lumpur"
@@ -23,11 +25,25 @@ async def seed_demo_data():
     async with async_session() as db:
         print("🌱 Seeding Demo Data (Vivatel KL profile)...")
 
-        # 1. Cleanup Existing Demo Data (local dev only)
+        # 1. Cleanup Existing Demo Data — DELETE existing Vivatel KL data
         print("   Cleaning up old data...")
-        async with engine.begin() as conn:
-             await conn.run_sync(Base.metadata.drop_all)
-             await conn.run_sync(Base.metadata.create_all)
+        # Find existing demo property by name first
+        existing_prop = await db.execute(
+            select(Property).where(Property.name == DEMO_PROPERTY_NAME)
+        )
+        existing_props = existing_prop.scalars().all()
+        for ep in existing_props:
+            await db.execute(delete(AnalyticsDaily).where(AnalyticsDaily.property_id == ep.id))
+            await db.execute(delete(Lead).where(Lead.property_id == ep.id))
+            existing_convs = await db.execute(
+                select(Conversation).where(Conversation.property_id == ep.id)
+            )
+            for ec in existing_convs.scalars().all():
+                await db.execute(delete(Message).where(Message.conversation_id == ec.id))
+            await db.execute(delete(Conversation).where(Conversation.property_id == ep.id))
+            await db.execute(delete(KBDocument).where(KBDocument.property_id == ep.id))
+            await db.execute(delete(Property).where(Property.id == ep.id))
+        await db.flush()
 
         # 2. Create Property
         prop_id = uuid.uuid4()
@@ -55,112 +71,80 @@ async def seed_demo_data():
         db.add(prop)
         print(f"   Created Property: {DEMO_PROPERTY_NAME}")
 
-        # 3. Knowledge Base — rich content matching demo script questions
-        kb_docs = [
-            KBDocument(
-                property_id=prop_id,
-                doc_type="rooms",
-                title="Room Types and Rates",
-                content=(
-                    "Vivatel KL offers the following room types:\n"
-                    "- Superior Room: RM 230/night, inclusive of breakfast for 2. "
-                    "23 sqm, king or twin bed, city view. Max 2 adults + 1 child.\n"
-                    "- Deluxe Room: RM 280/night, inclusive of breakfast for 2. "
-                    "28 sqm, king bed, higher floor with KL skyline view.\n"
-                    "- Deluxe Suite: RM 350/night, inclusive of breakfast for 2. "
-                    "40 sqm, separate living area, panoramic city view.\n"
-                    "- Family Room: RM 320/night, inclusive of breakfast for 4. "
-                    "35 sqm, 2 queen beds. Max 4 adults.\n"
-                    "All rates subject to 10% service charge and 8% government tax.\n"
-                    "Harga bilik Superior RM 230/malam, Deluxe RM 280/malam, Suite RM 350/malam. "
-                    "Semua harga termasuk sarapan pagi untuk 2 orang."
-                ),
-            ),
-            KBDocument(
-                property_id=prop_id,
-                doc_type="facilities",
-                title="Hotel Facilities",
-                content=(
-                    "Vivatel KL facilities:\n"
-                    "- Swimming Pool: Rooftop infinity pool, open 7am-10pm daily\n"
-                    "  (Kolam renang rooftop buka 7 pagi hingga 10 malam)\n"
-                    "- Gym / Fitness Centre: 24-hour access for all guests\n"
-                    "  (Pusat kecergasan 24 jam untuk semua tetamu)\n"
-                    "- Restaurant: 'Viv Café' — halal-certified, breakfast 6:30am-10:30am\n"
-                    "- Meeting Rooms: 3 rooms, capacity 10-50 pax. From RM 500 half-day, RM 800 full-day.\n"
-                    "- Parking: Basement at RM 10/day for hotel guests\n"
-                    "- Laundry: Same-day laundry and dry cleaning available"
-                ),
-            ),
-            KBDocument(
-                property_id=prop_id,
-                doc_type="faqs",
-                title="Check-in, Check-out and Frequently Asked Questions",
-                content=(
-                    "Check-in: 3:00 PM (Masa daftar masuk: pukul 3 petang)\n"
-                    "Check-out: 12:00 PM (Masa daftar keluar: pukul 12 tengah hari)\n"
-                    "Early check-in: available from 12pm at RM 50 surcharge (subject to availability)\n"
-                    "Late check-out: until 3pm at 50% room rate; until 6pm at full room rate\n\n"
-                    "Q: Is breakfast included? / Sarapan termasuk ke?\n"
-                    "A: Yes, breakfast included in all room rates. Served at Viv Café 6:30am-10:30am.\n\n"
-                    "Q: Extra bed? / Boleh tambah katil?\n"
-                    "A: Extra bed RM 80/night, subject to availability.\n\n"
-                    "Q: Is the hotel halal? / Hotel ni halal ke?\n"
-                    "A: Yes, Viv Café is JAKIM halal-certified.\n\n"
-                    "Q: Pets? / Boleh bawa kucing?\n"
-                    "A: Pets are not allowed. Haiwan peliharaan tidak dibenarkan.\n\n"
-                    "Q: Airport transfer?\n"
-                    "A: KLIA to hotel RM 120/car. Book 24 hours in advance.\n\n"
-                    "Q: Smoking?\n"
-                    "A: Smoking prohibited in all rooms. Designated smoking area on Level 3."
-                ),
-            ),
-            KBDocument(
-                property_id=prop_id,
-                doc_type="directions",
-                title="Location and Directions",
-                content=(
-                    "Vivatel KL is at Jalan Sultan Ismail, Kuala Lumpur.\n"
-                    "From KLIA: KLIA Ekspres to KL Sentral (28 min), then Grab ~RM 15 (10 min).\n"
-                    "From KL Sentral: Grab 10 min (~RM 10-15) or Monorail 2 stops to Bukit Bintang.\n"
-                    "Nearby: Pavilion KL (5-min walk), KLCC (10-min drive), Bukit Bintang (3-min walk), "
-                    "Jalan Alor food street (7-min walk).\n"
-                    "Complimentary shuttle to Pavilion and KLCC runs hourly 9am-9pm."
-                ),
-            ),
-            KBDocument(
-                property_id=prop_id,
-                doc_type="policies",
-                title="Hotel Policies",
-                content=(
-                    "- Minimum check-in age: 18 years with valid ID\n"
-                    "- Children under 12 stay free in existing bedding\n"
-                    "- Pets are not allowed\n"
-                    "- Smoking prohibited in all rooms. Designated area: Level 3\n"
-                    "- Damage deposit: RM 200 at check-in\n"
-                    "- 24-hour cancellation policy. Late cancellations charged 1 night."
-                ),
-            ),
-            KBDocument(
-                property_id=prop_id,
-                doc_type="rates",
-                title="Group and Corporate Rates",
-                content=(
-                    "Group bookings (10+ rooms):\n"
-                    "- 10-19 rooms: 10% off published rates\n"
-                    "- 20-49 rooms: 15% off published rates\n"
-                    "- 50+ rooms: Contact sales for custom pricing\n\n"
-                    "Corporate rates (minimum 10 room nights/month):\n"
-                    "- Superior: RM 190/night (nett)\n"
-                    "- Deluxe: RM 230/night (nett)\n"
-                    "- Deluxe Suite: RM 300/night (nett)\n\n"
-                    "For weddings, events, and conferences: our Grand Ballroom fits up to 300 pax. "
-                    "Contact our events team for packages."
-                ),
-            ),
+        # 3. Knowledge Base — rich content with embeddings for RAG retrieval
+        await db.flush()  # flush property so FK is available for ingest_document
+        print("   Generating KB embeddings (calling Gemini API)...")
+        kb_specs = [
+            ("rooms", "Room Types and Rates",
+             "Vivatel KL offers the following room types:\n"
+             "- Superior Room: RM 230/night, inclusive of breakfast for 2. "
+             "23 sqm, king or twin bed, city view. Max 2 adults + 1 child.\n"
+             "- Deluxe Room: RM 280/night, inclusive of breakfast for 2. "
+             "28 sqm, king bed, higher floor with KL skyline view.\n"
+             "- Deluxe Suite: RM 350/night, inclusive of breakfast for 2. "
+             "40 sqm, separate living area, panoramic city view.\n"
+             "- Family Room: RM 320/night, inclusive of breakfast for 4. "
+             "35 sqm, 2 queen beds. Max 4 adults.\n"
+             "All rates subject to 10% service charge and 8% government tax.\n"
+             "Harga bilik Superior RM 230/malam, Deluxe RM 280/malam, Suite RM 350/malam. "
+             "Semua harga termasuk sarapan pagi untuk 2 orang."),
+            ("facilities", "Hotel Facilities",
+             "Vivatel KL facilities:\n"
+             "- Swimming Pool: Rooftop infinity pool, open 7am-10pm daily\n"
+             "  (Kolam renang rooftop buka 7 pagi hingga 10 malam)\n"
+             "- Gym / Fitness Centre: 24-hour access for all guests\n"
+             "  (Pusat kecergasan 24 jam untuk semua tetamu)\n"
+             "- Restaurant: 'Viv Café' — halal-certified, breakfast 6:30am-10:30am\n"
+             "- Meeting Rooms: 3 rooms, capacity 10-50 pax. From RM 500 half-day, RM 800 full-day.\n"
+             "- Parking: Basement at RM 10/day for hotel guests\n"
+             "- Laundry: Same-day laundry and dry cleaning available"),
+            ("faqs", "Check-in, Check-out and Frequently Asked Questions",
+             "Check-in: 3:00 PM (Masa daftar masuk: pukul 3 petang)\n"
+             "Check-out: 12:00 PM (Masa daftar keluar: pukul 12 tengah hari)\n"
+             "Early check-in: available from 12pm at RM 50 surcharge (subject to availability)\n"
+             "Late check-out: until 3pm at 50% room rate; until 6pm at full room rate\n\n"
+             "Q: Is breakfast included? / Sarapan termasuk ke?\n"
+             "A: Yes, breakfast included in all room rates. Served at Viv Café 6:30am-10:30am.\n\n"
+             "Q: Extra bed? / Boleh tambah katil?\n"
+             "A: Extra bed RM 80/night, subject to availability.\n\n"
+             "Q: Is the hotel halal? / Hotel ni halal ke?\n"
+             "A: Yes, Viv Café is JAKIM halal-certified.\n\n"
+             "Q: Pets? / Boleh bawa kucing?\n"
+             "A: Pets are not allowed. Haiwan peliharaan tidak dibenarkan.\n\n"
+             "Q: Airport transfer?\n"
+             "A: KLIA to hotel RM 120/car. Book 24 hours in advance.\n\n"
+             "Q: Smoking?\n"
+             "A: Smoking prohibited in all rooms. Designated smoking area on Level 3."),
+            ("directions", "Location and Directions",
+             "Vivatel KL is at Jalan Sultan Ismail, Kuala Lumpur.\n"
+             "From KLIA: KLIA Ekspres to KL Sentral (28 min), then Grab ~RM 15 (10 min).\n"
+             "From KL Sentral: Grab 10 min (~RM 10-15) or Monorail 2 stops to Bukit Bintang.\n"
+             "Nearby: Pavilion KL (5-min walk), KLCC (10-min drive), Bukit Bintang (3-min walk), "
+             "Jalan Alor food street (7-min walk).\n"
+             "Complimentary shuttle to Pavilion and KLCC runs hourly 9am-9pm."),
+            ("policies", "Hotel Policies",
+             "- Minimum check-in age: 18 years with valid ID\n"
+             "- Children under 12 stay free in existing bedding\n"
+             "- Pets are not allowed\n"
+             "- Smoking prohibited in all rooms. Designated area: Level 3\n"
+             "- Damage deposit: RM 200 at check-in\n"
+             "- 24-hour cancellation policy. Late cancellations charged 1 night."),
+            ("rates", "Group and Corporate Rates",
+             "Group bookings (10+ rooms):\n"
+             "- 10-19 rooms: 10% off published rates\n"
+             "- 20-49 rooms: 15% off published rates\n"
+             "- 50+ rooms: Contact sales for custom pricing\n\n"
+             "Corporate rates (minimum 10 room nights/month):\n"
+             "- Superior: RM 190/night (nett)\n"
+             "- Deluxe: RM 230/night (nett)\n"
+             "- Deluxe Suite: RM 300/night (nett)\n\n"
+             "For weddings, events, and conferences: our Grand Ballroom fits up to 300 pax. "
+             "Contact our events team for packages."),
         ]
-        db.add_all(kb_docs)
-        print("   Added Knowledge Base (6 docs — demo ready)")
+        for doc_type, title, content in kb_specs:
+            await ingest_document(db, prop_id, doc_type, title, content)
+            print(f"     ✓ {title}")
+        print("   Added Knowledge Base (6 docs with embeddings — RAG ready)")
 
         # 4. Demo Conversations (3 scenarios matching the sales demo script)
 

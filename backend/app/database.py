@@ -14,6 +14,7 @@ engine = create_async_engine(
     max_overflow=5,
     pool_pre_ping=True,
     pool_recycle=300,  # Recycle connections every 5 minutes to play nice with PgBouncer
+    connect_args={"statement_cache_size": 0},  # Required for Supabase PgBouncer transaction mode
 )
 
 async_session = async_sessionmaker(

@@ -20,8 +20,8 @@ class Settings(BaseSettings):
 
     # Gemini (Default LLM)
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-1.5-flash"
-    gemini_embedding_model: str = "embedding-001"
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_embedding_model: str = "gemini-embedding-001"
     embedding_dimensions: int = 768
 
     # OpenAI (Fallback)

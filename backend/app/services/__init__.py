@@ -9,6 +9,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from openai import AsyncOpenAI
 from google import genai
+from google.genai import types as genai_types
 
 from app.models import KBDocument
 from app.config import get_settings
@@ -27,10 +28,13 @@ async def generate_embedding(text_content: str) -> list[float]:
             return gemini_client.models.embed_content(
                 model=settings.gemini_embedding_model,
                 contents=text_content,
+                config=genai_types.EmbedContentConfig(
+                    output_dimensionality=settings.embedding_dimensions
+                ),
             )
         try:
             response = await asyncio.to_thread(_sync_embed)
-            return response.embeddings[0].values
+            return list(response.embeddings[0].values)
         except Exception as e:
             logger.warning("Gemini embedding failed, trying OpenAI fallback", error=str(e))
 
@@ -132,8 +136,9 @@ async def search_knowledge_base(
         result = await db.execute(
             select(KBDocument)
             .where(KBDocument.property_id == property_id)
-            # Filter low-relevance results (cosine distance < 0.3 approx similarity > 0.7)
-            .where(KBDocument.embedding.cosine_distance(query_embedding) < 0.3)
+            # Filter low-relevance results (cosine distance < 0.8 — generous threshold for
+            # gemini-embedding-001 which produces distances in the 0.4-0.7 range for related content)
+            .where(KBDocument.embedding.cosine_distance(query_embedding) < 0.8)
             .order_by(KBDocument.embedding.cosine_distance(query_embedding))
             .limit(limit)
         )

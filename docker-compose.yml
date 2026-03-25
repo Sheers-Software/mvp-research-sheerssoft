@@ -1,13 +1,48 @@
 version: "3.9"
 
+# ═══════════════════════════════════════════════════════════
+# NOCTURN AI — Local Development Stack
+#
+# Usage:
+#   docker compose up -d --build
+#
+# Services: backend (8000), frontend (3000), postgres (5433), redis (6380)
+#
+# Secrets: all API keys are fetched from GCP Secret Manager at startup.
+# Run `gcloud auth application-default login` on the host first, then:
+#   Windows:  set GOOGLE_APPLICATION_CREDENTIALS_PATH=%APPDATA%\gcloud\application_default_credentials.json
+#   Mac/Linux: export GOOGLE_APPLICATION_CREDENTIALS_PATH=$HOME/.config/gcloud/application_default_credentials.json
+#
+# After first start, seed demo data:
+#   cd backend && python seed_demo_data.py
+# ═══════════════════════════════════════════════════════════
+
 services:
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: always
+    environment:
+      POSTGRES_USER: nocturn
+      POSTGRES_PASSWORD: nocturn_dev
+      POSTGRES_DB: nocturn
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nocturn -d nocturn"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   redis:
     image: redis:7-alpine
     restart: always
     ports:
       - "6380:6379"
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -20,23 +55,32 @@ services:
     ports:
       - "8000:8080"
     environment:
+      # ── Deployment mode ─────────────────────────────────
+      ENVIRONMENT: development
+      # ── Local database (overrides Secret Manager DATABASE_URL) ──
+      # Uses local postgres so RLS and migrations work without Supabase restrictions.
+      DATABASE_URL: postgresql+asyncpg://nocturn:nocturn_dev@postgres:5432/nocturn
+      # ── Redis ────────────────────────────────────────────
       REDIS_URL: redis://redis:6379/0
-      ENVIRONMENT: ${ENVIRONMENT:-production}
-      # All secrets (DATABASE_URL, API keys, JWT, etc.) are fetched from GCP Secret Manager
-      # at startup via config.py. No secrets are sourced from local env files.
-      #
-      # Authentication for Secret Manager:
-      #   - GCP (Cloud Run / GCE): workload identity / attached service account (automatic)
-      #   - Local Docker (Windows): GOOGLE_APPLICATION_CREDENTIALS_PATH defaults to
-      #     %APPDATA%/gcloud/application_default_credentials.json
-      #     Run `gcloud auth application-default login` on the host first.
+      # ── GCP Secret Manager (for AI API keys, JWT, etc.) ──
+      # All API secrets (GEMINI_API_KEY, OPENAI_API_KEY, JWT_SECRET, etc.)
+      # are fetched from GCP Secret Manager project nocturn-ai-487207.
+      # DATABASE_URL above overrides whatever is in Secret Manager.
       GOOGLE_APPLICATION_CREDENTIALS: /gcp/credentials.json
+      # ── LLM models ───────────────────────────────────────
+      GEMINI_MODEL: gemini-2.5-flash
+      GEMINI_EMBEDDING_MODEL: gemini-embedding-001
+      # ── CORS ─────────────────────────────────────────────
+      ALLOWED_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+      FRONTEND_URL: "http://localhost:3000"
     volumes:
-      # Mount GCP Application Default Credentials for local development.
-      # On GCP deployments this volume is unused — workload identity takes precedence.
-      # Windows (Git Bash / WSL2): $APPDATA resolves to C:\Users\<user>\AppData\Roaming
-      - ${GOOGLE_APPLICATION_CREDENTIALS_PATH:-$APPDATA/gcloud/application_default_credentials.json}:/gcp/credentials.json:ro
+      # Mount GCP Application Default Credentials.
+      # Windows default: C:\Users\<user>\AppData\Roaming\gcloud\application_default_credentials.json
+      # Override GOOGLE_APPLICATION_CREDENTIALS_PATH env var if your ADC is elsewhere.
+      - ${GOOGLE_APPLICATION_CREDENTIALS_PATH:-C:/Users/abasy/AppData/Roaming/gcloud/application_default_credentials.json}:/gcp/credentials.json:ro
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
 
@@ -45,8 +89,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # NEXT_PUBLIC_* vars are baked in at build time by Next.js.
-        # Anon key is intentionally public (safe in source/build args).
+        # NEXT_PUBLIC_* vars baked in at build time by Next.js.
         NEXT_PUBLIC_API_URL: http://localhost:8000
         NEXT_PUBLIC_SUPABASE_URL: https://ramenghkpvipxijhfptp.supabase.co
         NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJhbWVuZ2hrcHZpcHhpamhmcHRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0MTg5MzAsImV4cCI6MjA4Nzk5NDkzMH0.DmskI__M8XyXKwkhgrYFsBwgDyUY7GeiMHOwlEWhAQw
@@ -58,3 +101,6 @@ services:
     depends_on:
       backend:
         condition: service_started
+
+volumes:
+  postgres_data:
