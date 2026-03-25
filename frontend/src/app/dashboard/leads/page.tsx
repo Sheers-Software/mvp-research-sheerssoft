@@ -27,11 +27,17 @@ const statusBadge: Record<string, string> = {
 };
 
 const intentBadge: Record<string, string> = {
+    // values from lead extraction LLM
+    room_booking: 'badge-success',
+    event: 'badge-warning',
+    fb_inquiry: 'badge-info',
+    general: 'badge-neutral',
+    // legacy values from seed / manual entry
     booking: 'badge-success',
+    booking_inquiry: 'badge-success',
     inquiry: 'badge-info',
     complaint: 'badge-danger',
     group_booking: 'badge-warning',
-    event: 'badge-warning',
 };
 
 export default function LeadsPage() {
@@ -192,8 +198,8 @@ export default function LeadsPage() {
                                     </td>
                                     <td>
                                         {l.priority ? (
-                                            <span className={`badge ${l.priority === 'high' ? 'badge-danger' : l.priority === 'medium' ? 'badge-warning' : 'badge-neutral'}`}>
-                                                {l.priority}
+                                            <span className={`badge ${l.priority === 'high_value' ? 'badge-danger' : l.priority === 'standard' ? 'badge-neutral' : 'badge-neutral'}`}>
+                                                {l.priority === 'high_value' ? '⭐ High Value' : l.priority}
                                             </span>
                                         ) : '—'}
                                     </td>

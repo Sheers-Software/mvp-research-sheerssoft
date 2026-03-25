@@ -107,7 +107,7 @@ def _format_daily_report_email(prop: Property, stats: AnalyticsDaily) -> str:
                 </ul>
 
                 <div style="margin-top: 30px; text-align: center;">
-                    <a href="{settings.website_url if hasattr(settings, 'website_url') else '#'}" style="background-color: #0f172a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Full Dashboard</a>
+                    <a href="{settings.frontend_url}/dashboard" style="background-color: #0f172a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Full Dashboard →</a>
                 </div>
             </div>
             
