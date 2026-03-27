@@ -185,6 +185,106 @@ just reply here and I'll set it up same day.
 
 ---
 
+## PART 1.5 — NON-WHATSAPP OPENERS (Cold Call & Email)
+
+Use these when a hotel landline + email is available but no WhatsApp number is found.
+
+### 1.9 — Cold Call (The Reception Pivot)
+
+**Goal:** Get the GM's name and/or get transferred.
+
+**Script 1: Discovery (If GM name is UNKNOWN)**
+```
+Reception: "Good morning, [Hotel Name], how can I help you?"
+
+You: "Hi, good morning. I'm [Name] from SheersSoft. We're currently working with a few 
+hotels in [City] on their after-hours inquiry capture and I was hoping you could point 
+me in the right direction. 
+
+Who would be the best person to speak with about your reservations technology or 
+how you handle guest messages when the front desk is closed? 
+
+Is that usually the General Manager or your Reservations Manager?"
+```
+
+**Script 2: Direct (If GM name is KNOWN from research)**
+```
+Reception: "Good morning, [Hotel Name], how can I help you?"
+
+You: "Hi, good morning. Could you put me through to [GM Name]'s office please? 
+It's [Your Name] from SheersSoft."
+
+Reception: "May I know what it's regarding?"
+
+You: "Sure — we're working on the after-hours inquiry capture for properties in [City] 
+and I had a quick question for [GM Name] about how [Hotel Name] handles 
+WhatsApp messages overnight. Is [he/she] available?"
+```
+
+**If they say "They're in a meeting / Not available":**
+```
+"No problem at all. What's the best email address to send a quick note over to [him/her]? 
+I've got a couple of stats on after-hours revenue leaks in [City] that I think [he/she] 
+would find useful."
+```
+
+---
+
+### 1.10 — Cold Email Templates
+
+**Template A: The "Gap" Question (Subject: Question about [Hotel Name] after-hours inquiries)**
+```
+Hi [Name],
+
+I'm [Your Name] from SheersSoft. 
+
+Quick question for you — does [Hotel Name] have someone monitoring your guest 
+messages (WhatsApp/Social) after 10pm, or do guests typically have to wait 
+until the morning for a reply?
+
+The reason I ask is that most 3-star hotels in [City] are currently losing 
+anywhere from RM 8,000–15,000/month in bookings simply because no one is 
+awake to answer at 2am.
+
+We built an AI that stops that leak. It's live in 48 hours and we offer the 
+first 30 days free to prove the ROI.
+
+Worth a 10-minute chat this week to see what the numbers look like for [Hotel Name]?
+
+Best,
+
+[Your Name]
+SheersSoft
+```
+
+**Template B: The "Revenue Audit" (Subject: Conservative math on [Hotel Name]’s missed bookings)**
+```
+Hi [Name],
+
+I was doing some research on hotels in [City] and ran some conservative math 
+on [Hotel Name].
+
+Based on your room count and ADR, you're likely receiving 10–20 inquiries 
+per week after your front desk wraps up. At a standard 30% drop-off rate 
+for slow responses, that's roughly RM [X] in potential revenue walking away 
+every single month.
+
+I've attached a sample of what our After-Hours Revenue Audit looks like. 
+
+I’d love to run a free 7-day audit for [Hotel Name] — no technical setup, 
+no cost, no commitment. You just get the report at the end of the week 
+showing exactly what's being missed.
+
+Any interest in seeing those numbers?
+
+Best,
+
+[Your Name]
+SheersSoft
+```
+
+---
+
 ## PART 2 — PRE-CALL PREPARATION
 
 Do this before every call. Takes 10 minutes. Determines 50% of your close rate.

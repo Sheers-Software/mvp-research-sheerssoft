@@ -58,7 +58,7 @@ The local stack replaces GCP Cloud Run with local Docker containers:
 # 1. Docker Desktop running
 # 2. GCP authentication
 gcloud auth application-default login
-gcloud config set project nocturn-ai-487207
+gcloud config set project nocturn-aai
 
 # 3. Verify ADC credentials exist
 ls $APPDATA/gcloud/application_default_credentials.json  # Windows
@@ -114,7 +114,7 @@ gcloud builds submit \
 
 # 2. Re-enable Cloud Scheduler jobs (when needed)
 for job in nocturn-daily-report nocturn-followups nocturn-insights nocturn-keepalive; do
-  gcloud scheduler jobs resume $job --location=asia-southeast1 --project=nocturn-ai-487207
+  gcloud scheduler jobs resume $job --location=asia-southeast1 --project=nocturn-aai
 done
 ```
 
@@ -137,7 +137,7 @@ gcloud run services delete nocturn-frontend \
   --project=nocturn-ai-487207 --region=asia-southeast1 --quiet
 
 # Verify deletion
-gcloud run services list --project=nocturn-ai-487207
+gcloud run services list --project=nocturn-aai
 ```
 
 Cloud Scheduler jobs are already showing 0 items (no jobs to pause). Artifact Registry images can be kept for future deploys (cost: ~$0.02/month).

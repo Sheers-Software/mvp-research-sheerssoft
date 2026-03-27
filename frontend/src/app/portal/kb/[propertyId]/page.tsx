@@ -169,7 +169,7 @@ export default function PortalKBPage() {
                             <select
                                 value={addForm.doc_type}
                                 onChange={(e) => setAddForm((f) => ({ ...f, doc_type: e.target.value }))}
-                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13 }}
+                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13 }}
                             >
                                 <option value="faqs">FAQs</option>
                                 <option value="rooms">Rooms</option>
@@ -186,7 +186,7 @@ export default function PortalKBPage() {
                                 value={addForm.title}
                                 onChange={(e) => setAddForm((f) => ({ ...f, title: e.target.value }))}
                                 placeholder="e.g. Breakfast FAQ"
-                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
+                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
                             />
                         </div>
                         <div>
@@ -196,7 +196,7 @@ export default function PortalKBPage() {
                                 onChange={(e) => setAddForm((f) => ({ ...f, content: e.target.value }))}
                                 placeholder="Enter document content here..."
                                 rows={8}
-                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
                             />
                         </div>
                     </div>
@@ -272,7 +272,7 @@ export default function PortalKBPage() {
                                         value={editContent}
                                         onChange={(e) => setEditContent(e.target.value)}
                                         rows={8}
-                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', marginBottom: 8 }}
+                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', marginBottom: 8 }}
                                     />
                                     <button
                                         className="btn btn-primary btn-sm"

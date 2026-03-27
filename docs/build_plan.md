@@ -1,9 +1,9 @@
 # Build Plan
 ## Nocturn AI — AI Inquiry Capture & Conversion Engine
-### Version 2.2 · 23 Mar 2026 · Original Ship Date: 11 Mar 2026
+### Version 2.3 · 25 Mar 2026 · Original Ship Date: 11 Mar 2026
 ### Aligned with [product_context.md](./product_context.md) · Steered by [building-successful-saas-guide.md](./building-successful-saas-guide.md)
 ### Cross-referenced with: [portal_architecture.md](./portal_architecture.md), [product_gap.md](./product_gap.md) v1.2, [prd.md](./prd.md) v2.1
-### Implementation Status: v0.3.3 · All GCP compute spun down — ready for next deploy
+### Implementation Status: v0.5.0 · All GCP compute spun down — ready for next deploy
 
 ---
 
@@ -21,10 +21,57 @@ P0 product code is **complete**. The remaining blockers are infra tasks and fiel
 | 6 | **Pilot property KB not populated** | ❌ **FIELD WORK** — No KB ingested for first pilot property. 1 day on-site or via admin KB ingestion tool. | KB session: collect rate card, room types, FAQs, policies. Ingest via `/admin/kb-ingestion` or `python backend/scripts/ingest_kb.py`. |
 | 7 | **"Lost" status missing from leads filter UI** | ✅ **RESOLVED** — v0.3.1. Lost filter live in leads view. | — |
 | 8 | **Tenant self-service portal not built** | ✅ **RESOLVED** — v0.4. Full `/portal` + `/welcome` wizard shipped. | — |
+| 9 | **Shadow Pilot infrastructure** | ✅ **SPRINT 2.5 BUILT** — All dev items complete. One infra item remains: Cloud Scheduler job for `/run-weekly-audit-report` (create on next GCP deploy). Day 7 AM notification not yet built. | Create Cloud Scheduler job on next deploy. Build AM notification (see Sprint 2.5 below). |
+| 10 | **`WHATSAPP_API_TOKEN` and `WHATSAPP_APP_SECRET` missing from Secret Manager** | ❌ **INFRA** — Required for Meta Cloud API in production. Shadow pilots use Twilio (already configured). Blocks Stage 3 (full product) for first client. | Add to GCP Secret Manager before first Stage 3 client go-live. |
 
 ---
 
-## v0.4 — Self-Service Onboarding & Portal (Current Sprint)
+## v0.5 — After-Hours Revenue Audit + GCP Production (Current Sprint)
+
+### What Was Built
+
+| Feature | Status |
+|---------|--------|
+| Public audit calculator at `/audit` (frontend) | ✅ Complete |
+| `AuditRecord` model + `audit_records` table | ✅ Complete |
+| `POST /audit/calculate` (public, 60/min rate limit) | ✅ Complete |
+| `POST /audit/submit` (public, 5/min rate limit) | ✅ Complete |
+| `GET/PATCH /audit/records` (superadmin pipeline) | ✅ Complete |
+| `/admin/tools/revenue-audit` internal tool | ✅ Complete |
+| `ENVIRONMENT=production` in `cloudbuild.yaml` | ✅ Complete |
+| `test_ai_accuracy` graceful skip on DB permission error | ✅ Complete |
+| `audit_only_mode` + shadow pilot fields on `Property` model | ✅ Complete |
+| AI bypass in `conversation.py` when `audit_only_mode=True` | ✅ Complete |
+| Weekly audit email (`run_weekly_audit_report` scheduler + internal endpoint) | ✅ Complete |
+| `/admin/shadow-pilots` provisioning page | ✅ Complete |
+| Dark → light theme migration (globals.css, all pages) | ✅ Complete |
+| GCP project ID fix (`nocturn-ai-487207` → `nocturn-aai`) across all configs | ✅ Complete |
+
+---
+
+## Sprint 2.5 — Shadow Pilot Infrastructure (Mostly Complete)
+
+> **Goal:** Complete the three-stage sales funnel. A SheersSoft AM can provision a shadow pilot for a prospect in 5 minutes from the admin panel. The GM gets a real-data audit email on Day 7 automatically.
+
+| Task | Owner | Deliverable | Status |
+|------|-------|-------------|--------|
+| `audit_only_mode`, `shadow_pilot_start_date`, `shadow_pilot_phone` on `Property` model | Dev | Alembic migration + `main.py` incremental ALTER | ✅ Built |
+| Skip AI response when `audit_only_mode = True` | Dev | In `conversation.py` `process_guest_message()`: if `property.audit_only_mode`, log message, return without calling LLM | ✅ Built |
+| Weekly audit email template | Dev | SendGrid HTML email: "Your hotel received X after-hours inquiries. Based on your ADR of RM Y, you left approximately RM Z on the table this week." | ✅ Built |
+| `run_weekly_audit_report` scheduler job | Dev | `services/scheduler.py` + `POST /api/v1/internal/run-weekly-audit-report` — queries AnalyticsDaily for all `audit_only_mode=True` properties, computes leakage, sends GM email | ✅ Built |
+| Cloud Scheduler job for weekly audit email | Infra | 1 new Cloud Scheduler job targeting `/api/v1/internal/run-weekly-audit-report` weekly | ❌ Not created — add on next GCP deploy |
+| Shadow pilot provisioning in `/admin` | Dev | `/admin/shadow-pilots` page: create shadow pilot (property name, GM email, ADR, Twilio number), sets `audit_only_mode=True`, records `shadow_pilot_start_date` | ✅ Built |
+| Day 7 auto-notification to SheersSoft AM | Dev | When weekly audit email sends, also POST to internal Slack webhook (or log prominently) so AM knows to call same day | ❌ Not built |
+
+**Quality Gates:**
+- [ ] Shadow pilot property created via admin → incoming Twilio messages logged → NO AI response sent
+- [ ] AnalyticsDaily correctly aggregates `is_after_hours` count for `audit_only_mode` properties
+- [ ] Weekly audit email sends with correct inquiry count + RM calculation
+- [ ] AM notification fires same day as audit email
+
+---
+
+## v0.4 — Self-Service Onboarding & Portal (Previous Sprint)
 
 ### What Was Built
 
@@ -202,6 +249,19 @@ This is not optional. This screen sells the product.
 | 10 | BM/Manglish 50-question test suite passed at ≥80% | One-time P0 gate; re-run before each new property if AI engine has changed |
 | 11 | Stripe webhook configured | Not required for pilot — manual invoicing. Activate when ≥3 paying tenants confirmed. |
 | 12 | Rollback plan documented (disable AI, revert to manual) | Maintenance mode toggle available from `/admin/system` |
+| 13 | Shadow pilot complete (if using Stage 2 funnel path) | Day 7 audit email sent, GM has seen real inquiry data, Day 7 call completed before requesting Meta API registration |
+| 14 | `audit_only_mode` confirmed False before full product launch | Verify in admin panel. If still True, AI will not respond to guests. |
+
+**Shadow Pilot Go-Live Checklist (per prospect):**
+
+| # | Item |
+|---|------|
+| 1 | Twilio shadow number provisioned and set as `shadow_pilot_phone` on Property |
+| 2 | Property created with `audit_only_mode = True` |
+| 3 | GM instructed to promote shadow number (WhatsApp bio, email footer, signage) |
+| 4 | `shadow_pilot_start_date` recorded |
+| 5 | Calendar reminder for Day 7 call set |
+| 6 | Day 7 audit email tested in staging before prospect goes live |
 
 ---
 
@@ -253,32 +313,31 @@ This is not optional. This screen sells the product.
 
 ## 4. Post-Launch: 10-Customer Expansion (Days 29–60)
 
-### Week 5–6: Prove It
+### Week 1-2: Shadow Pilots Running
 
 | Action | Goal |
 |---|---|
-| Capture first pilot property's first 7 days of data | Real numbers: inquiries, after-hours recovery, leads |
-| Build the first case study one-pager | Target formula: 20 leads × RM 230 ADR × 20% conversion = RM 920 recovered in first week. Scale to 30-day case study. Do NOT publish estimates until verified by real data. |
-| Activate referral pipeline — **highest priority** | Referrals convert 10× better than cold. Start in parallel with first pilot, not after. |
-| Share results with warm prospects | Book demo calls using first pilot case study |
-| Deploy pilots at 3 more properties | Self-service `/welcome` wizard must let new clients go live in < 2 hours |
+| Run audit outreach to 10 prospects (audit calculator link as first touch) | 3–5 audit submissions in first week |
+| Convert 3 audit submissions to shadow pilots | 3 shadow pilots active simultaneously |
+| Provision shadow Twilio numbers for each | Each prospect has real inquiry data collecting |
 
-### Week 7–8: Convert
+### Week 3-4: First Shadow → Full Conversions
 
 | Action | Goal |
 |---|---|
-| ROI report for each pilot property — real numbers from their dashboard | Proof, not promises |
-| Conversion calls: pilot → paid (Starter or Professional tier) | Target: 60%+ conversion |
-| Cold outreach to 10 new properties using first pilot case study | Expand pipeline |
-| Leverage referral network | Fresh properties = faster decisions |
+| Day 7 calls for first shadow pilots | Each GM reviews their own inquiry data |
+| Initiate Meta Cloud API registration for converted prospects | 2-4 day approval window begins |
+| Build first property KBs using actual questions from shadow pilot data | KB built from real questions → high AI accuracy from Day 1 |
+| First full product clients go live | Real AI responses, real leads captured |
 
-### Week 9–10: Scale
+### Week 5-6: Prove It and Case Study
 
 | Action | Goal |
 |---|---|
-| 10 paying customers | RM 20,000+ MRR |
-| Formalize onboarding documentation | Repeatable process |
-| Hire Customer Success / Support | First non-engineering hire |
+| Capture first 7 days of full-product data | Real numbers: inquiries, after-hours recovery, leads |
+| Build the first case study one-pager | Formula: shadow pilot volume × conversion rate × ADR = actual recovery. Do NOT publish estimates. |
+| Activate referral pipeline | Referrals convert 10× better than cold outreach. Ask at Day 7 call. |
+| Run more audit outreach using shadow pilot data as social proof | "Hotel X had 14 after-hours messages last week on a shadow number — here's their RM figure." |
 
 ---
 
@@ -310,6 +369,8 @@ This is not optional. This screen sells the product.
 | 7 | CAC > LTV (unit economics) | Medium | Critical | Track from first customer. Stop scaling acquisition if LTV:CAC < 3. | Product |
 | 8 | "Build it and they will come" (no distribution) | High | Critical | 3–5 customer calls/week. Case study → demos. Distribution strategy from day one. | Product |
 | 9 | ~~Dashboard lands on onboarding checklist, not revenue~~ | — | — | ✅ **RESOLVED v0.3.1** — Dashboard home shows revenue KPI cards as the first screen. | — |
+| 10 | GM refuses Meta Cloud API number transfer | High | High | Shadow pilot data makes this a non-issue: "You had X after-hours messages last week on the shadow number. Your real number gets 4–5x that volume. We just need to route it to us." | Product/Sales |
+| 11 | Shadow pilot volume too low to impress GM | Low | Medium | Pre-qualify using audit calculator estimate before provisioning shadow pilot. Properties projecting <5 after-hours msgs/day are below ICP threshold. | Sales |
 
 ---
 

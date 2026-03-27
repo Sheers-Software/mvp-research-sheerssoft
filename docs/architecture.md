@@ -1,6 +1,6 @@
 # System Architecture
 ## Nocturn AI — AI Inquiry Capture & Conversion Engine
-### Version 2.2 · 23 Mar 2026
+### Version 2.3 · 25 Mar 2026
 ### Aligned with [product_context.md](./product_context.md) · Steered by [building-successful-saas-guide.md](./building-successful-saas-guide.md)
 ### Cross-referenced with: [portal_architecture.md](./portal_architecture.md), [prd.md](./prd.md) v2.1
 ### Implementation Status: v0.3.3 · All GCP compute spun down (2026-03-23) · Database: Supabase PostgreSQL 17 (ap-southeast-2)
@@ -81,6 +81,86 @@ graph TB
     style PG fill:#336791,color:#fff
     style RD fill:#DC382D,color:#fff
     style DASH fill:#0ea5e9,color:#fff
+```
+
+---
+
+## 2.5 Three-Stage Funnel Architecture
+
+The product operates as a three-stage commercial funnel. Each stage has a distinct architecture:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Stage 1 — AUDIT (public, no auth, rate-limited)                │
+│                                                                 │
+│  /audit (Next.js page, no auth)                                 │
+│    → POST /api/v1/audit/calculate  (60/min per IP)              │
+│    → POST /api/v1/audit/submit     (5/min per IP)               │
+│    → AuditRecord saved to PostgreSQL                            │
+│    → Email within 60s (SendGrid) + SheersSoft notification      │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │ SheersSoft AM offers shadow pilot
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Stage 2 — SHADOW PILOT (Twilio shadow number, audit_only_mode) │
+│                                                                 │
+│  Property.audit_only_mode = True                                │
+│  Property.shadow_pilot_phone = "+60XXXXXXXXXX" (Twilio)         │
+│  Property.shadow_pilot_start_date = <date>                      │
+│                                                                 │
+│  WhatsApp (Twilio) → channels.py webhook                        │
+│    → Conversation created, Message saved                        │
+│    → is_after_hours flag set                                    │
+│    → AnalyticsDaily aggregated daily                            │
+│    → AI response SKIPPED (audit_only_mode=True)                 │
+│                                                                 │
+│  Day 7 → run_weekly_audit_report scheduler job                  │
+│    → SELECT COUNT(*), ADR FROM AnalyticsDaily                   │
+│    → Email GM: "You received X after-hours inquiries.           │
+│                 RM Y left on the table."                        │
+│    → SheersSoft AM notified to initiate Day 7 call              │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │ Day 7 call → GM agrees to full product
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Stage 3 — FULL PRODUCT (Meta Cloud API, audit_only_mode=False) │
+│                                                                 │
+│  Property.whatsapp_provider = "meta"                            │
+│  Property.audit_only_mode = False                               │
+│  Property.whatsapp_number = GM's real WhatsApp Business number  │
+│                                                                 │
+│  Full AI response pipeline active:                              │
+│  Conversation Engine → RAG → LLM → WhatsApp reply              │
+│  Lead Capture → Dashboard → Daily 7am email to GM              │
+│  Subscription billing begins                                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Architectural Constraint — No Passive WhatsApp Tap
+
+WhatsApp routes a number to ONE destination exclusively: either the phone app OR the Meta/Twilio webhook. There is no passive "listen only" mode at the API level. The shadow pilot sidesteps this by using a Twilio-provisioned number that is separate from the hotel's existing WhatsApp Business number. The GM promotes it as a secondary "booking enquiries" channel during the 7-day proof window.
+
+This constraint has direct implications for the product flow:
+- Stage 2 (shadow pilot) uses a NEW Twilio number per prospect
+- Stage 3 requires the GM to transfer their real number to Meta Cloud API
+- The shadow pilot data eliminates the GM's objection to the number transfer
+
+### Shadow Pilot Conversation Flow
+
+When `audit_only_mode = True`:
+
+```
+Guest message (Twilio shadow number)
+  → channels.py webhook
+  → normalize_twilio_webhook()
+  → Property lookup (by shadow_pilot_phone)
+  → get_or_create_conversation()  ← conversation created, is_after_hours set
+  → process_guest_message() called
+      → if property.audit_only_mode:
+            log_message_only()  ← just saves Message to DB
+            return  ← NO AI response sent
+      → else: [normal AI pipeline]
+  → AnalyticsDaily aggregated at end of day
 ```
 
 ---
@@ -194,6 +274,14 @@ The frontend is structured as four distinct route groups in a single Next.js app
 | **Internal Ops** | `/admin` | SheersSoft team only | ✅ Active |
 | **Tenant Management** | `/portal` | Hotel owners/admins | ✅ Active (v0.4) |
 | **Onboarding Wizard** | `/welcome` | New hotel owners (first login) | ✅ Active (v0.4) |
+| **Public Audit** | `/audit` | Prospective hotel GMs (no auth) | ✅ Active (v0.5) |
+
+### Feature Activation Status
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| After-Hours Revenue Audit (`/audit`, AuditRecord, 5 endpoints) | ✅ **Active (v0.5)** | Public calculator, lead gate, superadmin pipeline. Rate-limited: 60/min calculate, 5/min submit. AuditRecord table with RLS disabled (not property-scoped). |
+| Shadow Pilot Mode (`audit_only_mode`, weekly email, provisioning) | ❌ **Pending (Sprint 2.5)** | Requires Property model additions, conversation.py bypass logic, weekly audit email template, `run_weekly_audit_report` scheduler endpoint. |
 
 Security boundary is enforced at the API level: `require_superadmin()` for `/admin`, `check_tenant_access()` for `/portal`, `check_property_access()` for `/dashboard`. Auth callback routing is fully role-based — see auth routing table below.
 
@@ -260,6 +348,13 @@ SupportTicket (tenant user → SheersSoft staff workflow)
 Application (public intake at ai.sheerssoft.com/apply → converts to Tenant)
 ```
 
+```
+Property (audit + shadow pilot additions — Sprint 2.5):
+  + audit_only_mode: bool (default False) — when True, AI skips response, just logs
+  + shadow_pilot_start_date: timestamptz — when the shadow pilot began
+  + shadow_pilot_phone: varchar(30) — the Twilio shadow number used for this pilot
+```
+
 ### Tenant Provisioning Flow
 
 ```
@@ -297,6 +392,7 @@ In production, APScheduler is **disabled**. Cloud Scheduler calls internal endpo
 - `POST /api/v1/internal/run-followups`
 - `POST /api/v1/internal/run-insights`
 - `POST /api/v1/internal/cleanup-leads`
+- `POST /api/v1/internal/run-weekly-audit-report` — triggered by Cloud Scheduler on Day 7 of each active shadow pilot. Queries AnalyticsDaily for the pilot property, computes after-hours inquiry count and RM leakage, emails GM, notifies AM.
 
 All require `X-Internal-Secret` header. Excluded from OpenAPI docs.
 
@@ -748,7 +844,7 @@ graph LR
 ```bash
 gcloud builds submit \
   --config=backend/cloudbuild.yaml \
-  --project=nocturn-ai-487207 \
+  --project=nocturn-aai \
   --region=asia-southeast1 \
   --substitutions=COMMIT_SHA=$(git rev-parse HEAD) \
   .

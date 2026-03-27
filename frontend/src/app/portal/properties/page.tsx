@@ -87,7 +87,7 @@ export default function PortalPropertiesPage() {
                                 value={addForm.property_name}
                                 onChange={(e) => setAddForm((f) => ({ ...f, property_name: e.target.value }))}
                                 placeholder="e.g. Grand Palace Hotel KL"
-                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
+                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
                             />
                         </div>
                         <div>
@@ -95,7 +95,7 @@ export default function PortalPropertiesPage() {
                             <select
                                 value={addForm.timezone}
                                 onChange={(e) => setAddForm((f) => ({ ...f, timezone: e.target.value }))}
-                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13 }}
+                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13 }}
                             >
                                 {TIMEZONES.map((tz) => (
                                     <option key={tz} value={tz}>{tz}</option>

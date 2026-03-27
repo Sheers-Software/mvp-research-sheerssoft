@@ -308,7 +308,7 @@ gcloud builds submit \
 
 # 2. Re-enable Cloud Scheduler jobs
 for job in nocturn-daily-report nocturn-followups nocturn-insights nocturn-keepalive; do
-  gcloud scheduler jobs resume $job --location=asia-southeast1 --project=nocturn-ai-487207
+  gcloud scheduler jobs resume $job --location=asia-southeast1 --project=nocturn-aai
 done
 ```
 
@@ -316,7 +316,7 @@ done
 ```bash
 # Pause Scheduler jobs
 for job in nocturn-daily-report nocturn-followups nocturn-insights nocturn-keepalive; do
-  gcloud scheduler jobs pause $job --location=asia-southeast1 --project=nocturn-ai-487207
+  gcloud scheduler jobs pause $job --location=asia-southeast1 --project=nocturn-aai
 done
 
 # Delete Cloud Run services
@@ -340,7 +340,7 @@ gcloud builds submit \
 ```bash
 gcloud auth login
 gcloud auth application-default login
-gcloud config set project nocturn-ai-487207
+gcloud config set project nocturn-aai
 gcloud auth configure-docker asia-southeast1-docker.pkg.dev
 ```
 

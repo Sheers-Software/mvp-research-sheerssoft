@@ -96,7 +96,7 @@ export default function PortalSupportPage() {
                                 value={form.subject}
                                 onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
                                 placeholder="Brief description of your issue"
-                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
+                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
                             />
                         </div>
                         <div>
@@ -106,7 +106,7 @@ export default function PortalSupportPage() {
                                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                                 placeholder="Please describe the issue in detail..."
                                 rows={5}
-                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
                             />
                         </div>
                         <div>
@@ -114,7 +114,7 @@ export default function PortalSupportPage() {
                             <select
                                 value={form.priority}
                                 onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
-                                style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13 }}
+                                style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13 }}
                             >
                                 <option value="low">Low</option>
                                 <option value="medium">Medium</option>
@@ -197,7 +197,7 @@ export default function PortalSupportPage() {
                 </div>
             )}
 
-            <div style={{ marginTop: 32, padding: '16px 20px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
+            <div style={{ marginTop: 32, padding: '16px 20px', background: 'var(--bg-secondary)', borderRadius: 8, border: '1px solid var(--border-default)' }}>
                 <p className="text-sm" style={{ marginBottom: 4 }}>
                     <strong>Other ways to reach us:</strong>
                 </p>

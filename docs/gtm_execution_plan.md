@@ -131,7 +131,7 @@ This is two separate actions, both required:
 ```bash
 # Get the key from SendGrid dashboard → Settings → API Keys
 echo -n "SG.xxxxxxxxxxxxxxxxxxxx" | gcloud secrets versions add SENDGRID_API_KEY \
-  --data-file=- --project=nocturn-ai-487207
+  --data-file=- --project=nocturn-aai
 ```
 
 **Action B — Create Cloud Scheduler job for daily report:**
@@ -177,7 +177,7 @@ gcloud scheduler jobs create http nocturn-keepalive \
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 # Copy output, then:
 echo -n "the-key-output" | gcloud secrets versions add FERNET_ENCRYPTION_KEY \
-  --data-file=- --project=nocturn-ai-487207
+  --data-file=- --project=nocturn-aai
 ```
 
 Redeploy backend after adding. Verify `pii_encryption.py` encrypts new lead phone/email fields by checking a test lead in the database directly.

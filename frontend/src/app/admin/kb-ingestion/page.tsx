@@ -203,7 +203,7 @@ export default function KbIngestionPage() {
         border: '1px solid var(--border)',
         borderRadius: 6,
         fontSize: 14,
-        background: 'var(--surface)',
+        background: 'var(--bg-secondary)',
         color: 'var(--text)',
         boxSizing: 'border-box',
     };

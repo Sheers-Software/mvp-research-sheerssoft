@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD)
 ## Nocturn AI — AI Inquiry Capture & Conversion Engine
-### Version 2.2 · 23 Mar 2026
+### Version 2.3 · 25 Mar 2026
 ### Aligned with [product_context.md](./product_context.md) · Ground truth: [opportunity_2_playbook.md](./opportunity_2_playbook.md)
 ### Cross-referenced with: [portal_architecture.md](./portal_architecture.md), [product_gap.md](./product_gap.md), [gtm_execution_plan.md](./gtm_execution_plan.md)
 
@@ -11,6 +11,8 @@
 Malaysian hotels receive **90% of bookings through manual channels** — WhatsApp, phone, email, and walk-ins. After 6pm, reservations desks close and inquiries are dropped. At mid-tier properties, a team handles 200–300 touchpoints on busy days with 30% needing manual follow-up — a pattern confirmed across the target segment. **Revenue literally falls on the floor every night.**
 
 Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct inquiry they fail to answer pushes the guest toward Booking.com or Agoda — where the hotel pays for what should have been free.
+
+Hotels also operate **blind to their own after-hours volume**. Most GMs estimate they receive "a few messages" after 10pm — the actual number is typically 3–5x their estimate. The data does not exist until someone installs a listener. The after-hours audit solves this blind spot before asking for any commitment.
 
 **No product today captures, responds to, and converts inquiries across WhatsApp, web, and email — 24/7 — and proves the revenue impact to the GM.**
 
@@ -30,6 +32,7 @@ Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct
 | 4 | **Honest AI** | Never fabricate rates or availability. When unsure, hand off to a human with full context. Trust is the product. |
 | 5 | **Show, don't tell** | The dashboard is the sales pitch. If the GM opens it every morning, we win. If they don't, we've failed. |
 | 6 | **Live in 48 Hours** | Onboarding must be frictionless. No complex IT integrations. Forward an email, drop a script tag, and go live. |
+| 7 | **Proof Before Commitment** | Never ask for a hotel's WhatsApp Business API credentials before showing the GM real data from their own number. The shadow pilot gives them 7 days of actual inquiry volume before they transfer their real number. |
 
 ---
 
@@ -42,12 +45,13 @@ Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct
 | Attribute | Value | Rationale |
 |---|---|---|
 | **Property Type** | Independent and mid-tier brand hotels (3–4 star) only | Budget lacks margin; 5-star has enterprise procurement |
-| **Size** | 50–300 rooms | Sweet spot for inquiry volume and sales cycle |
-| **Location** | Malaysia (initial market) | PDPA, BM/EN, local relationships. No regional sprawl until PMF |
-| **Booking Mix** | >50% manual channels (WhatsApp, phone, email, walk-in) | OTAs don't need this. Must have after-hours gap |
-| **Pain Signal** | No after-hours inquiry coverage; 2–5 person reservations team; >20 inquiries/day | Pre-qualify. Low volume = can't prove ROI |
+| **Size** | 40–150 rooms | Under 40: insufficient inquiry volume to prove ROI. Over 150: procurement delays the sale. |
+| **Location** | Klang Valley, Penang, JB (initial market) | Dense enough to reference clients to each other. PDPA, BM/EN, local relationships. No regional sprawl until PMF. |
+| **Dark Window** | Front desk closes at or before 10pm (skeleton crew only) | The night auditor does not answer WhatsApp. 10pm–8am = dead zone. This is the product's value window. |
+| **Channel Dependency** | WhatsApp is primary booking inquiry channel (>60% of manual inquiries) | Email and phone hotels exist but are lower urgency — WhatsApp guests expect instant replies. |
+| **OTA Dependency** | Paying 15%+ Agoda / Booking.com commission | Makes the "OTA displacement" portion of the audit financially visceral to the GM. |
 | **Decision Maker** | GM or Revenue Manager (NOT IT) | IT blocks deals. GMs care about revenue |
-| **Budget** | RM 1,500–5,000/month | Value-based: 10–30% of RM 3,000–5,000 recovered/month |
+| **Budget** | RM 499–2,800/month | Value-based: 10–30% of estimated monthly recovery from after-hours leads |
 
 **Explicitly NOT in v1:** Budget hostels, Airbnb-style, 5-star chains, properties with <15 inquiries/day.
 
@@ -90,7 +94,7 @@ Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct
 |---|---|
 | **User Story** | *As a guest, I send a WhatsApp message to the hotel and get an instant AI response — no waiting for office hours.* |
 | **Integration** | Primary: Meta WhatsApp Business Cloud API (official). Fallback/sandbox: Twilio WhatsApp. `Property.whatsapp_provider` controls which is active. |
-| **Behavior** | Incoming message → conversation engine → AI response → reply via WhatsApp. Multi-turn context preserved. Non-text media (image/audio/video) returns a bilingual canned reply without calling the AI. |
+| **Behavior** | Incoming message → conversation engine → AI response → reply via WhatsApp. Multi-turn context preserved. Non-text media (image/audio/video) returns a bilingual canned reply without calling the AI. `Property.audit_only_mode = True` activates the **Shadow Pilot** — incoming messages are logged and counted but the AI does not respond. Used during the 7-day proof period before a GM transfers their real number. |
 | **Acceptance Criteria** | Full round-trip conversation over WhatsApp. Message delivery confirmed. Unsupported media handled gracefully. |
 
 #### F3: Web Chat Widget
@@ -152,6 +156,38 @@ Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct
 | **Production Blockers** | ⚠️ Not yet functional in production: (1) `SENDGRID_API_KEY` missing from GCP Secret Manager; (2) Cloud Scheduler `run-daily-report` job not created. Both required before pilot go-live. |
 | **Acceptance Criteria** | Reports send at 7:00am after blockers resolved. Data matches dashboard. Mobile-optimised. One-click link to authenticated session. |
 
+#### F9: After-Hours Revenue Audit Calculator
+| Attribute | Detail |
+|---|---|
+| **User Story** | *As a hotel GM, I enter my property details into a free calculator and immediately see how much revenue I am losing overnight — with zero commitment required.* |
+| **Route** | Public page at `/audit` (no authentication). Accessible from ai.sheerssoft.com/audit. |
+| **Inputs** | Room count (slider 20–200), Average room rate RM (slider 80–800), Daily WhatsApp messages (dropdown with "I don't know" auto-derive), Front desk closure time (8pm/9pm/10pm/11pm/midnight/24h), OTA commission rate (15%/18%/20%/22%/25%) |
+| **Output (instant, no gate)** | Monthly revenue leaking (RM), Monthly OTA commission displaced (RM), Annual total leakage (RM, highlighted), Conservative estimate (40% discount applied for credibility), ROI multiple if subscribing to Nocturn AI (RM 499/mo boutique tier), Net Year-1 recovery |
+| **Lead Gate** | To receive the full PDF report: GM enters name, hotel name, email, WhatsApp number. POST to `/api/v1/audit/submit` → saves AuditRecord → triggers email within 60 seconds → SheersSoft receives notification for follow-up within 10 minutes. |
+| **Calculation Method** | 60% of messages arrive after hours (industry benchmark). 20% conservative conversion rate. 2.0 avg stay nights. 65% of unanswered guests book via OTA. Final figure discounted 40% for credibility. |
+| **Acceptance Criteria** | Live calculation updates in <300ms as inputs change. Submit saves AuditRecord. Email triggered. Rate limited: 60/min on calculate, 5/min on submit per IP. |
+
+#### F10: Shadow Pilot Mode
+| Attribute | Detail |
+|---|---|
+| **User Story** | *As a hotel GM considering Nocturn AI, I have a Twilio shadow number listening on my hotel's incoming WhatsApp inquiries for 7 days — with no disruption to my existing setup — and receive a report showing exactly how many after-hours inquiries my hotel received and the RM value I left on the table.* |
+| **What it is** | A Twilio-hosted WhatsApp number provisioned per prospect. The GM promotes it as a "booking enquiries" channel in their WhatsApp bio, email footer, or printed signage for 7 days. The hotel's EXISTING number is not touched. |
+| **`audit_only_mode`** | `Property.audit_only_mode = True` — incoming messages are logged to conversations and AnalyticsDaily but the AI does NOT send any response. The shadow pilot is an observation window, not an AI deployment. |
+| **Why not the real number** | WhatsApp routes a number to ONE destination only: either the phone app (hotel staff) or the Meta/Twilio webhook. There is no passive tap mode. The shadow number sidesteps this constraint by being a new number entirely. |
+| **7-Day Audit Email** | On Day 7, an automated email is sent to the GM: *"Your hotel received [X] inquiries after 10pm this week. Based on your ADR of RM [Y], you left approximately RM [Z] on the table."* This email is the close. |
+| **Transition to Full Product** | On the Day 7 call, SheersSoft initiates the Meta Cloud API registration for the GM's REAL WhatsApp Business number. Once approved (2–4 days), `audit_only_mode` is set to False on the production property and the AI goes live. |
+| **Property Fields Added** | `audit_only_mode: bool`, `shadow_pilot_start_date: datetime`, `shadow_pilot_phone: str` |
+| **Acceptance Criteria** | Shadow pilot property created via `/admin`. Incoming messages logged. No AI response sent. Weekly audit email triggered by scheduler. Day 7 transition flow documented in admin. |
+
+#### F11: Audit-to-Full Conversion Automation
+| Attribute | Detail |
+|---|---|
+| **User Story** | *As a SheersSoft account manager, I receive an automatic notification when a GM submits the audit calculator and when a shadow pilot reaches Day 7 — so I can respond within 10 minutes and close the deal at the highest-probability moment.* |
+| **Audit submission trigger** | POST `/audit/submit` → AuditRecord saved → email to GM with full report within 60 seconds → Slack/internal notification to SheersSoft AM within 10 minutes |
+| **Shadow pilot Day 7 trigger** | `run_weekly_audit_report` scheduler job → sends GM email with real inquiry data → SheersSoft AM notified to initiate Day 7 call |
+| **AM follow-up sequence** | T+0: Audit submitted → AM WhatsApps GM within 10 minutes: "I see you ran the audit for [Hotel Name]. Want to install a shadow listener this week?" T+7 days: Audit email sent → AM calls same day: "You had [X] after-hours messages. Want me to set up the full AI on your real number?" |
+| **Acceptance Criteria** | Internal notifications send within 60 seconds of trigger events. Weekly audit email sends on day 7 of shadow pilot. Email content includes actual inquiry count and computed RM leakage from AnalyticsDaily. |
+
 ---
 
 ### 4.1.1 Known Gaps — Status as of v2.1
@@ -181,6 +217,7 @@ Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct
 | Mobile app for staff | Web dashboard is sufficient for v1. Mobile-responsive design. |
 | Stripe billing and subscription management | Payment infrastructure follows proven value, not precedes it. Pilot pricing is manual invoicing. UI in `/portal/billing` is live but Stripe activation is gated on ≥3 paying tenants. |
 | Public application intake form | Self-serve signup. Not needed until sales motion is established. |
+| Automated PDF report generation | The audit calculator shows results on-screen; the "full report" email is a text-based summary. A designed PDF is a post-PMF investment. |
 
 ---
 
@@ -196,6 +233,9 @@ Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct
 | **Human Handoff Rate** | % escalated to staff | <20% |
 | **Lead Capture Rate** | % of conversations with contact info collected | >60% |
 | **Estimated Revenue Recovered** | `(lead nights × ADR, default 1 night) × 20%` | RM 3,000–5,000+/month per property (based on RM 230 ADR × 20 after-hours leads/day × 20% conversion). First pilot property will establish the first verified benchmark. |
+| **Audit → Shadow Pilot Conversion** | % of audit submissions that accept the shadow pilot offer | >30% |
+| **Shadow Pilot → Full Product Conversion** | % of shadow pilots that convert to paid subscription | >50% |
+| **Days Audit → Paid** | Calendar days from audit submission to first subscription payment | <21 days |
 
 ### Business KPIs (Internal — What We Track)
 
@@ -203,8 +243,8 @@ Targets aligned with `gtm_execution_plan.md` 90-day scorecard:
 
 | Metric | Day-35 Target | Day-60 Target | Day-90 Target | Red Flag |
 |---|---|---|---|---|
-| Active Pilots | 1 (first pilot live) | 3–4 | 5+ | — |
-| Paying Customers | 1 | 2–3 | 10 | <5 by Day 90 = value prop issue |
+| Active Pilots | 1 full product client OR 3 shadow pilots running | 3–4 | 5+ | — |
+| Paying Customers | 1 | 3 paying clients (from shadow pilot conversions) | 10 | <5 by Day 90 = value prop issue |
 | MRR | RM 1,500 | RM 4,500–9,000 | RM 15,000–30,000 | — |
 | Pilot → Paid Conversion | — | First data point | >60% | Below 50% = value prop weak |
 | Monthly Churn | — | <5% | <5% | >10% = product problem, not sales |
@@ -235,17 +275,19 @@ Targets aligned with `gtm_execution_plan.md` 90-day scorecard:
 
 > *"B2B customers don't trust cheap software. Charge 10–30% of value created."*
 
-| Tier | Price | Target Segment | Includes |
-|---|---|---|---|
-| **Starter** | RM 1,500/mo | Budget/3-star, <100 rooms | 1 WhatsApp line, web widget, 500 conversations/mo, basic dashboard |
-| **Professional** | RM 3,000/mo | 4-star, 100–300 rooms | 2 WhatsApp lines, web widget, email handling, 2,000 conversations/mo, full dashboard + reports |
-| **Enterprise** | RM 5,000+/mo | 5-star, 300+ rooms | Unlimited lines, custom AI training, priority support, API access |
+| Stage | Tier | Price | Commitment | What It Is |
+|---|---|---|---|---|
+| **Stage 1** | Audit | Free | Zero | Public calculator at /audit. Instant RM leakage number. No account required. |
+| **Stage 2** | Shadow Pilot | Free | 7 days | Twilio shadow number. audit_only_mode listening. Real inquiry data. Weekly audit email on Day 7. |
+| **Stage 3** | Boutique | RM 499/mo | Month-to-month | Full AI on real WhatsApp number (up to 150 rooms). Lead capture. Daily 7am email. Dashboard. |
+| **Stage 3** | Independent | RM 1,200/mo | Month-to-month | All Boutique features + 2 properties + unlimited KB docs + email channel + priority support. |
+| **Stage 3** | Premium | RM 2,800/mo | Annual option (15% discount) | All Independent features + unlimited properties + web widget + custom AI training. |
 
-**Pilot Offer:** 30 days FREE, time-limited only. No credit card. Prove value before asking for money.
+**Shadow Pilot Offer:** 7 days of real inquiry data on a Twilio shadow number — free, no commitment, zero disruption to existing WhatsApp setup. Transitions to Boutique paid tier after Day 7 call confirms value. 30-day money-back guarantee on first paid month.
 
 **Invoicing for v1:** Pilot billing is manual (direct bank transfer or invoice). Stripe billing infrastructure exists in the codebase but is not customer-facing until pilot-to-paid conversion is proven.
 
-**Sales motion:** Starter/Pro = sales-assisted. Enterprise = full sales process.
+**Sales motion:** Boutique/Independent = sales-assisted via three-stage funnel. Premium = full sales process.
 
 ---
 
@@ -261,6 +303,8 @@ Targets aligned with `gtm_execution_plan.md` 90-day scorecard:
 | AI chatbot market is crowded | Prospects have already evaluated generic chatbots and dismissed them | Differentiation must be explicit in every demo: this is **after-hours revenue recovery tied to a GM dashboard** — not a chatbot. Lead with the RM number, not the AI feature. |
 | **"Build it and they will come"** | No customers despite product | Distribution strategy from day one. Case study → demos. 3–5 customer calls/week. |
 | **CAC > LTV** | Buying revenue at a loss | Track unit economics from first customer. Stop scaling if LTV:CAC < 3. |
+| GM refuses Meta Cloud API registration (number transfer) | High sales friction, delays Stage 3 | Shadow pilot data eliminates this objection — GM has seen their own numbers. "You had 14 after-hours messages last week. Your real number is getting 4-5x that. We just need to point your WhatsApp number to us." |
+| Shadow pilot volume too low to impress GM | Can't prove ROI on weak-volume properties | Pre-qualify: estimate shadow volume using room count before provisioning. Properties with <5 msgs/day are too small for the current ICP. |
 
 ---
 
@@ -270,15 +314,15 @@ Targets aligned with `gtm_execution_plan.md` 90-day scorecard:
 
 ### Launch Sequence
 
-1. **Pilot property (design partner #1)** — 90% manual, 30+ daily touchpoints, zero after-hours coverage. Deploy first. Do things that don't scale. Establish the first verified benchmark.
-2. **Referral pipeline** — Referrals convert 10× better than cold outreach. Activate in parallel with first pilot, not after.
-3. **Warm prospects** — Properties with established relationships. Longer sales cycle (chain hotels need procurement sign-off).
-4. **Warm pipeline** — Book demos once first pilot data is in hand.
-5. **Cold expansion** — Only after first case study with real numbers. Proof, not promises.
+1. **Audit outreach (cold/warm)** — Send audit calculator link as the first touch. "Run your free hotel revenue audit in 2 minutes." No demo request. No sales call. Just value.
+2. **Audit → Shadow Pilot** — Within 10 minutes of submission, SheersSoft AM offers the shadow pilot: "We can have a number listening on your hotel's inquiries by tomorrow."
+3. **Shadow Pilot → Full Product** — Day 7 call with real data: "[X] after-hours messages, RM [Y] left on the table." Convert to Boutique tier.
+4. **Full Product → Referral** — At Day 30 ROI call, request one warm introduction to a peer GM.
+5. **Cold expansion** — Only after first case study with real numbers. Never promises, always proof.
 
 ### The 60-Second Pitch
 
-> *"Your hotel gets 30+ inquiries a day via WhatsApp and email. After 6pm, nobody answers. Our AI captures every single inquiry, responds in under 30 seconds — 24/7 — and hands you a daily report showing exactly how many leads would have been lost. Hotels like yours recover RM 3,000–5,000+/month by capturing direct inquiries that would otherwise go cold or convert via OTA."*
+> *"We'll show you exactly how many WhatsApp inquiries your hotel is missing after 10pm — and the RM value — using your own data. Takes 2 minutes at ai.sheerssoft.com/audit. If the number is significant, we set up a free 7-day listener on a shadow number. After 7 days, you'll have real proof. Then you decide."*
 
 ---
 
@@ -335,7 +379,14 @@ New client login
 
 ### 9.1 Validated v1.x Roadmap
 
-**Pre-pilot deliverables** — status as of v2.2:
+**Pre-pilot deliverables** — status as of v2.3:
+- ✅ After-Hours Revenue Audit calculator at `/audit` (v0.5)
+- ✅ AuditRecord model + audit endpoints (v0.5)
+- ✅ Internal admin revenue audit tool at `/admin/tools/revenue-audit` (v0.5)
+- ✅ `ENVIRONMENT=production` in cloudbuild.yaml (v0.5)
+- ❌ `audit_only_mode` flag on Property — Shadow Pilot Mode (Sprint 2.5)
+- ❌ Weekly audit email + scheduler job (Sprint 2.5)
+- ❌ Shadow pilot provisioning in admin panel (Sprint 2.5)
 - ✅ Dashboard home shows revenue KPI cards (rebuilt v0.3.1)
 - ✅ Staff reply input in conversations view (v0.3.1)
 - ✅ "Lost" status filter in leads UI (v0.3.1)
@@ -375,6 +426,8 @@ The codebase contains infrastructure built ahead of validation. This table track
 | Support chatbot + ticket system | ✅ **Active** | `/portal/support` allows tenant users to submit and view tickets. Backend ticket CRUD live. |
 | Application intake form | ❌ **Dormant** | Self-serve GTM motion not yet validated. Activate when inbound demand justifies it. |
 | Tenant self-service portal (`/portal`, `/welcome`) | ✅ **Active** | Full portal built in v0.4: KB self-management, team management, channel status, billing, support. `/welcome` 5-step onboarding wizard live. |
+| After-Hours Revenue Audit (`/audit`, AuditRecord, audit endpoints) | ✅ **Active** | Built in v0.5. Public calculator + superadmin submissions pipeline. |
+| Shadow Pilot Mode (`audit_only_mode`, shadow provisioning, weekly email) | ❌ **Pending (Sprint 2.5)** | Core to the new three-stage sales funnel. Block on go-live until complete. |
 
 **Rule for activating dormant features:** Follow the decision tree in `product_gap.md` Section 7. A feature unlocks only when its release condition is met — not when it is technically ready.
 

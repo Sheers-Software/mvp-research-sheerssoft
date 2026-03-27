@@ -85,7 +85,7 @@ Update `STAFF_NOTIFICATION_EMAIL` to Zul's real email:
 printf 'zul@vivatel.com.my' | \
   gcloud secrets versions add STAFF_NOTIFICATION_EMAIL \
     --data-file=- \
-    --project=nocturn-ai-487207
+    --project=nocturn-aai
 ```
 
 Also set `Property.notification_email` directly on the Vivatel property row so it's hotel-specific:

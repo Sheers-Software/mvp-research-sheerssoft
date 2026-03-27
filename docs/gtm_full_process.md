@@ -20,22 +20,23 @@ The product is built. The AI engine works. The onboarding wizard is live. The da
 
 ---
 
-### The Flywheel
+### The Flywheel (Multi-Channel)
 
 ```
-Cold DM
-  → Response
-    → Qualified Conversation
-      → Demo Booked
-        → Demo → Close
-          → Onboarding (48hrs)
-            → First Lead Captured
-              → Day 7 Health Call → Happy
-                → Day 30 ROI Review
-                  → Upsell / Referral
-                    → Case Study
-                      → Warm Inbound
-                        → faster close → repeat
+Cold DM (WhatsApp) OR Cold Call (Reception) 
+  → Email / Follow-up
+    → Response / GM Transfer
+      → Qualified Conversation
+        → Demo Booked
+          → Demo → Close
+            → Onboarding (48hrs)
+              → First Lead Captured
+                → Day 7 Health Call → Happy
+                  → Day 30 ROI Review
+                    → Upsell / Referral
+                      → Case Study
+                        → Warm Inbound
+                          → faster close → repeat
 ```
 
 The flywheel is slow at first because we have no case studies. The guarantee compensates. Once we have two documented case studies with real RM numbers, the cold DM response rate and close rate will increase significantly. Every action right now is about getting to those first two case studies.
@@ -72,7 +73,7 @@ Everything in this document is sequenced to address Constraint 1 first.
 ### Non-Negotiable Principles
 
 1. **Script is God.** Every message, every call, every follow-up follows a written process. Inconsistency is the enemy of learning what works.
-2. **One channel first.** WhatsApp DM only for acquisition until 10 clients. No LinkedIn ads, no cold email blasts, no content-first strategy until the DM channel produces results.
+2. **Multi-channel for 0–10.** Use WhatsApp DM where available. If no WhatsApp, use Cold Call (Reception) + Cold Email. No LinkedIn ads or massive content-first strategy until these channels produce results.
 3. **Never pitch to the wrong person.** GM, Revenue Manager, Owner, or Director of Reservations only. Anyone else is a waste of a sequence.
 4. **Never leave a call without a next step.** Every interaction ends with a booked touchpoint or a confirmed action.
 5. **Guarantee is the answer to trust.** When they hesitate because we have no clients, the answer is always the same: there is no financial risk. This is our superpower. Use it.
@@ -127,7 +128,7 @@ Before adding any property to your outreach queue, score them. Minimum score: 7/
 | No "24-hour front desk" listing or no overnight staff (reviews or website) | 1 | Confirms the problem exists |
 
 **Tier Assignment:**
-- Score 8–10: Tier 1 — contact this week
+- Score 8–10: Tier 1 — contact this week (Priority: WhatsApp > Call + Email)
 - Score 5–7: Tier 2 — contact after Tier 1 exhausted
 - Score <5: Do not contact in Phase 1
 
@@ -272,6 +273,37 @@ sooner, just reply here and I'll set up a 20-min demo same day.
 ```
 
 *(After Touch 4 with no reply: mark as "Inactive — follow up in 60 days." Set a calendar reminder. Move on.)*
+
+---
+
+### 1.5.1 — Non-WhatsApp Sequence (Cold Call + Email)
+
+If no WhatsApp number is found during research, follow this 4-touch sequence instead.
+
+**TOUCH 1 — Day 0: The Reception Pivot**
+
+1. **The Call:** Call the hotel landline.
+   - *Goal:* Identify the GM/Revenue Manager's name and get an email.
+   - *Script:* "Hi, I'm [Name] from SheersSoft. We're working with hotels in [City] on after-hours inquiry capture. Who would be the best person to speak with about your reservations technology? Is it [GM Name from list] or someone else?"
+2. **The Email:** Send immediately after the call (or if the call fails).
+   - *Subject:* Quick question about [Hotel Name] after-hours inquiries
+   - *Body:* Use Email Template from `sales_script_complete.md`.
+
+**TOUCH 2 — Day 3: The Gentle Bump (Call or Email)**
+
+If no reply to Email/Call 1:
+- **Action:** Short follow-up call ("Just wanted to make sure [Name] received my note") or a "Bump" email.
+
+**TOUCH 3 — Day 7: The Value Drop (The Revenue Audit)**
+
+- **Action:** Send the "Audit Offer" (see Section 2.5) via email.
+- **Hook:** "I ran some conservative math for [Hotel Name] — details in this email."
+
+**TOUCH 4 — Day 14: The Permission Close**
+
+- **Action:** Final email. "I'll leave this alone for now, but here if you ever need to stop the [RM X] leak."
+
+---
 
 ---
 

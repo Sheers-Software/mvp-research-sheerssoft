@@ -107,7 +107,7 @@ export default function PortalTeamPage() {
                                 value={inviteForm.email}
                                 onChange={(e) => setInviteForm((f) => ({ ...f, email: e.target.value }))}
                                 placeholder="staff@yourhotel.com"
-                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
+                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
                             />
                         </div>
                         <div>
@@ -117,7 +117,7 @@ export default function PortalTeamPage() {
                                 value={inviteForm.full_name}
                                 onChange={(e) => setInviteForm((f) => ({ ...f, full_name: e.target.value }))}
                                 placeholder="Jane Smith"
-                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
+                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
                             />
                         </div>
                     </div>
@@ -126,7 +126,7 @@ export default function PortalTeamPage() {
                         <select
                             value={inviteForm.role}
                             onChange={(e) => setInviteForm((f) => ({ ...f, role: e.target.value }))}
-                            style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13 }}
+                            style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13 }}
                         >
                             <option value="staff">Staff</option>
                             <option value="admin">Admin</option>

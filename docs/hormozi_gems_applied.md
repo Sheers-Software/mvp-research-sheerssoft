@@ -1,5 +1,6 @@
 # Hormozi Gems Applied to Nocturn AI
 ## Based on: "Helping a $2.2M/Year Cold Email Agency Scale to $10M" — Hormozi Highlights
+### Updated: v2.3 · 25 Mar 2026 — Reflects three-stage funnel (Audit → Shadow Pilot → Full Product)
 
 > This document extracts the key frameworks from Alex Hormozi's business scaling session and maps each one directly to Nocturn AI / SheersSoft. The cold email agency in the video is structurally identical to our business: B2B service with recurring revenue, delivery dependent on onboarding quality, and growth blocked by churn before acquisition.
 
@@ -30,21 +31,57 @@ The lesson: their problem wasn't volume. It was offer clarity, churn, and system
 
 Right now our ICP is defined as "Malaysian hotel". That is too wide. A 300-room city business hotel and a 20-room heritage boutique have completely different guest conversations, different inquiry types, different ADRs, different staff capacity.
 
-**Recommended niche (Phase 1, first 10 clients):**
-> **Independent 3–4 star hotels in Klang Valley, 40–150 rooms, no in-house reservation tech team.**
+**Recommended niche (Phase 1, first 10 clients) — sharpened:**
+> **Independent 3–4 star hotels, 40–150 rooms, Klang Valley / Penang / JB, with a verifiable after-hours dark window (closes at 10pm or earlier) and paying 15%+ OTA commission on Agoda or Booking.com.**
 
-These properties:
-- Lose the most revenue after hours (no overnight staff answering WhatsApp)
-- Have the budget (ADR RM 200–500, meaningful recovery value)
-- Make decisions fast (owner-operator, no committee)
-- Are easy to find (MOTAC registry, Google Maps, TripAdvisor)
-- Are concentrated enough to reference each other ("We're working with Grand Millenium's sister property...")
+The tighter qualifiers matter:
+- **Dark window (closes at 10pm):** The product's value is entirely in the 10pm–8am gap. A hotel with 24-hour reception has no dark window and no pain.
+- **OTA dependency (15%+):** Makes the "OTA displacement" portion of the audit viscerally painful. The GM already feels this every morning when they see Agoda bookings.
+- **WhatsApp as primary inquiry channel:** 90% of Malaysian domestic guests inquire via WhatsApp, not phone or email. If a hotel's primary channel is still phone, the use case is weaker.
+- **40–150 rooms (not 50–300):** Under 40 rooms: daily inquiry volume too low to generate compelling audit numbers. Over 150 rooms: usually has an in-house reservations tech team or chain procurement that slows the sale.
 
-**One offer:**
-> "Your hotel AI concierge, live on WhatsApp in 48 hours. Captures leads after hours. Sends a daily revenue report to your GM every morning at 7am. First month free. Only pay when the AI captures your first qualified lead."
+**One offer (three-stage funnel):**
+
+The offer is not a single pitch. It is a funnel where the GM self-selects deeper:
+
+```
+STAGE 1 — The Audit (free, instant, no commitment)
+  "Run your free 2-minute after-hours revenue audit."
+  → GM sees their RM leakage number
+  → Submits email to get the full report
+  → SheersSoft AM reaches out within 10 minutes
+
+STAGE 2 — The Shadow Pilot (free, 7 days, zero disruption)
+  "Let us install a shadow listener on a Twilio number for 7 days.
+   We'll tell you exactly how many after-hours inquiries your hotel
+   received — using real data, not estimates."
+  → GM promotes shadow number alongside real number
+  → Real inquiry data collected over 7 days
+  → Day 7 email: "You received X inquiries after 10pm. RM Y left on the table."
+  → This email IS the close.
+
+STAGE 3 — The Full Product (paid, RM 499/mo Boutique)
+  "Transfer your real WhatsApp Business number to us.
+   The AI responds in 18 seconds at 2am. Daily 7am revenue report.
+   First 30 days guaranteed — no leads, no charge."
+  → Only happens after GM has seen their own shadow pilot data
+  → Meta Cloud API registration initiated by SheersSoft
+  → Subscription begins after first lead is captured
+```
+
+The funnel works because:
+1. Stage 1 costs nothing (2 minutes of GM time)
+2. Stage 2 costs nothing and requires no disruption to existing setup
+3. By Stage 3, the GM is not buying on faith — they are buying on their own data
 
 **One channel (Phase 1):**
-> Direct WhatsApp outreach to hotel GMs + warm referrals from signed clients.
+> Direct WhatsApp outreach to hotel GMs, with the FIRST MESSAGE delivering the audit link — not a demo request.
+
+Old first message: *"Can I show you a demo of our AI?"* (asks for their time)
+
+New first message: *"Hi [Name], quick question — does [Hotel Name] have someone answering WhatsApp after 10pm? I built a free 2-minute audit that tells you exactly how much revenue you're leaving overnight: ai.sheerssoft.com/audit/[hotel]. No signup needed."*
+
+The audit link does the qualifying work. If they click, they're interested. If they fill it in, they're a warm lead. If they submit their email, they're sales-qualified.
 
 Do not add LinkedIn, paid ads, cold email blasts, or content marketing until this single channel produces 10 paying clients. Spread is the enemy.
 
@@ -69,17 +106,37 @@ Bad KB (incomplete/wrong)
 
 This is the single most important thing to prevent.
 
-**Churn prevention protocol (implement before signing 4th client):**
+**How the shadow pilot breaks the churn cascade:**
+
+The original churn cascade assumed the client goes live with a KB built from guesswork: "What do you think your guests ask?" The shadow pilot changes this fundamentally.
+
+During Stage 2 (shadow pilot), the AI is in observation mode. Every message from a real guest is logged. After 7 days, SheersSoft has an exact list of the questions this hotel's guests actually ask. The KB is then built from that list — not from what the GM thinks guests ask.
+
+New cascade with shadow pilot:
+```
+Shadow pilot (7 days) → real question log
+  → KB built from actual questions asked
+    → AI accuracy high from Day 1
+      → GM sees correct answers in first week
+        → No "AI isn't working" moment
+          → Retention secured
+```
+
+**Revised prevention protocol (with shadow pilot):**
 
 | Day | Action | Owner |
 |-----|--------|-------|
-| 0 | KB wizard completed — rooms, rates, FAQs, policies | Client (guided by us via /welcome) |
+| -7 to 0 | Shadow pilot active — real inquiry data collecting | Automated |
+| -7 | Audit email: "You received X after-hours inquiries" | Automated |
+| -6 to -1 | Day 7 call: review data, offer full product, initiate Meta API registration | Account Manager |
+| 0 | Meta API approved → `audit_only_mode = False` → AI goes live | Dev |
+| 0 | KB wizard completed — built from shadow pilot question log, not guesswork | Client + SheersSoft |
 | 1 | Test 10 WhatsApp conversations manually with real queries | SheersSoft |
 | 3 | GM receives first daily report email | Automated |
 | 7 | 30-minute check-in call: "Did the AI answer correctly?" | Account Manager |
 | 14 | Review: leads captured, conversations handled, KB gaps | Dashboard |
 | 30 | ROI review call: estimated revenue recovered vs. subscription cost | Account Manager |
-| 60 | Renewal conversation if on pilot — upsell to boutique tier | Account Manager |
+| 60 | Renewal conversation — upsell to Independent tier | Account Manager |
 
 **Rule:** Do not sign a new client until the previous one has completed day 14 check-in with zero critical AI failures. Quality compounding > volume compounding at this stage.
 
@@ -97,25 +154,37 @@ This was described as the single biggest unlock in their cold email performance 
 
 This is asking for their time before we've demonstrated value. It's backwards.
 
-**The Nocturn AI lead magnet:**
+**The updated lead magnet — two stages:**
 
-> **"Free After-Hours Revenue Audit"**
->
-> "We'll analyse your hotel's inquiry patterns for 7 days and tell you exactly how much revenue you're losing overnight. No commitment. No sales call required. We'll send the report to your inbox."
+**Stage A: Audit Calculator (built, live at /audit)**
 
 How it works:
-1. GM visits ai.sheerssoft.com/audit — enters hotel name, room count, ADR, WhatsApp number
-2. We install a minimal listener on their WhatsApp (or use a demo simulation) for 7 days
-3. At the end: send a PDF report: "Your hotel received X inquiries after 10pm. Based on your ADR of RM X, you left approximately RM X on the table last week."
-4. The report IS the sales pitch. The product demos itself.
-5. Follow-up: "Want to flip this? We can capture those leads automatically, starting this week."
+1. GM visits ai.sheerssoft.com/audit — enters room count, ADR, messages/day, closure time, OTA rate
+2. Instant live calculation: "RM [X] conservative annual leakage"
+3. GM submits email to get the full report
+4. System sends email within 60 seconds
+5. SheersSoft AM receives notification → WhatsApps GM within 10 minutes
 
-This shifts the dynamic from us asking for their attention → us proving value before they pay a cent. Conversion on this lead magnet vs. cold demo request: expect 3–5x improvement.
+The calculator converts because:
+- The GM enters THEIR OWN NUMBERS — not industry averages
+- The RM figure is therefore undeniable (it's based on their ADR, their message volume)
+- The OTA commission displacement is particularly visceral — they HATE paying Agoda
+- There is zero commitment to see the number
 
-**Secondary lead magnet:** ROI Calculator embedded on the website.
-- Inputs: Room count, ADR, average occupancy rate
-- Output: "Your hotel loses an estimated RM X per month from after-hours inquiries. Nocturn AI pays for itself in week 1."
-- No email required to see the number. Email required to get the detailed breakdown.
+**Stage B: Shadow Pilot (most powerful close in existence)**
+
+The audit calculator gives the GM an estimate. The shadow pilot gives them proof.
+
+> "We'll install a shadow listener on a Twilio number. You put it in your WhatsApp bio for 7 days. We'll tell you EXACTLY how many after-hours messages you missed — not an estimate, your actual numbers."
+
+After 7 days:
+> *"Hi [Name], your audit for [Hotel Name] is ready. You received 14 messages after 10pm this week. Based on your ADR of RM 280, you left approximately RM 11,760 on the table last week. That's RM 47,040 per month at conservative 20% conversion."*
+
+This is not a sales pitch. It is a doctor reading test results. The conversion happens because:
+1. The data is indisputable (it came from their hotel)
+2. The solution is already half-deployed (the shadow number is already connected)
+3. The ask is small (just point your real number to us)
+4. The risk is zero (30-day guarantee)
 
 ---
 
@@ -125,15 +194,20 @@ This shifts the dynamic from us asking for their attention → us proving value 
 
 **Two applications for us:**
 
-### A. Our own lead response (SheersSoft → hotel GM)
-When a hotel GM fills in the application form at ai.sheerssoft.com, the current flow is: form submission → someone from SheersSoft eventually calls them.
+### A. Our own lead response — The Two Speed-to-Lead Moments
 
-That "eventually" is killing conversions.
+**Moment 1: Audit submission (audit calculator)**
+- GM fills in audit calculator → submits email → RECEIVES: personalised email within 60 seconds + SheersSoft AM notification
+- AM WhatsApps GM within 10 minutes: "Hi [Name], I see you ran the audit for [Hotel Name]. Your estimated RM [X] annual leakage is actually conservative — want me to prove the real number? I can install a shadow listener on your hotel's inquiries by tomorrow."
+- If GM doesn't respond in 2 hours: founder personal WhatsApp
+- If GM responds: offer shadow pilot on same call
 
-**New flow:**
-- Form submitted → Instant automated response within 60 seconds: personalised email + WhatsApp message (ironic, given what we sell) saying: "Hi [Name], thanks for your interest. Here's a 15-minute calendar link to speak with our team today."
-- If not booked within 2 hours: follow-up WhatsApp from founder personally.
-- Target: First contact ≤ 10 minutes of form submission.
+**Moment 2: Shadow pilot Day 7 email**
+- Day 7 audit email sends → AM calls GM same day (not next day, same day)
+- This is the highest-converting moment in the entire funnel. GM has just read that their hotel missed RM X last week. The AM's call is: "I see you got your 7-day audit. You had [X] after-hours messages. Your real number is getting more than that. Want me to flip the switch today?"
+- Target: Day 7 call initiated within 4 hours of audit email sending.
+
+Rule: The Day 7 call is the single highest-leverage sales action. Every day of delay reduces conversion. Automate the notification so the AM cannot miss it.
 
 ### B. The product itself IS speed to lead for hotel guests
 The core value proposition of Nocturn AI is that it responds to guest WhatsApp messages in 18 seconds at 2am when no human is available. We already solve the speed-to-lead problem for hotels. This should be front and centre in all positioning:
@@ -328,12 +402,16 @@ That is the bridge-half-built problem. Every pivot abandons the bricks already l
 | Tenant portal (owner self-management) | ✅ Laid |
 | Daily revenue report email | ✅ Laid |
 | Admin internal tool (SheersSoft) | ✅ Laid |
-| Client #1 (live, happy, generating data) | ⬜ Next brick |
-| Client #1 case study + ROI data | ⬜ Follows |
+| After-hours revenue audit calculator (/audit) | ✅ Laid (v0.5) |
+| Internal audit pipeline (/admin/tools/revenue-audit) | ✅ Laid (v0.5) |
+| Shadow pilot mode (audit_only_mode, weekly email) | ⬜ Next sprint (Sprint 2.5) |
+| Client #1 via shadow pilot (live, happy, generating data) | ⬜ Next brick |
+| Shadow pilot question log → KB built from real data | ⬜ Follows |
+| Client #1 case study + actual ROI data | ⬜ Follows |
 | Referral from client #1 | ⬜ Follows |
 | BM language test suite passed | ⬜ Pending |
 
-The bridge is almost complete. The flood comes after client #1 is live and producing real data. Do not pivot. Lay the remaining bricks.
+The bridge is 90% built. Two bricks remain before the flood: (1) shadow pilot infrastructure (Sprint 2.5), and (2) the first client live via the new funnel. Do not pivot. The lead magnet is live. The sales motion is defined. Sprint 2.5 then client #1.
 
 ---
 

@@ -64,7 +64,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       # ── GCP Secret Manager (for AI API keys, JWT, etc.) ──
       # All API secrets (GEMINI_API_KEY, OPENAI_API_KEY, JWT_SECRET, etc.)
-      # are fetched from GCP Secret Manager project nocturn-ai-487207.
+      # are fetched from GCP Secret Manager project nocturn-aai.
       # DATABASE_URL above overrides whatever is in Secret Manager.
       GOOGLE_APPLICATION_CREDENTIALS: /gcp/credentials.json
       # ── LLM models ───────────────────────────────────────

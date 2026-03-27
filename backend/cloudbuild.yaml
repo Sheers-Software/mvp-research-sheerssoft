@@ -3,7 +3,7 @@ substitutions:
   _REPO: nocturn-ai
   _BACKEND_SERVICE: nocturn-backend
   _FRONTEND_SERVICE: nocturn-frontend
-  _SA: nocturn-cloud-run@nocturn-ai-487207.iam.gserviceaccount.com
+  _SA: nocturn-cloud-run@nocturn-aai.iam.gserviceaccount.com
 
 steps:
   # ── 1. Build backend image ───────────────────────────────────────────────────

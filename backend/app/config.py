@@ -137,7 +137,7 @@ class Settings(BaseSettings):
                             logger.warning(f"Failed to initialize Secret Manager client: {client_err}")
                             break  # Stop trying to fetch secrets if client fails to init
 
-                    name = f"projects/nocturn-ai-487207/secrets/{key}/versions/latest"
+                    name = f"projects/nocturn-aai/secrets/{key}/versions/latest"
                     response = client.access_secret_version(request={"name": name})
                     fetched_val = response.payload.data.decode("UTF-8").strip().lstrip("\ufeff")
 
@@ -156,7 +156,7 @@ class Settings(BaseSettings):
         if not self.database_url:
             raise ValueError(
                 "DATABASE_URL could not be loaded from GCP Secret Manager and is not set as an environment variable. "
-                "Ensure GCP Application Default Credentials are configured and the secret exists in project nocturn-ai-487207."
+                "Ensure GCP Application Default Credentials are configured and the secret exists in project nocturn-aai."
             )
 
     class Config:

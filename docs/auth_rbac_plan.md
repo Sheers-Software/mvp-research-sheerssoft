@@ -215,7 +215,7 @@ Staff receives email → clicks link
 
 Until P0 changes are made, the following manual controls apply:
 
-1. **SUPERADMIN_EMAILS** is set as a Cloud Run env var (not in git) — only accessible to people with GCP Console access to the `nocturn-ai-487207` project
+1. **SUPERADMIN_EMAILS** is set as a Cloud Run env var (not in git) — only accessible to people with GCP Console access to the `nocturn-aai` project
 2. **Legacy admin** (`admin/password123`) is only accessible via the "SheersSoft Admin Login →" link on the login page — tenant users are never shown this path
 3. **No real tenant clients are provisioned yet** — all current data is internal/test only; the security risk exposure is currently zero
 4. First real client (Vivatel/Zul) should be provisioned **after** P0 items 1–3 are completed

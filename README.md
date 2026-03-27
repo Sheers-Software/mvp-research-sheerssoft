@@ -45,7 +45,7 @@ All secrets are loaded exclusively from GCP Secret Manager at startup. No `.env`
 ```bash
 gcloud auth login
 gcloud auth application-default login   # creates ADC credentials mounted into containers
-gcloud config set project nocturn-ai-487207
+gcloud config set project nocturn-aai
 ```
 
 #### 2. Secrets in GCP Secret Manager (`nocturn-ai-487207`)
@@ -124,7 +124,7 @@ gcloud run services delete nocturn-frontend --project=nocturn-ai-487207 --region
 ```bash
 gcloud auth login
 gcloud auth application-default login
-gcloud config set project nocturn-ai-487207
+gcloud config set project nocturn-aai
 gcloud auth configure-docker asia-southeast1-docker.pkg.dev
 ```
 

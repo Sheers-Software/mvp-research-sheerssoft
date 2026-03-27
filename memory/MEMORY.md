@@ -2,7 +2,7 @@
 
 ## GCP / Infrastructure
 
-- **GCP Project**: `nocturn-ai-487207` (numeric: `343745766874`)
+- **GCP Project**: `nocturn-aai` (numeric: `343745766874`)
 - **GCP ADC**: Run `gcloud auth application-default login` on each new machine
 - **Supabase project ref**: `ramenghkpvipxijhfptp` → `https://ramenghkpvipxijhfptp.supabase.co`
 - **Supabase status**: Free tier — auto-pauses after 7 days inactivity. Unpause from Supabase dashboard. Upgrade to Pro before first paying tenant.
@@ -14,16 +14,16 @@
 | **Backend** | `https://nocturn-backend-owtn645vea-as.a.run.app` | 1 vCPU, 1GB, min=1, CPU always-on, port 8080 |
 | **Frontend** | `https://nocturn-frontend-owtn645vea-as.a.run.app` | 1 vCPU, 512MB, min=0, CPU-throttled, port 3000 |
 
-- **Artifact Registry**: `asia-southeast1-docker.pkg.dev/nocturn-ai-487207/nocturn-ai/`
-- **Cloud Run SA**: `nocturn-cloud-run@nocturn-ai-487207.iam.gserviceaccount.com`
+- **Artifact Registry**: `asia-southeast1-docker.pkg.dev/nocturn-aai/nocturn-ai/`
+- **Cloud Run SA**: `nocturn-cloud-run@nocturn-aai.iam.gserviceaccount.com`
 - **Database on Cloud Run**: Supabase free tier (healthy, connected via Secret Manager URL)
 - **Redis on Cloud Run**: In-memory fallback (no Memorystore; acceptable for pilot single-instance)
 - **APScheduler**: Disabled in production (`ENVIRONMENT=production`). Cloud Scheduler jobs NOT yet created — this is the next infra task.
-- **Deploy command**: `gcloud builds submit --config=backend/cloudbuild.yaml --project=nocturn-ai-487207 --region=asia-southeast1 --substitutions=COMMIT_SHA=$(git rev-parse HEAD) .`
+- **Deploy command**: `gcloud builds submit --config=backend/cloudbuild.yaml --project=nocturn-aai --region=asia-southeast1 --substitutions=COMMIT_SHA=$(git rev-parse HEAD) .`
 
 ## GCP Secret Manager — Full State
 
-Secrets **confirmed in** Secret Manager (`nocturn-ai-487207`):
+Secrets **confirmed in** Secret Manager (`nocturn-aai`):
 - `DATABASE_URL` (has BOM — stripped in config.py automatically)
 - `GEMINI_API_KEY`, `OPENAI_API_KEY`
 - `JWT_SECRET`, `JWT_ALGORITHM`, `JWT_EXPIRY_HOURS`
@@ -44,7 +44,7 @@ Secrets **still missing** (add from respective dashboards):
 
 - **Local listener secret** (dev only): stored as `STRIPE_WEBHOOK_SECRET` in Secret Manager
 - **Live webhook URL**: `https://nocturn-backend-owtn645vea-as.a.run.app/api/v1/billing/webhook`
-- **To go live**: Add endpoint in Stripe Dashboard → Developers → Webhooks. Copy new `whsec_`, then: `echo -n "whsec_..." | gcloud secrets versions add STRIPE_WEBHOOK_SECRET --data-file=- --project=nocturn-ai-487207`
+- **To go live**: Add endpoint in Stripe Dashboard → Developers → Webhooks. Copy new `whsec_`, then: `echo -n "whsec_..." | gcloud secrets versions add STRIPE_WEBHOOK_SECRET --data-file=- --project=nocturn-aai`
 - **Local listener** (Windows): `.\stripe_webhook_listen.ps1` (Stripe CLI installed via winget)
 - **Stripe account**: Sheers Software Sdn Bhd sandbox (`acct_1RqmsMP5doWxcb8U`)
 - **Test mode key**: stored in `C:\Users\abasy\.config\stripe\config.toml` (expires 2026-06-02)
@@ -130,7 +130,7 @@ cd mvp-research-sheerssoft
 # 2. Auth to GCP (gets ADC for Secret Manager access)
 gcloud auth login
 gcloud auth application-default login
-gcloud config set project nocturn-ai-487207
+gcloud config set project nocturn-aai
 
 # 3. Configure Docker for Artifact Registry
 gcloud auth configure-docker asia-southeast1-docker.pkg.dev

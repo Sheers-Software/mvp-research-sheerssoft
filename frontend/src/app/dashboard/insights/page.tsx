@@ -166,7 +166,7 @@ export default function DashboardInsightsPage() {
                                 ] as const).map((s) => {
                                     const pct = Math.round((s.value / sentimentTotal) * 100);
                                     return (
-                                        <div key={s.label} style={{ textAlign: 'center', padding: '16px 12px', background: 'var(--surface)', borderRadius: 8 }}>
+                                        <div key={s.label} style={{ textAlign: 'center', padding: '16px 12px', background: 'var(--bg-secondary)', borderRadius: 8 }}>
                                             <div style={{ fontSize: 28, marginBottom: 6 }}>{s.icon}</div>
                                             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{pct}%</div>
                                             <div className="text-xs text-muted" style={{ marginTop: 2 }}>{s.label}</div>
@@ -210,7 +210,7 @@ export default function DashboardInsightsPage() {
                                     <div
                                         key={idx}
                                         className="flex items-center justify-between"
-                                        style={{ padding: '10px 14px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border-subtle)' }}
+                                        style={{ padding: '10px 14px', background: 'var(--bg-secondary)', borderRadius: 8, border: '1px solid var(--border-default)' }}
                                     >
                                         <div className="flex items-center gap-sm">
                                             <span style={{ color: 'var(--warning)', fontSize: 16 }}>⚠</span>

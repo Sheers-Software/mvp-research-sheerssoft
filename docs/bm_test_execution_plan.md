@@ -104,7 +104,7 @@ Expected: AI responds in BM within 10–15 seconds.
 If it responds: proceed to test.
 If it doesn't respond: check Cloud Run logs at:
 ```
-https://console.cloud.google.com/run/detail/asia-southeast1/nocturn-backend/logs?project=nocturn-ai-487207
+https://console.cloud.google.com/run/detail/asia-southeast1/nocturn-backend/logs?project=nocturn-aai
 ```
 
 Look for: `"twilio_whatsapp_webhook"` or `"Property not found"` errors.
@@ -253,7 +253,7 @@ gcloud logging read "resource.type=cloud_run_revision AND resource.labels.servic
 ### Watch live logs
 ```
 gcloud beta run services logs tail nocturn-backend \
-  --region=asia-southeast1 --project=nocturn-ai-487207
+  --region=asia-southeast1 --project=nocturn-aai
 ```
 
 **What to look for:**

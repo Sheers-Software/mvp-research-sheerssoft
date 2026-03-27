@@ -203,7 +203,7 @@ export default function WelcomePage() {
     };
 
     return (
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 60, paddingBottom: 60, background: 'var(--background, #0f0f17)' }}>
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 60, paddingBottom: 60, background: 'var(--bg-primary)' }}>
             <div style={{ width: '100%', maxWidth: 680, padding: '0 20px' }}>
                 {/* Brand */}
                 <div style={{ textAlign: 'center', marginBottom: 32 }}>
@@ -242,7 +242,7 @@ export default function WelcomePage() {
                                 { icon: '📡', title: 'Connect channels', desc: 'WhatsApp, Email, and Web Chat are configured by your account manager' },
                                 { icon: '👥', title: 'Invite your team', desc: 'Add staff who will monitor the dashboard' },
                             ].map((item) => (
-                                <div key={item.title} className="flex items-center gap-sm" style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
+                                <div key={item.title} className="flex items-center gap-sm" style={{ padding: '12px 16px', background: 'var(--bg-primary)', borderRadius: 8, border: '1px solid var(--border-default)' }}>
                                     <span style={{ fontSize: 24, flexShrink: 0 }}>{item.icon}</span>
                                     <div>
                                         <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{item.title}</p>
@@ -278,7 +278,7 @@ export default function WelcomePage() {
                                             value={wizardData.propertyInfo[field]}
                                             onChange={(e) => setWizardData((d) => ({ ...d, propertyInfo: { ...d.propertyInfo, [field]: e.target.value } }))}
                                             placeholder={field === 'address' ? 'e.g. 123 Jalan Hotel, KL' : field === 'email' ? 'hotel@example.com' : field === 'website' ? 'https://...' : '+60 3-xxxx xxxx'}
-                                            style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
+                                            style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
                                         />
                                     </div>
                                 ))}
@@ -303,21 +303,21 @@ export default function WelcomePage() {
                                         value={room.name}
                                         onChange={(e) => setWizardData((d) => { const r = [...d.rooms]; r[idx] = { ...r[idx], name: e.target.value }; return { ...d, rooms: r }; })}
                                         placeholder="Room type"
-                                        style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13 }}
+                                        style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13 }}
                                     />
                                     <input
                                         type="text"
                                         value={room.description}
                                         onChange={(e) => setWizardData((d) => { const r = [...d.rooms]; r[idx] = { ...r[idx], description: e.target.value }; return { ...d, rooms: r }; })}
                                         placeholder="Description"
-                                        style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13 }}
+                                        style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13 }}
                                     />
                                     <input
                                         type="text"
                                         value={room.rate}
                                         onChange={(e) => setWizardData((d) => { const r = [...d.rooms]; r[idx] = { ...r[idx], rate: e.target.value }; return { ...d, rooms: r }; })}
                                         placeholder="RM/night"
-                                        style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13 }}
+                                        style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13 }}
                                     />
                                     {wizardData.rooms.length > 1 && (
                                         <button
@@ -339,7 +339,7 @@ export default function WelcomePage() {
                                 value={wizardData.facilities}
                                 onChange={(e) => setWizardData((d) => ({ ...d, facilities: e.target.value }))}
                                 placeholder="Pool, Gym, Spa, Restaurant, Free WiFi (comma-separated)"
-                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
+                                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
                             />
                         </section>
 
@@ -355,20 +355,20 @@ export default function WelcomePage() {
                                 </button>
                             </div>
                             {wizardData.faqs.map((faq, idx) => (
-                                <div key={idx} style={{ display: 'grid', gap: 6, marginBottom: 12, padding: '12px 14px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border-subtle)', position: 'relative' }}>
+                                <div key={idx} style={{ display: 'grid', gap: 6, marginBottom: 12, padding: '12px 14px', background: 'var(--bg-primary)', borderRadius: 8, border: '1px solid var(--border-default)', position: 'relative' }}>
                                     <input
                                         type="text"
                                         value={faq.question}
                                         onChange={(e) => setWizardData((d) => { const f = [...d.faqs]; f[idx] = { ...f[idx], question: e.target.value }; return { ...d, faqs: f }; })}
                                         placeholder="Question"
-                                        style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--background, #0f0f17)', color: 'var(--text-primary)', fontSize: 13 }}
+                                        style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13 }}
                                     />
                                     <textarea
                                         value={faq.answer}
                                         onChange={(e) => setWizardData((d) => { const f = [...d.faqs]; f[idx] = { ...f[idx], answer: e.target.value }; return { ...d, faqs: f }; })}
                                         placeholder="Answer"
                                         rows={2}
-                                        style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--background, #0f0f17)', color: 'var(--text-primary)', fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }}
+                                        style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }}
                                     />
                                     {wizardData.faqs.length > 1 && (
                                         <button
@@ -393,7 +393,7 @@ export default function WelcomePage() {
                                         value={wizardData.policies.checkin}
                                         onChange={(e) => setWizardData((d) => ({ ...d, policies: { ...d.policies, checkin: e.target.value } }))}
                                         placeholder="14:00"
-                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
+                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
                                     />
                                 </div>
                                 <div>
@@ -403,7 +403,7 @@ export default function WelcomePage() {
                                         value={wizardData.policies.checkout}
                                         onChange={(e) => setWizardData((d) => ({ ...d, policies: { ...d.policies, checkout: e.target.value } }))}
                                         placeholder="12:00"
-                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
+                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
                                     />
                                 </div>
                             </div>
@@ -414,7 +414,7 @@ export default function WelcomePage() {
                                     onChange={(e) => setWizardData((d) => ({ ...d, policies: { ...d.policies, cancellation: e.target.value } }))}
                                     placeholder="e.g. Free cancellation up to 48 hours before check-in..."
                                     rows={3}
-                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
                                 />
                             </div>
                         </section>
@@ -454,7 +454,7 @@ export default function WelcomePage() {
                             ] as const).map((ch) => {
                                 const status = channelStatuses[ch.key] ?? 'pending';
                                 return (
-                                    <div key={ch.key} className="flex items-center justify-between" style={{ padding: '14px 18px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
+                                    <div key={ch.key} className="flex items-center justify-between" style={{ padding: '14px 18px', background: 'var(--bg-primary)', borderRadius: 8, border: '1px solid var(--border-default)' }}>
                                         <div className="flex items-center gap-sm">
                                             <span style={{ fontSize: 24 }}>{ch.icon}</span>
                                             <span style={{ fontWeight: 600, fontSize: 14 }}>{ch.name}</span>
@@ -496,7 +496,7 @@ export default function WelcomePage() {
                                     value={inviteForm.email}
                                     onChange={(e) => setInviteForm((f) => ({ ...f, email: e.target.value }))}
                                     placeholder="staff@yourhotel.com"
-                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
                                 />
                             </div>
                             <div>
@@ -506,7 +506,7 @@ export default function WelcomePage() {
                                     value={inviteForm.full_name}
                                     onChange={(e) => setInviteForm((f) => ({ ...f, full_name: e.target.value }))}
                                     placeholder="Jane Smith"
-                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
                                 />
                             </div>
                             <div>
@@ -514,7 +514,7 @@ export default function WelcomePage() {
                                 <select
                                     value={inviteForm.role}
                                     onChange={(e) => setInviteForm((f) => ({ ...f, role: e.target.value }))}
-                                    style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13 }}
+                                    style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13 }}
                                 >
                                     <option value="staff">Staff</option>
                                     <option value="admin">Admin</option>
@@ -560,19 +560,19 @@ export default function WelcomePage() {
                         </div>
 
                         <div style={{ display: 'grid', gap: 10, marginBottom: 28 }}>
-                            <div className="flex items-center gap-sm" style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 8 }}>
+                            <div className="flex items-center gap-sm" style={{ padding: '12px 16px', background: 'var(--bg-primary)', borderRadius: 8 }}>
                                 <span>✅</span>
                                 <span className="text-sm">Knowledge base configured</span>
                             </div>
-                            <div className="flex items-center gap-sm" style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 8 }}>
+                            <div className="flex items-center gap-sm" style={{ padding: '12px 16px', background: 'var(--bg-primary)', borderRadius: 8 }}>
                                 <span>{statusIcon(channelStatuses.whatsapp)}</span>
                                 <span className="text-sm">WhatsApp — {channelStatuses.whatsapp}</span>
                             </div>
-                            <div className="flex items-center gap-sm" style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 8 }}>
+                            <div className="flex items-center gap-sm" style={{ padding: '12px 16px', background: 'var(--bg-primary)', borderRadius: 8 }}>
                                 <span>{statusIcon(channelStatuses.email)}</span>
                                 <span className="text-sm">Email — {channelStatuses.email}</span>
                             </div>
-                            <div className="flex items-center gap-sm" style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 8 }}>
+                            <div className="flex items-center gap-sm" style={{ padding: '12px 16px', background: 'var(--bg-primary)', borderRadius: 8 }}>
                                 <span>{statusIcon(channelStatuses.website)}</span>
                                 <span className="text-sm">Website Widget — {channelStatuses.website}</span>
                             </div>
