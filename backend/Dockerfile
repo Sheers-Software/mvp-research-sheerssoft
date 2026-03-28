@@ -43,6 +43,8 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8080}/api/v1/health || exit 1
 
-# Cloud Run injects PORT at runtime. 2 workers sufficient for MVP;
-# Cloud Run scales horizontally for higher load.
-CMD ["sh", "-c", "exec gunicorn app.main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8080} --timeout 120 --keep-alive 5"]
+# Cloud Run injects PORT at runtime. 1 worker per instance — uvicorn handles
+# concurrency via asyncio. Cloud Run scales horizontally across instances.
+# Multiple workers share a PgBouncer backend connection and race on prepared
+# statements at startup, causing DuplicatePreparedStatementError.
+CMD ["sh", "-c", "exec gunicorn app.main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8080} --timeout 120 --keep-alive 5"]
