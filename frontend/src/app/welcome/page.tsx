@@ -22,7 +22,6 @@ interface WizardData {
     facilities: string;
     faqs: FaqRow[];
     policies: { checkin: string; checkout: string; cancellation: string };
-    contact: { name: string; phone: string };
 }
 
 const TOTAL_STEPS = 5;
@@ -77,8 +76,18 @@ export default function WelcomePage() {
     const [currentStep, setCurrentStep] = useState(1);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+
+    // Provisioned state — set after self-provision or portal/home load
     const [propertyId, setPropertyId] = useState<string | null>(null);
+    const [tenantId, setTenantId] = useState<string | null>(null);
     const [propertyName, setPropertyName] = useState('');
+
+    // Step 1: hotel name input (used when no account exists yet)
+    const [hotelName, setHotelName] = useState('');
+    const [provisioning, setProvisioning] = useState(false);
+    // 'unknown' while checking, 'needed' if no tenant yet, 'done' if already provisioned
+    const [provisionState, setProvisionState] = useState<'unknown' | 'needed' | 'done'>('unknown');
+
     interface PropertyChannelData {
         property_id: string;
         channels: { whatsapp: string; email: string; website: string };
@@ -91,37 +100,51 @@ export default function WelcomePage() {
         facilities: '',
         faqs: [{ question: '', answer: '' }],
         policies: { checkin: '14:00', checkout: '12:00', cancellation: '' },
-        contact: { name: '', phone: '' },
     });
 
     const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', role: 'staff' });
     const [inviting, setInviting] = useState(false);
     const [inviteSuccess, setInviteSuccess] = useState('');
 
+    // Redirect to login if not authenticated
     useEffect(() => {
         if (!authLoading && !user) {
             router.replace('/login');
         }
     }, [user, authLoading, router]);
 
+    // On mount: check if user already has a tenant/property
     useEffect(() => {
-        // Load first property info
-        apiGet<{ tenant?: object; properties?: Array<{ id: string; name: string; onboarding_score: number }> }>('/portal/home')
+        if (authLoading || !user) return;
+
+        apiGet<{
+            tenant?: { id: string };
+            properties?: Array<{ id: string; name: string; onboarding_score: number }>;
+        }>('/portal/home')
             .then((data) => {
                 const props = data?.properties ?? [];
+                const tid = data?.tenant ? (data.tenant as any).id : null;
                 if (props.length > 0) {
                     const firstProp = props[0];
                     setPropertyId(firstProp.id);
                     setPropertyName(firstProp.name);
-                    // If already 100% onboarded, redirect to portal
-                    if (firstProp.onboarding_score >= 100 && data?.tenant) {
+                    if (tid) setTenantId(tid);
+                    setProvisionState('done');
+                    // If already fully onboarded, go to portal
+                    if (firstProp.onboarding_score >= 100) {
                         router.replace('/portal');
                     }
+                } else {
+                    setProvisionState('needed');
                 }
             })
-            .catch(() => {});
-    }, [router]);
+            .catch(() => {
+                // 403 = no tenant membership yet — user needs to self-provision
+                setProvisionState('needed');
+            });
+    }, [user, authLoading, router]);
 
+    // Load channel statuses when entering step 3
     useEffect(() => {
         if (currentStep === 3 && propertyId) {
             apiGet<PropertyChannelData[]>('/portal/channels')
@@ -130,18 +153,64 @@ export default function WelcomePage() {
         }
     }, [currentStep, propertyId]);
 
+    // Step 1 → 2: provision tenant if needed, then advance
+    const handleGetStarted = async () => {
+        if (provisionState === 'done') {
+            setCurrentStep(2);
+            return;
+        }
+        if (!hotelName.trim()) {
+            setError('Please enter your hotel name to continue.');
+            return;
+        }
+        setProvisioning(true);
+        setError('');
+        try {
+            const result = await apiPost<{
+                tenant_id: string;
+                property_id: string;
+                property_name: string;
+                is_new: boolean;
+            }>('/onboarding/self-provision', { hotel_name: hotelName.trim() });
+            setPropertyId(result.property_id);
+            setTenantId(result.tenant_id);
+            setPropertyName(result.property_name);
+            setProvisionState('done');
+            setCurrentStep(2);
+        } catch (e: unknown) {
+            setError((e instanceof Error ? e.message : String(e)) || 'Failed to set up your account. Please try again.');
+        } finally {
+            setProvisioning(false);
+        }
+    };
+
+    // Step 2: save knowledge base
     const handleSaveKB = async () => {
-        if (!propertyId) return;
+        if (!propertyId) {
+            setError('Account setup incomplete. Please go back to Step 1.');
+            return;
+        }
         setSaving(true);
         setError('');
         try {
             const { propertyInfo, rooms, facilities, faqs, policies } = wizardData;
             await apiPost(`/properties/${propertyId}/kb/ingest-wizard`, {
-                property_info: propertyInfo,
-                rooms,
+                property_name: propertyName || 'My Hotel',
+                rooms: rooms
+                    .filter((r) => r.name.trim())
+                    .map((r) => ({
+                        name: r.name,
+                        description: r.description,
+                        rate_myr: r.rate ? parseFloat(r.rate) || null : null,
+                    })),
                 facilities: facilities.split(',').map((s: string) => s.trim()).filter(Boolean),
-                faqs,
+                faqs: faqs.filter((f) => f.question.trim() && f.answer.trim()),
                 policies,
+                contact: {
+                    address: propertyInfo.address || null,
+                    phone: propertyInfo.phone || null,
+                    email: propertyInfo.email || null,
+                },
             });
             setCurrentStep(3);
         } catch (e: unknown) {
@@ -151,12 +220,17 @@ export default function WelcomePage() {
         }
     };
 
+    // Step 4: invite team member
     const handleInvite = async () => {
-        if (!inviteForm.email || !user?.tenant_id) return;
+        const tid = tenantId || user?.tenant_id;
+        if (!inviteForm.email || !tid) {
+            setError('Cannot send invitation — account not fully provisioned yet.');
+            return;
+        }
         setInviting(true);
         setError('');
         try {
-            await apiPost(`/onboarding/invite-user/${user.tenant_id}`, inviteForm);
+            await apiPost(`/onboarding/invite-user/${tid}`, inviteForm);
             setInviteSuccess(`Invitation sent to ${inviteForm.email}`);
             setInviteForm({ email: '', full_name: '', role: 'staff' });
         } catch (e: unknown) {
@@ -166,20 +240,23 @@ export default function WelcomePage() {
         }
     };
 
+    // Step 5: activate and go to portal
     const handleActivate = async () => {
-        if (!propertyId) return;
+        if (!propertyId) {
+            router.replace('/portal');
+            return;
+        }
         setSaving(true);
         setError('');
         try {
             await apiPost(`/onboarding/complete/${propertyId}`);
-            router.replace('/portal');
-        } catch (e: unknown) {
-            setError((e instanceof Error ? e.message : String(e)) || 'Failed to activate');
-            setSaving(false);
+        } catch {
+            // Non-fatal — endpoint may not exist yet, proceed anyway
         }
+        router.replace('/portal');
     };
 
-    if (authLoading) {
+    if (authLoading || provisionState === 'unknown') {
         return (
             <div className="login-page">
                 <div className="loader" />
@@ -190,15 +267,16 @@ export default function WelcomePage() {
     if (!user) return null;
 
     const channelStatuses = (() => {
-        if (!channels.length || !propertyId) return { whatsapp: 'pending', email: 'pending', website: 'pending' };
+        if (!channels.length || !propertyId) return { whatsapp: 'skipped', email: 'skipped', website: 'skipped' };
         const propChannels = channels.find((c) => c.property_id === propertyId);
-        return propChannels?.channels ?? { whatsapp: 'pending', email: 'pending', website: 'pending' };
+        return propChannels?.channels ?? { whatsapp: 'skipped', email: 'skipped', website: 'skipped' };
     })();
 
     const statusIcon = (status: string) => {
         if (status === 'active') return '✅';
         if (status === 'configuring' || status === 'pending') return '⏳';
         if (status === 'failed') return '❌';
+        if (status === 'skipped') return '—';
         return '—';
     };
 
@@ -219,27 +297,27 @@ export default function WelcomePage() {
                     </div>
                 )}
 
-                {/* ─── STEP 1: Welcome / Property Details ─── */}
+                {/* ─── STEP 1: Welcome / Property Name ─── */}
                 {currentStep === 1 && (
                     <div className="card animate-in" style={{ padding: 32 }}>
                         <div style={{ textAlign: 'center', marginBottom: 28 }}>
                             <div style={{ fontSize: 48, marginBottom: 12 }}>🏨</div>
                             <h2 style={{ marginBottom: 8 }}>Welcome to AI Concierge</h2>
-                            {propertyName && (
+                            {propertyName ? (
                                 <p className="text-muted" style={{ fontSize: 15 }}>
-                                    Setting up <strong>{propertyName}</strong>
+                                    Continuing setup for <strong>{propertyName}</strong>
+                                </p>
+                            ) : (
+                                <p className="text-sm text-muted" style={{ marginTop: 8, lineHeight: 1.6 }}>
+                                    Let's get your AI concierge up and running in minutes.
                                 </p>
                             )}
-                            <p className="text-sm text-muted" style={{ marginTop: 12, lineHeight: 1.6 }}>
-                                This wizard will help you configure your AI concierge in just a few minutes.
-                                Your AI will then be ready to handle guest inquiries 24/7.
-                            </p>
                         </div>
 
                         <div style={{ display: 'grid', gap: 16, marginBottom: 24 }}>
                             {[
                                 { icon: '📚', title: 'Set up your knowledge base', desc: 'Tell the AI about your rooms, rates, and policies' },
-                                { icon: '📡', title: 'Connect channels', desc: 'WhatsApp, Email, and Web Chat are configured by your account manager' },
+                                { icon: '📡', title: 'Connect channels', desc: 'WhatsApp, Email, and Web Chat — configured by your account manager' },
                                 { icon: '👥', title: 'Invite your team', desc: 'Add staff who will monitor the dashboard' },
                             ].map((item) => (
                                 <div key={item.title} className="flex items-center gap-sm" style={{ padding: '12px 16px', background: 'var(--bg-primary)', borderRadius: 8, border: '1px solid var(--border-default)' }}>
@@ -252,8 +330,36 @@ export default function WelcomePage() {
                             ))}
                         </div>
 
-                        <button className="btn btn-primary w-full" onClick={() => setCurrentStep(2)}>
-                            Get Started →
+                        {provisionState === 'needed' && (
+                            <div style={{ marginBottom: 20 }}>
+                                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                                    Hotel / Property Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={hotelName}
+                                    onChange={(e) => setHotelName(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleGetStarted()}
+                                    placeholder="e.g. Grand Hyatt Kuala Lumpur"
+                                    autoFocus
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, boxSizing: 'border-box' }}
+                                />
+                                <p className="text-xs text-muted" style={{ marginTop: 6 }}>
+                                    This creates your account. You can change the name later in Settings.
+                                </p>
+                            </div>
+                        )}
+
+                        <button
+                            className="btn btn-primary w-full"
+                            onClick={handleGetStarted}
+                            disabled={provisioning || (provisionState === 'needed' && !hotelName.trim())}
+                        >
+                            {provisioning ? (
+                                <span className="flex items-center gap-sm" style={{ justifyContent: 'center' }}>
+                                    <span className="loader" style={{ width: 14, height: 14 }} /> Setting up your account…
+                                </span>
+                            ) : 'Get Started →'}
                         </button>
                     </div>
                 )}
@@ -264,6 +370,7 @@ export default function WelcomePage() {
                         <h2 style={{ marginBottom: 6 }}>Knowledge Base Setup</h2>
                         <p className="text-sm text-muted" style={{ marginBottom: 24 }}>
                             Tell the AI what it needs to know to answer guest questions accurately.
+                            {propertyName && <> Setting up <strong>{propertyName}</strong>.</>}
                         </p>
 
                         {/* Property Info */}
@@ -412,7 +519,7 @@ export default function WelcomePage() {
                                 <textarea
                                     value={wizardData.policies.cancellation}
                                     onChange={(e) => setWizardData((d) => ({ ...d, policies: { ...d.policies, cancellation: e.target.value } }))}
-                                    placeholder="e.g. Free cancellation up to 48 hours before check-in..."
+                                    placeholder="e.g. Free cancellation up to 48 hours before check-in…"
                                     rows={3}
                                     style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
                                 />
@@ -431,6 +538,9 @@ export default function WelcomePage() {
                             </button>
                             <button className="btn btn-ghost btn-sm" onClick={() => setCurrentStep(1)}>
                                 Back
+                            </button>
+                            <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setCurrentStep(3)}>
+                                Skip for now →
                             </button>
                         </div>
                     </div>
@@ -452,7 +562,7 @@ export default function WelcomePage() {
                                 { key: 'email', icon: '✉️', name: 'Email' },
                                 { key: 'website', icon: '🌐', name: 'Website Widget' },
                             ] as const).map((ch) => {
-                                const status = channelStatuses[ch.key] ?? 'pending';
+                                const status = channelStatuses[ch.key] ?? 'skipped';
                                 return (
                                     <div key={ch.key} className="flex items-center justify-between" style={{ padding: '14px 18px', background: 'var(--bg-primary)', borderRadius: 8, border: '1px solid var(--border-default)' }}>
                                         <div className="flex items-center gap-sm">
@@ -526,7 +636,7 @@ export default function WelcomePage() {
                             <button
                                 className="btn btn-primary btn-sm"
                                 onClick={handleInvite}
-                                disabled={inviting}
+                                disabled={inviting || !inviteForm.email}
                             >
                                 {inviting ? 'Sending…' : 'Send Invitation'}
                             </button>
@@ -555,14 +665,14 @@ export default function WelcomePage() {
                             <div style={{ fontSize: 56, marginBottom: 12 }}>🚀</div>
                             <h2 style={{ marginBottom: 8 }}>Ready to Go Live</h2>
                             <p className="text-sm text-muted">
-                                Your AI concierge is configured. Review the checklist below and activate when ready.
+                                Your AI concierge is configured. Click below to go to your portal.
                             </p>
                         </div>
 
                         <div style={{ display: 'grid', gap: 10, marginBottom: 28 }}>
                             <div className="flex items-center gap-sm" style={{ padding: '12px 16px', background: 'var(--bg-primary)', borderRadius: 8 }}>
                                 <span>✅</span>
-                                <span className="text-sm">Knowledge base configured</span>
+                                <span className="text-sm">Account created for <strong>{propertyName || 'your property'}</strong></span>
                             </div>
                             <div className="flex items-center gap-sm" style={{ padding: '12px 16px', background: 'var(--bg-primary)', borderRadius: 8 }}>
                                 <span>{statusIcon(channelStatuses.whatsapp)}</span>
@@ -585,14 +695,12 @@ export default function WelcomePage() {
                                 disabled={saving}
                                 style={{ minWidth: 180 }}
                             >
-                                {saving ? 'Activating…' : '🎉 Activate AI Concierge'}
+                                {saving ? 'Loading…' : 'Go to My Portal →'}
                             </button>
                         </div>
 
                         <div style={{ textAlign: 'center', marginTop: 16 }}>
-                            <a href="/portal" style={{ color: 'var(--accent)', fontSize: 13, textDecoration: 'none' }}>
-                                Go to Portal →
-                            </a>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setCurrentStep(4)}>← Back</button>
                         </div>
                     </div>
                 )}

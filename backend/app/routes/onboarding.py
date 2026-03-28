@@ -284,6 +284,125 @@ async def _setup_channels_async(
 
 
 # ─────────────────────────────────────────────────────────────
+# Self-Service Provisioning (First-time magic link users)
+# ─────────────────────────────────────────────────────────────
+
+@router.post("/onboarding/self-provision")
+async def self_provision(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """
+    Self-service tenant provisioning for new users arriving via magic link.
+    Idempotent — returns existing tenant/property if already provisioned.
+    Creates: Tenant + Property + TenantMembership + OnboardingProgress.
+    """
+    # Check if user already has a membership
+    stmt = select(TenantMembership).where(TenantMembership.user_id == user.id)
+    result = await db.execute(stmt)
+    existing_membership = result.scalar_one_or_none()
+
+    if existing_membership:
+        # Return existing setup
+        prop_stmt = (
+            select(Property)
+            .where(Property.tenant_id == existing_membership.tenant_id)
+            .order_by(Property.created_at)
+        )
+        prop_result = await db.execute(prop_stmt)
+        prop = prop_result.scalar_one_or_none()
+        return {
+            "tenant_id": str(existing_membership.tenant_id),
+            "property_id": str(prop.id) if prop else None,
+            "property_name": prop.name if prop else None,
+            "is_new": False,
+        }
+
+    hotel_name = (body.get("hotel_name") or "My Hotel").strip() or "My Hotel"
+
+    # Create Tenant
+    tenant_slug = _slugify(hotel_name)
+    slug_check = await db.execute(select(Tenant).where(Tenant.slug == tenant_slug))
+    if slug_check.scalar_one_or_none():
+        tenant_slug = f"{tenant_slug}-{uuid.uuid4().hex[:6]}"
+
+    tenant = Tenant(
+        name=hotel_name,
+        slug=tenant_slug,
+        subscription_tier="pilot",
+        subscription_status="trialing",
+    )
+    db.add(tenant)
+    await db.flush()
+
+    # Create Property
+    property_slug = _slugify(hotel_name)
+    prop_slug_check = await db.execute(select(Property).where(Property.slug == property_slug))
+    if prop_slug_check.scalar_one_or_none():
+        property_slug = f"{property_slug}-{uuid.uuid4().hex[:6]}"
+
+    prop = Property(
+        tenant_id=tenant.id,
+        name=hotel_name,
+        slug=property_slug,
+        timezone="Asia/Kuala_Lumpur",
+        plan_tier="pilot",
+        notification_email=user.email,
+    )
+    db.add(prop)
+    await db.flush()
+
+    # Create TenantMembership
+    membership = TenantMembership(
+        user_id=user.id,
+        tenant_id=tenant.id,
+        role="owner",
+    )
+    db.add(membership)
+
+    # Create OnboardingProgress (all channels skipped — set up by account manager later)
+    progress = OnboardingProgress(
+        tenant_id=tenant.id,
+        property_id=prop.id,
+        whatsapp_status="skipped",
+        email_status="skipped",
+        website_status="skipped",
+    )
+    db.add(progress)
+
+    # Seed a starter KB document
+    starter_doc = KBDocument(
+        property_id=prop.id,
+        doc_type="faqs",
+        title="Welcome to Nocturn AI",
+        content=(
+            f"Welcome to {hotel_name}! This property is powered by Nocturn AI. "
+            "Our AI concierge is available 24/7 to assist guests with room inquiries, "
+            "rates, facilities, and booking information."
+        ),
+    )
+    db.add(starter_doc)
+
+    await db.commit()
+
+    logger.info(
+        "Self-provisioned tenant",
+        tenant_id=str(tenant.id),
+        property_id=str(prop.id),
+        user_id=str(user.id),
+        hotel_name=hotel_name,
+    )
+
+    return {
+        "tenant_id": str(tenant.id),
+        "property_id": str(prop.id),
+        "property_name": hotel_name,
+        "is_new": True,
+    }
+
+
+# ─────────────────────────────────────────────────────────────
 # Property Management
 # ─────────────────────────────────────────────────────────────
 
