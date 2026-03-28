@@ -64,7 +64,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       # ── GCP Secret Manager (for AI API keys, JWT, etc.) ──
       # All API secrets (GEMINI_API_KEY, OPENAI_API_KEY, JWT_SECRET, etc.)
-      # are fetched from GCP Secret Manager project nocturn-aai.
+      # are fetched from GCP Secret Manager project nocturn-ai-487207.
       # DATABASE_URL above overrides whatever is in Secret Manager.
       GOOGLE_APPLICATION_CREDENTIALS: /gcp/credentials.json
       # ── LLM models ───────────────────────────────────────
@@ -90,14 +90,15 @@ services:
       dockerfile: Dockerfile
       args:
         # NEXT_PUBLIC_* vars baked in at build time by Next.js.
-        NEXT_PUBLIC_API_URL: http://localhost:8000
+        # Use Docker service hostname so the server-side proxy reaches the backend container.
+        NEXT_PUBLIC_API_URL: http://backend:8080
         NEXT_PUBLIC_SUPABASE_URL: https://ramenghkpvipxijhfptp.supabase.co
         NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJhbWVuZ2hrcHZpcHhpamhmcHRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0MTg5MzAsImV4cCI6MjA4Nzk5NDkzMH0.DmskI__M8XyXKwkhgrYFsBwgDyUY7GeiMHOwlEWhAQw
     restart: always
     ports:
       - "3000:3000"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_API_URL: http://backend:8080
     depends_on:
       backend:
         condition: service_started

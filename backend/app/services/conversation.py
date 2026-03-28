@@ -47,8 +47,8 @@ async def _call_llm(messages: list[dict], max_tokens: int = 512, temperature: fl
     """
     Call LLM with automatic fallback.
     1. Try Gemini
-    2. If Gemini fails, try OpenAI GPT-4o-mini
-    3. If OpenAI fails, try Anthropic Claude Haiku
+    2. If Gemini fails, try Anthropic Claude Haiku
+    3. If Anthropic fails, try OpenAI GPT-4o-mini
     4. If all fail, return template fallback response
     """
     # Attempt 1: Gemini
@@ -57,7 +57,7 @@ async def _call_llm(messages: list[dict], max_tokens: int = 512, temperature: fl
             from google.genai import types
             system_msg = ""
             gemini_contents = []
-            
+
             for msg in messages:
                 if msg["role"] == "system":
                     system_msg = msg["content"]
@@ -66,11 +66,11 @@ async def _call_llm(messages: list[dict], max_tokens: int = 512, temperature: fl
                     role = "model" if msg["role"] == "assistant" else "user"
                     gemini_contents.append(
                         types.Content(
-                            role=role, 
+                            role=role,
                             parts=[types.Part.from_text(text=msg["content"])]
                         )
                     )
-            
+
             # Since _call_llm is async, we use the async client 'aio'
             response = await gemini_client.aio.models.generate_content(
                 model=settings.gemini_model,
@@ -90,25 +90,6 @@ async def _call_llm(messages: list[dict], max_tokens: int = 512, temperature: fl
             logger.warning("Gemini LLM call failed, trying fallback", error=str(e))
     else:
         logger.warning("Gemini API key missing, skipping to fallback")
-
-    # Attempt 2: OpenAI
-    if settings.openai_api_key and openai_client:
-        try:
-            response = await openai_client.chat.completions.create(
-                model=settings.openai_model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
-            content = response.choices[0].message.content
-            if not content or not content.strip():
-                logger.warning("OpenAI returned empty response, trying fallback")
-            else:
-                return content.strip(), response.usage, settings.openai_model
-        except Exception as e:
-            logger.warning("OpenAI LLM call failed, trying fallback", error=str(e))
-    else:
-        logger.warning("OpenAI API key missing, skipping to fallback")
 
     # Attempt 2: Anthropic Claude Haiku
     if settings.anthropic_api_key:
@@ -133,9 +114,30 @@ async def _call_llm(messages: list[dict], max_tokens: int = 512, temperature: fl
             )
             return response.content[0].text.strip(), None, settings.anthropic_model
         except Exception as e:
-            logger.error("Anthropic fallback also failed", error=str(e))
+            logger.warning("Anthropic LLM call failed, trying fallback", error=str(e))
+    else:
+        logger.warning("Anthropic API key missing, skipping to fallback")
 
-    # Attempt 3: Template fallback
+    # Attempt 3: OpenAI
+    if settings.openai_api_key and openai_client:
+        try:
+            response = await openai_client.chat.completions.create(
+                model=settings.openai_model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            content = response.choices[0].message.content
+            if not content or not content.strip():
+                logger.warning("OpenAI returned empty response, trying fallback")
+            else:
+                return content.strip(), response.usage, settings.openai_model
+        except Exception as e:
+            logger.warning("OpenAI LLM call failed, trying fallback", error=str(e))
+    else:
+        logger.warning("OpenAI API key missing, skipping to fallback")
+
+    # Attempt 4: Template fallback
     logger.error("All LLM providers failed, using template fallback")
     return FALLBACK_RESPONSE, None, "fallback_template"
 

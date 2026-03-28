@@ -2,15 +2,15 @@
 
 An AI-powered hotel inquiry capture system that recovers revenue lost after hours, tracks granular ROI, and is a fully multi-tenant SaaS platform built by SheersSoft.
 
-**v0.4.0** — Self-service onboarding, tenant portal, and KB management. Any hotel can now onboard, configure their AI concierge, and go live without SheersSoft engineer involvement.
+**v0.5.1** — Infrastructure hardening: GCP Secret Manager project ID corrected, LLM fallback chain updated (Gemini → Claude Haiku → GPT-4o-mini), Docker frontend proxy fixed, Anthropic API key provisioned.
 
 ## Architecture
 
-- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.4.0
+- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.5.1
 - **Frontend:** Next.js 14 + TypeScript
 - **Database:** Supabase PostgreSQL 17 + pgvector — user `nocturn_app`, transaction pooler (port 6543, ap-southeast-2)
 - **Auth:** Supabase Auth (magic links) + local JWT fallback
-- **LLMs:** Google Gemini (primary), OpenAI GPT-4o-mini & Anthropic Claude Haiku (fallbacks)
+- **LLMs:** Google Gemini (primary), Anthropic Claude Haiku (secondary), OpenAI GPT-4o-mini (tertiary)
 - **Channels:** WhatsApp (Meta Cloud API & Twilio), Web Chat Widget, Email (SendGrid)
 - **Billing:** Stripe (one-time setup fee + subscription management)
 - **Infra:** GCP Cloud Run (backend + frontend), GCP Secret Manager (`nocturn-ai-487207`)
@@ -69,13 +69,13 @@ gcloud config set project nocturn-aai
 
 ### Launch (local Docker)
 
-GCP ADC credentials (`~/.config/gcloud/application_default_credentials.json` on Linux/Mac, `%APPDATA%\gcloud\application_default_credentials.json` on Windows) are mounted into the container automatically. No local postgres — all containers connect to Supabase.
+GCP ADC credentials are mounted into the backend container automatically. The local stack spins up its own postgres (port 5433) + redis (port 6380) — no Supabase dependency for local dev.
 
 ```bash
-# Production stack (backend :8000, frontend :3000, redis :6380)
-docker-compose up -d --build
+# Local dev stack (backend :8000, frontend :3000, postgres :5433, redis :6380)
+docker compose up -d --build
 
-# Demo stack (backend :8001, frontend :3001, redis :6381)
+# Demo stack
 docker-compose -f docker-compose.demo.yml up -d --build
 ```
 
@@ -87,12 +87,7 @@ docker-compose -f docker-compose.demo.yml up -d --build
 
 ### GCP Deployment
 
-**Current state (as of 2026-03-23):** All GCP compute resources are fully spun down.
-- Cloud Run services: deleted
-- Cloud Scheduler jobs: deleted
-- Artifact Registry: deleted
-- Cloud SQL: deleted (database is Supabase — no Cloud SQL ever needed)
-- Secret Manager: active, all secrets stored
+**Current state (as of 2026-03-29):** Re-deploying from v0.5.1. Artifact Registry (`nocturn-ai`) is active. Secret Manager has all critical secrets. Cloud Run services will be recreated by the deploy command below.
 
 **Deploy (spin up):**
 ```bash
@@ -124,7 +119,7 @@ gcloud run services delete nocturn-frontend --project=nocturn-ai-487207 --region
 ```bash
 gcloud auth login
 gcloud auth application-default login
-gcloud config set project nocturn-aai
+gcloud config set project nocturn-ai-487207
 gcloud auth configure-docker asia-southeast1-docker.pkg.dev
 ```
 
@@ -297,6 +292,8 @@ cd backend && python seed_demo_data.py
 - [x] Phase 1.5: Internal Controls — Maintenance Mode, Service Health Dashboard, Announcements System
 - [x] Phase 1.6: Infra Migration — Supabase-only DB, GCP Secret Manager–only secrets, Cloud SQL removed
 - [x] **v0.4.0: Self-Service Onboarding & Tenant Portal** — `/welcome` wizard, `/portal` owner layer, KB self-service, role-based auth routing, generic ICP (not Vivatel-specific)
+- [x] **v0.5.0: Local Dev Stack + Demo Readiness** — local postgres/redis in docker-compose, google-genai SDK upgrade, gemini-embedding-001, RAG threshold fix, shadow pilot infrastructure (audit_only_mode, weekly audit report, /admin/shadow-pilots)
+- [x] **v0.5.1: Infrastructure Hardening** — GCP Secret Manager project ID corrected (nocturn-ai-487207), cloudbuild.yaml SA fixed, LLM fallback chain reordered (Haiku as secondary), Docker frontend proxy URL fixed (backend:8080), Anthropic API key provisioned, WhatsApp GTM lead pipeline (10k leads, 330 WhatsApp-ready)
 
 ## Database & Supabase Notes
 
@@ -314,6 +311,6 @@ cd backend && python seed_demo_data.py
 - **Non-text messages:** Images, audio, video, and location pins receive a bilingual acknowledgement (EN + BM) instead of being silently ignored.
 - **Error resilience:** If the AI pipeline fails, the guest still receives a human-readable fallback response.
 - **Multi-tenant sender:** Outbound messages use each property's registered `twilio_phone_number` — not a shared global value.
-- **LLM fallback chain:** Blank or failed responses fall through: Gemini → OpenAI → Anthropic → template string.
+- **LLM fallback chain:** Blank or failed responses fall through: Gemini → Anthropic Claude Haiku → OpenAI → template string.
 - **Gemini embeddings:** Synchronous Gemini embedding call wrapped in `asyncio.to_thread()` — do not call directly from async code.
 - **Bilingual responses:** All guest-facing error strings have both English and Bahasa Malaysia variants (`FALLBACK_RESPONSE` / `FALLBACK_RESPONSE_BM`).
