@@ -51,8 +51,11 @@ async def lifespan(app: FastAPI):
     else:
         # In production, only ensure system_config table exists (no full create_all)
         from app.services.system_config import ensure_system_config_table
-        async with engine.begin() as conn:
-            await ensure_system_config_table(conn)
+        try:
+            async with engine.begin() as conn:
+                await ensure_system_config_table(conn)
+        except Exception as sc_err:
+            logger.warning("system_config table setup skipped", error=str(sc_err))
 
     # Apply incremental column migrations (idempotent — safe on every startup).
     # Wrapped in try/except: on Supabase the connecting role may not own the
@@ -140,8 +143,11 @@ async def lifespan(app: FastAPI):
 
     # Seed default scheduler config (no-op if already seeded)
     from app.services.system_config import seed_default_config
-    async with async_session() as db:
-        await seed_default_config(db)
+    try:
+        async with async_session() as db:
+            await seed_default_config(db)
+    except Exception as seed_err:
+        logger.warning("Scheduler config seed skipped", error=str(seed_err))
 
     # Start APScheduler only in dev/demo — production uses Cloud Scheduler
     # calling /api/v1/internal/* endpoints (CPU-throttled Cloud Run).
