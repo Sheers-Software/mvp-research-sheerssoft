@@ -23,7 +23,7 @@ steps:
     args:
       - build
       - --build-arg
-      - NEXT_PUBLIC_API_URL=https://nocturn-backend-343745766874.asia-southeast1.run.app
+      - NEXT_PUBLIC_API_URL=https://nocturn-backend-owtn645vea-as.a.run.app
       - --build-arg
       - NEXT_PUBLIC_SUPABASE_URL=https://ramenghkpvipxijhfptp.supabase.co
       - --build-arg
@@ -72,7 +72,7 @@ steps:
       - --memory=1Gi
       - --timeout=300
       - --cpu-throttling
-      - --set-env-vars=ENVIRONMENT=production,FRONTEND_URL=https://nocturn-frontend-343745766874.asia-southeast1.run.app,SUPERADMIN_EMAILS=a.basyir@sheerssoft.com
+      - --set-env-vars=ENVIRONMENT=production,FRONTEND_URL=https://nocturn-frontend-owtn645vea-as.a.run.app,SUPERADMIN_EMAILS=a.basyir@sheerssoft.com,ALLOWED_ORIGINS=https://nocturn-frontend-owtn645vea-as.a.run.app
       - --allow-unauthenticated
       - --port=8080
 
@@ -96,7 +96,7 @@ steps:
       - --memory=512Mi
       - --timeout=60
       - --cpu-throttling
-      - --set-env-vars=NEXT_PUBLIC_API_URL=https://nocturn-backend-343745766874.asia-southeast1.run.app
+      - --set-env-vars=NEXT_PUBLIC_API_URL=https://nocturn-backend-owtn645vea-as.a.run.app
       - --allow-unauthenticated
       - --port=3000
 
