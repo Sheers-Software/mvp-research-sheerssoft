@@ -164,7 +164,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Nocturn AI — Inquiry Capture & Conversion Engine",
     description="AI-powered hotel inquiry capture and conversion system by SheersSoft",
-    version="0.5.1",
+    version="0.5.2",
     dependencies=[],
     lifespan=lifespan,
 )

@@ -2,11 +2,11 @@
 
 An AI-powered hotel inquiry capture system that recovers revenue lost after hours, tracks granular ROI, and is a fully multi-tenant SaaS platform built by SheersSoft.
 
-**v0.5.1** — Infrastructure hardening: GCP Secret Manager project ID corrected, LLM fallback chain updated (Gemini → Claude Haiku → GPT-4o-mini), Docker frontend proxy fixed, Anthropic API key provisioned.
+**v0.5.2** — Routing & Infrastructure Patch: Fixed `self-provision` 404 missing route bug inside Docker container and correctly mapped GCP Secret Manager to `nocturn-ai`.
 
 ## Architecture
 
-- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.5.1
+- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.5.2
 - **Frontend:** Next.js 14 + TypeScript
 - **Database:** Supabase PostgreSQL 17 + pgvector — user `nocturn_app`, transaction pooler (port 6543, ap-southeast-2)
 - **Auth:** Supabase Auth (magic links) + local JWT fallback
@@ -87,7 +87,7 @@ docker-compose -f docker-compose.demo.yml up -d --build
 
 ### GCP Deployment
 
-**Current state (as of 2026-03-29):** Re-deploying from v0.5.1. Artifact Registry (`nocturn-ai`) is active. Secret Manager has all critical secrets. Cloud Run services will be recreated by the deploy command below.
+**Current state (as of 2026-03-30):** Re-deploying from v0.5.2. Artifact Registry (`nocturn-ai`) is active. Secret Manager (`nocturn-ai`) has all critical secrets. Cloud Run services will be recreated by the deploy command below.
 
 **Deploy (spin up):**
 ```bash
@@ -294,6 +294,7 @@ cd backend && python seed_demo_data.py
 - [x] **v0.4.0: Self-Service Onboarding & Tenant Portal** — `/welcome` wizard, `/portal` owner layer, KB self-service, role-based auth routing, generic ICP (not Vivatel-specific)
 - [x] **v0.5.0: Local Dev Stack + Demo Readiness** — local postgres/redis in docker-compose, google-genai SDK upgrade, gemini-embedding-001, RAG threshold fix, shadow pilot infrastructure (audit_only_mode, weekly audit report, /admin/shadow-pilots)
 - [x] **v0.5.1: Infrastructure Hardening** — GCP Secret Manager project ID corrected (nocturn-ai-487207), cloudbuild.yaml SA fixed, LLM fallback chain reordered (Haiku as secondary), Docker frontend proxy URL fixed (backend:8080), Anthropic API key provisioned, WhatsApp GTM lead pipeline (10k leads, 330 WhatsApp-ready)
+- [x] **v0.5.2: Routing & Infrastructure Patch** — Fixed `self-provision` 404 missing route bug inside backend build and correctly mapped GCP Secret Manager project to `nocturn-ai`.
 
 ## Database & Supabase Notes
 

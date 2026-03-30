@@ -1,4 +1,4 @@
-$PROJECT_ID = "nocturn-aai"
+$PROJECT_ID = "nocturn-ai-487207"
 $REGION = "asia-southeast1"
 $BACKEND_SERVICE = "nocturn-backend"
 $FRONTEND_SERVICE = "nocturn-frontend"
