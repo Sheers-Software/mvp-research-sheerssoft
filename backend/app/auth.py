@@ -97,9 +97,10 @@ async def get_current_user(
             }
         raise HTTPException(status_code=401, detail="Invalid token format")
 
+    from app.models import TenantMembership
     stmt = (
         select(User)
-        .options(selectinload(User.memberships))
+        .options(selectinload(User.memberships).selectinload(TenantMembership.tenant))
         .where(User.id == user_id)
     )
     result = await db.execute(stmt)

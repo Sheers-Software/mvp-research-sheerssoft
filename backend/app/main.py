@@ -193,6 +193,15 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# Ensure ALL unhandled exceptions return JSON (not Starlette's plain-text "Internal Server Error")
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.error("Unhandled exception", path=str(request.url), error=str(exc), exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
 from app.middleware import TelemetryMiddleware, MaintenanceModeMiddleware
 app.add_middleware(TelemetryMiddleware)
 app.add_middleware(MaintenanceModeMiddleware)

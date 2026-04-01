@@ -69,6 +69,12 @@ export default function AuthCallbackPage() {
                 const profileRes = await fetch('/api/v1/auth/me', {
                     headers: { Authorization: `Bearer ${access_token}` },
                 });
+                if (!profileRes.ok) {
+                    const text = await profileRes.text();
+                    let detail = 'Failed to load profile. Please try again.';
+                    try { detail = JSON.parse(text).detail || detail; } catch { /* non-JSON error body */ }
+                    throw new Error(detail);
+                }
                 const user = await profileRes.json();
                 // Full reload so AuthProvider re-reads the token from localStorage
                 let dest = '/dashboard';
