@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
+import PublicNav from '@/components/PublicNav';
 
 export default function LoginPage() {
     const { login, requestMagicLink, user, loading } = useAuth();
@@ -49,6 +50,8 @@ export default function LoginPage() {
     };
 
     return (
+        <>
+        <PublicNav />
         <div className="login-page">
             <div className="login-card">
                 <div className="login-logo">
@@ -174,5 +177,6 @@ export default function LoginPage() {
                 </p>
             </div>
         </div>
+        </>
     );
 }
