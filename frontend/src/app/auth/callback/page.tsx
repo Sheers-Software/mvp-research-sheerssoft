@@ -58,8 +58,10 @@ export default function AuthCallbackPage() {
                     body: JSON.stringify({ access_token: supabaseAccessToken }),
                 });
                 if (!res.ok) {
-                    const d = await res.json();
-                    throw new Error(d.detail || 'Auth failed');
+                    const text = await res.text();
+                    let detail = 'Auth failed. Please request a new magic link.';
+                    try { detail = JSON.parse(text).detail || detail; } catch { /* non-JSON error body */ }
+                    throw new Error(detail);
                 }
                 const { access_token } = await res.json();
                 localStorage.setItem('nocturn_token', access_token);

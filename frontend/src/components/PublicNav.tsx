@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import Logo from '@/components/Logo';
 
 export default function PublicNav() {
   const pathname = usePathname();
@@ -12,31 +13,7 @@ export default function PublicNav() {
       <div className="public-nav-inner">
         {/* Logo — left */}
         <Link href="/" className="public-nav-logo">
-          <svg
-            viewBox="0 0 120 28"
-            height="22"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-label="Nocturn AI"
-          >
-            {/* Wordmark: NOCTURN in dark, AI in accent blue */}
-            <text
-              x="0" y="21"
-              fontFamily="'Inter', -apple-system, sans-serif"
-              fontWeight="800"
-              fontSize="20"
-              letterSpacing="-0.5"
-              fill="#0f172a"
-            >NOCTURN</text>
-            <text
-              x="84" y="21"
-              fontFamily="'Inter', -apple-system, sans-serif"
-              fontWeight="800"
-              fontSize="20"
-              letterSpacing="-0.5"
-              fill="#2563eb"
-            > AI</text>
-          </svg>
+          <Logo size={28} variant="navy" showText />
           <span className="public-nav-byline">by SheersSoft</span>
         </Link>
 

@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
+import { Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from '@/lib/auth';
+
+const instrumentSerif = Instrument_Serif({
+  weight: ["400"],
+  subsets: ["latin"],
+  variable: "--font-instrument-serif",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Nocturn AI — Hotel Concierge Intelligence",
@@ -14,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={instrumentSerif.variable}>
       <body>
         <AuthProvider>
           {children}
