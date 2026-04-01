@@ -3,18 +3,24 @@ Async SQLAlchemy database engine and session management.
 """
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 from app.config import get_settings
 
 settings = get_settings()
 
+# NullPool: SQLAlchemy does not maintain its own connection pool.
+# Each session opens a fresh connection and closes it on release.
+# Supabase's Supavisor (PgBouncer-compatible) handles the actual pooling in
+# transaction mode. SQLAlchemy's own pooling + PgBouncer transaction mode causes
+# "prepared statement does not exist" errors because named prepared statements
+# created on one server connection are not visible on another.
+# statement_cache_size=0: disable asyncpg's client-side prepared statement cache
+# so queries are sent as simple/unnamed statements instead of named prepared ones.
 engine = create_async_engine(
     settings.database_url,
     echo=not settings.is_production,
-    pool_size=2,       # Reduced to fit Supabase free tier connection limits (60 max direct)
-    max_overflow=5,
-    pool_pre_ping=True,
-    pool_recycle=300,  # Recycle connections every 5 minutes to play nice with PgBouncer
-    connect_args={"statement_cache_size": 0},  # Required for Supabase PgBouncer transaction mode
+    poolclass=NullPool,
+    connect_args={"statement_cache_size": 0},
 )
 
 async_session = async_sessionmaker(
