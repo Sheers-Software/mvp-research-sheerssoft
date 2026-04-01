@@ -271,23 +271,25 @@ Targets aligned with `gtm_execution_plan.md` 90-day scorecard:
 
 ---
 
-## 6. Pricing — Value-Based, Not Cost-Plus
+## 6. Pricing — Performance-Based Revenue Partner Model
 
-> *"B2B customers don't trust cheap software. Charge 10–30% of value created."*
+> **Updated 31 Mar 2026:** Pricing model has pivoted to a performance-aligned structure. Old flat-tier subscriptions (Boutique RM 499 / Independent RM 1,200 / Premium RM 2,800) are retired. See [product_context.md](./product_context.md) Section 6 for full context.
 
-| Stage | Tier | Price | Commitment | What It Is |
-|---|---|---|---|---|
-| **Stage 1** | Audit | Free | Zero | Public calculator at /audit. Instant RM leakage number. No account required. |
-| **Stage 2** | Shadow Pilot | Free | 7 days | Twilio shadow number. audit_only_mode listening. Real inquiry data. Weekly audit email on Day 7. |
-| **Stage 3** | Boutique | RM 499/mo | Month-to-month | Full AI on real WhatsApp number (up to 150 rooms). Lead capture. Daily 7am email. Dashboard. |
-| **Stage 3** | Independent | RM 1,200/mo | Month-to-month | All Boutique features + 2 properties + unlimited KB docs + email channel + priority support. |
-| **Stage 3** | Premium | RM 2,800/mo | Annual option (15% discount) | All Independent features + unlimited properties + web widget + custom AI training. |
+| Component | Amount | Notes |
+|-----------|--------|-------|
+| **Platform Fee** | RM 199/month | Full omni-channel access + dashboard + daily GM report |
+| **Setup + AI Training** | RM 999 one-time | 48-hour implementation by SheersSoft team |
+| **Performance Fee** | 3% on confirmed direct bookings facilitated by Nocturn AI | Outcome-aligned — zero bookings = zero performance fee |
 
-**Shadow Pilot Offer:** 7 days of real inquiry data on a Twilio shadow number — free, no commitment, zero disruption to existing WhatsApp setup. Transitions to Boutique paid tier after Day 7 call confirms value. 30-day money-back guarantee on first paid month.
+**Guarantee:** 30-day revenue recovery guarantee — if we don't demonstrate recovery, next month's platform fee is waived.
 
-**Invoicing for v1:** Pilot billing is manual (direct bank transfer or invoice). Stripe billing infrastructure exists in the codebase but is not customer-facing until pilot-to-paid conversion is proven.
+**Positioning:** Nocturn AI charges 3% vs OTA's 15–25%, saving hotels ~12–15% per direct booking. The pitch is OTA displacement, not AI chatbot.
 
-**Sales motion:** Boutique/Independent = sales-assisted via three-stage funnel. Premium = full sales process.
+**Entry into the service:** Application form at sheerssoft.com/apply (Founding Cohort — limited enrollment). Fields: hotel name, city, room count (<30 / 30–50 / 50–150 / 150+), after-hours process, WhatsApp number.
+
+**Invoicing for v1:** Manual invoicing (direct bank transfer). Stripe billing infrastructure exists in the codebase but is not customer-facing until conversion is proven.
+
+**Sales motion:** Application → SheersSoft review → onboarding call → RM 999 setup → live in 48 hours → RM 199/mo + 3% performance.
 
 ---
 
@@ -312,17 +314,24 @@ Targets aligned with `gtm_execution_plan.md` 90-day scorecard:
 
 > *"You need distribution strategy from day one. 'Build it and they will come' kills companies."* — First 10 customers are design partners; over-serve them.
 
-### Launch Sequence
+> **Updated 31 Mar 2026:** GTM funnel simplified. Shadow pilot stage is now secondary to the direct application → onboarding flow. Primary entry point is the public application form.
 
-1. **Audit outreach (cold/warm)** — Send audit calculator link as the first touch. "Run your free hotel revenue audit in 2 minutes." No demo request. No sales call. Just value.
-2. **Audit → Shadow Pilot** — Within 10 minutes of submission, SheersSoft AM offers the shadow pilot: "We can have a number listening on your hotel's inquiries by tomorrow."
-3. **Shadow Pilot → Full Product** — Day 7 call with real data: "[X] after-hours messages, RM [Y] left on the table." Convert to Boutique tier.
-4. **Full Product → Referral** — At Day 30 ROI call, request one warm introduction to a peer GM.
-5. **Cold expansion** — Only after first case study with real numbers. Never promises, always proof.
+### Launch Sequence (Current)
 
-### The 60-Second Pitch
+1. **Application outreach (cold/warm)** — Direct prospects to sheerssoft.com/apply. Framing: "Stop paying 18% to OTAs. We charge 3%. Apply for the Founding Cohort." No shadow pilot required upfront.
+2. **Application → Onboarding call** — SheersSoft reviews application, schedules onboarding call within 48 hours.
+3. **Onboarding call → Setup** — RM 999 setup fee collected. SheersSoft builds property KB, links WhatsApp + web widget. Live in 48 hours.
+4. **Live → Day 7 Report** — First weekly performance report delivered: inquiries handled, leads captured, estimated RM recovered.
+5. **Day 30 ROI call → Referral** — Review confirmed revenue vs 3% fee. Request warm intro to peer GM.
+6. **Case study → Cold expansion** — Only armed with real, confirmed numbers from pilot property.
 
-> *"We'll show you exactly how many WhatsApp inquiries your hotel is missing after 10pm — and the RM value — using your own data. Takes 2 minutes at ai.sheerssoft.com/audit. If the number is significant, we set up a free 7-day listener on a shadow number. After 7 days, you'll have real proof. Then you decide."*
+### Shadow Pilot (Secondary Path — Prospects Who Want Proof First)
+
+Still available for risk-averse GMs who won't commit without data. Deploy Twilio shadow number, `audit_only_mode = True`, 7-day observation, Day 7 email with real inquiry count + RM leakage. Then convert to full onboarding.
+
+### The 60-Second Pitch (Updated)
+
+> *"Your hotel is paying 15–18% commission every time a guest books through Agoda or Booking.com. We capture those same guests directly — on WhatsApp, email, and your website — 24 hours a day, 7 days a week. We charge RM 199 a month plus 3% only on bookings we actually convert. That's it. No long contracts. Apply at sheerssoft.com/apply."*
 
 ---
 
@@ -424,7 +433,7 @@ The codebase contains infrastructure built ahead of validation. This table track
 | SuperAdmin dashboard (`/admin`) | ✅ **Active (internal ops)** | SheersSoft ops tool — tenant management, scheduler config, maintenance mode, service health. Never shown to hotel clients. |
 | Stripe billing (checkout, subscriptions) | ❌ **Dormant** | Activate when pilot-to-paid conversion is proven; manual invoicing until ≥3 paying tenants. |
 | Support chatbot + ticket system | ✅ **Active** | `/portal/support` allows tenant users to submit and view tickets. Backend ticket CRUD live. |
-| Application intake form | ❌ **Dormant** | Self-serve GTM motion not yet validated. Activate when inbound demand justifies it. |
+| Application intake form | ✅ **Active (primary entry point)** | Founding Cohort application at /apply is now the primary GTM entry point per new website (31 Mar 2026). Fields: hotel name, city, room count, after-hours process, WhatsApp number. Backend `Application` model + `/api/v1/applications` endpoint must be wired to this form. |
 | Tenant self-service portal (`/portal`, `/welcome`) | ✅ **Active** | Full portal built in v0.4: KB self-management, team management, channel status, billing, support. `/welcome` 5-step onboarding wizard live. |
 | After-Hours Revenue Audit (`/audit`, AuditRecord, audit endpoints) | ✅ **Active** | Built in v0.5. Public calculator + superadmin submissions pipeline. |
 | Shadow Pilot Mode (`audit_only_mode`, shadow provisioning, weekly email) | ❌ **Pending (Sprint 2.5)** | Core to the new three-stage sales funnel. Block on go-live until complete. |

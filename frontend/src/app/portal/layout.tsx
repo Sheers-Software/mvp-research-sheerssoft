@@ -40,6 +40,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
     const [bannerDismissed, setBannerDismissed] = useState(false);
     const [announcements, setAnnouncements] = useState<ActiveAnnouncement[]>([]);
     const [dismissedAnnIds, setDismissedAnnIds] = useState<Set<string>>(new Set());
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => {
         if (!loading && !user) {
@@ -49,6 +50,10 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
             router.replace('/dashboard');
         }
     }, [user, loading, router]);
+
+    useEffect(() => {
+        setSidebarOpen(false);
+    }, [pathname]);
 
     useEffect(() => {
         const checkMaintenance = () => {
@@ -87,7 +92,28 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
 
     return (
         <div className="layout">
-            <aside className="sidebar">
+            {/* Mobile top bar */}
+            <header className="mobile-header">
+                <button
+                    className="hamburger"
+                    onClick={() => setSidebarOpen((o) => !o)}
+                    aria-label="Toggle navigation"
+                >
+                    <span />
+                    <span />
+                    <span />
+                </button>
+                <span className="mobile-header-brand">AI Concierge</span>
+                {tenantName && <span className="text-sm text-muted" style={{ flexShrink: 0 }}>{tenantName}</span>}
+            </header>
+
+            {/* Sidebar overlay */}
+            <div
+                className={`sidebar-overlay${sidebarOpen ? ' sidebar-open' : ''}`}
+                onClick={() => setSidebarOpen(false)}
+            />
+
+            <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
                 <div className="sidebar-brand">
                     <h2>AI Concierge</h2>
                     <p>{tenantName || 'Property Portal'}</p>
@@ -100,6 +126,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                             key={item.href}
                             href={item.href}
                             className={`nav-link ${pathname === item.href ? 'active' : ''}`}
+                            onClick={() => setSidebarOpen(false)}
                         >
                             <span className="nav-icon">{item.icon}</span>
                             {item.label}
@@ -107,7 +134,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                     ))}
 
                     <span className="nav-section" style={{ marginTop: 16 }}>Operations</span>
-                    <Link href="/dashboard" className="nav-link">
+                    <Link href="/dashboard" className="nav-link" onClick={() => setSidebarOpen(false)}>
                         <span className="nav-icon">📊</span>
                         Staff Dashboard
                     </Link>
@@ -115,7 +142,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                     {user.is_superadmin && (
                         <>
                             <span className="nav-section" style={{ marginTop: 16 }}>Admin</span>
-                            <Link href="/admin" className="nav-link">
+                            <Link href="/admin" className="nav-link" onClick={() => setSidebarOpen(false)}>
                                 <span className="nav-icon">⚙️</span>
                                 Platform Admin
                             </Link>

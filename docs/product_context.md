@@ -1,5 +1,5 @@
 # Product Context: Nocturn AI (SheersSoft)
-**Source**: [sheerssoft.com](https://sheerssoft.com) — Research Date: 13 Feb 2026
+**Source**: [sheerssoft.com](https://sheerssoft.com) — Research Date: 13 Feb 2026 · **Updated**: 31 Mar 2026 (new website / pricing model)
 **Steered by:** [building-successful-saas-guide.md](./building-successful-saas-guide.md) — Principal Engineer lessons (Google/Meta)
 
 ---
@@ -8,9 +8,11 @@
 
 **Nocturn AI** is an AI-powered hotel concierge built by **Sheers Software Sdn Bhd** (Malaysian company, SSM Registered, PDPA Compliant). The product captures every guest inquiry 24/7 across WhatsApp, web chat, and email — especially during after-hours when reservation desks are closed — and converts them into captured leads with proven revenue recovery metrics.
 
-**Tagline:** *"Every Unanswered Inquiry Is a Booking Your Competitor Gets."*
+**Headline:** *"Stop Paying 18% to OTAs. Capture Direct Revenue for 3."*
 
-**Value Proposition:** Live in 48 hours. Proving value in 7 days. 30-day free pilot. No credit card required.
+**Value Proposition:** RM 199/month platform fee + 3% on confirmed bookings we facilitate. One-time RM 999 setup. Live in 48 hours. 30-day revenue recovery guarantee.
+
+> Positioning shift (31 Mar 2026): The product is now framed as a **revenue partner** that costs 3% vs. OTA's 15–25% — not primarily as an AI concierge. The "after-hours capture" narrative is still present but the primary hook is OTA commission displacement.
 
 **Survival imperative:** The company must avoid the graveyard patterns: solving problems nobody pays for, "build it and they will come," underpricing, ignoring unit economics, building horizontal platforms, premature scaling. This document enforces ruthless ICP focus, distribution strategy from day one, and metrics-driven execution.
 
@@ -150,23 +152,40 @@
 
 ---
 
-## 6. Pricing (Website) — Value-Based
+## 6. Pricing (Website) — Performance-Based Revenue Partner Model
 
-> *"B2B customers don't trust cheap software with their business processes."* — Charge 10–30% of value created. RM 9,315 recovered/mo → RM 2,000–3,000 defensible.
+> **Major update — 31 Mar 2026:** Pricing model has pivoted from flat-tier SaaS subscriptions to a performance-aligned "Revenue Partner" structure. Old tiers (Starter RM 1,500 / Pro RM 3,000 / Enterprise RM 5,000+) are **retired**.
 
-| Tier | Price | Target | Includes |
-|------|-------|--------|----------|
-| **Starter** | RM 1,500/mo | Budget & 3-star, <100 rooms | 1 WhatsApp line, web chat, 500 convos/mo, email support, basic dashboard |
-| **Professional** | RM 3,000/mo | 4-star, 100–300 rooms | 2 WhatsApp lines, web chat, email auto-handler, 2,000 convos/mo, priority support, full dashboard + Reports |
-| **Enterprise** | RM 5,000+/mo | 5-star, 300+ rooms | Unlimited convos, unlimited WA lines, custom integrations, dedicated account manager, full dashboard + API |
+### Current Pricing — Revenue Partner Plan
 
-**Pricing model:** Tiered feature-based with clear upgrade path. Pilot is time-limited (30 days), not feature-limited — reduces friction. Free trial or freemium: never both time- and feature-limited.
+| Component | Amount | Notes |
+|-----------|--------|-------|
+| **Platform Fee** | RM 199/month | Full channel access + dashboard |
+| **Setup + AI Training** | RM 999 one-time | 48-hour implementation |
+| **Performance Fee** | 3% on confirmed direct bookings we facilitate | Outcome-aligned; zero bookings = zero performance fee |
+
+**Guarantee:** 30-day revenue recovery guarantee — if we don't recover our cost, next month's platform fee is waived.
+
+**Value comparison framing (from website):**
+- OTA commissions: 15–25% per booking (Agoda, Booking.com)
+- Nocturn AI: 3% + RM 199/mo
+- Estimated saving: 12–15% per booking on bookings that would have gone through OTA
 
 **Commercial Terms:**
-- Free 30-day pilot — no credit card
-- Month-to-month after pilot — no contract
-- Exceeding limit: notify first; upgrade or queue messages (no surprise charges)
-- Annual: 2 months free (contact for details)
+- Application-based intake at sheerssoft.com/apply (or ai.sheerssoft.com/apply)
+- Founding Cohort: limited enrollment for Malaysian heritage properties
+- Month-to-month after setup
+- No PMS integration required; no IT team required
+
+### Entry Point — Application Form (/apply)
+
+The primary GTM entry point is now the public application form. Fields:
+- Hotel name and city
+- Number of rooms (<30 / 30–50 / 50–150 / 150+)
+- Current after-hours process
+- WhatsApp contact number
+
+> **Note for PRD:** Application intake was previously listed as DORMANT in PRD v2.x. It is now the **primary lead capture mechanism** and should be treated as ACTIVE.
 
 ---
 
@@ -264,10 +283,11 @@ Use this section to validate PRD, Build Plan, and Architecture:
 - [ ] **Languages:** AI explicitly handles English + Bahasa Malaysia
 - [ ] **Email:** Handles *forwarded* reservation emails (not just direct sends)
 - [ ] **Widget:** Single `<script>` tag, no dependencies, works on WordPress
-- [ ] **Pricing tiers:** Starter (RM 1,500), Pro (RM 3,000), Enterprise (RM 5,000+)
-- [ ] **Pilot:** 30 days free, no credit card, month-to-month after
+- [ ] **Pricing model (UPDATED 31 Mar 2026):** RM 199/mo + RM 999 setup + 3% performance fee. Old flat tiers (RM 1,500/3,000/5,000) are retired.
+- [ ] **Guarantee:** 30-day revenue recovery guarantee (waive following month if no recovery)
+- [ ] **Entry point:** Application form at /apply — primary lead capture, NOT dormant
 - [ ] **Report:** Daily at **7am** property-local-time (Cloud Scheduler `30 7 * * *` MYT); weekly summary Monday
-- [ ] **Case study metrics:** Replace RM 12,400 unverified benchmark with Vivatel's real 30-day numbers once available
-- [ ] **Product naming:** Nocturn AI (public)
-- [ ] **Unit economics:** CAC, LTV, churn tracked from first paying customer
-- [ ] **ICP ruthlessness:** No expansion beyond 3–4 star Malaysian hotels until PMF
+- [ ] **Case study metrics:** Replace unverified benchmarks with real pilot data once available
+- [ ] **Product naming:** Nocturn AI (public) / Sheers Software Sdn Bhd (legal)
+- [ ] **Unit economics:** CAC, LTV, churn tracked from first paying customer; performance fee % tracked separately
+- [ ] **ICP ruthlessness:** Malaysian hotels, room count entry now at <30 (disqualifier per apply form); target 30–150+ rooms

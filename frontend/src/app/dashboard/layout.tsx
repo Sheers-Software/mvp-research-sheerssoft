@@ -43,12 +43,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const [bannerDismissed, setBannerDismissed] = useState(false);
     const [announcements, setAnnouncements] = useState<ActiveAnnouncement[]>([]);
     const [dismissedAnnIds, setDismissedAnnIds] = useState<Set<string>>(new Set());
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => {
         if (!loading && !user) {
             router.replace('/login');
         }
     }, [user, loading, router]);
+
+    useEffect(() => {
+        setSidebarOpen(false);
+    }, [pathname]);
 
     useEffect(() => {
         // Fetch the user's primary property for display and API calls
@@ -98,7 +103,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     return (
         <div className="layout">
-            <aside className="sidebar">
+            {/* Mobile top bar */}
+            <header className="mobile-header">
+                <button
+                    className="hamburger"
+                    onClick={() => setSidebarOpen((o) => !o)}
+                    aria-label="Toggle navigation"
+                >
+                    <span />
+                    <span />
+                    <span />
+                </button>
+                <span className="mobile-header-brand">Nocturn AI</span>
+                {property && <span className="text-sm text-muted" style={{ flexShrink: 0 }}>{property.name}</span>}
+            </header>
+
+            {/* Sidebar overlay — closes sidebar when tapping outside on mobile */}
+            <div
+                className={`sidebar-overlay${sidebarOpen ? ' sidebar-open' : ''}`}
+                onClick={() => setSidebarOpen(false)}
+            />
+
+            <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
                 <div className="sidebar-brand">
                     <h2>Nocturn AI</h2>
                     <p>{property?.name || 'Hotel Dashboard'}</p>
@@ -111,6 +137,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             key={item.href}
                             href={item.href}
                             className={`nav-link ${pathname === item.href ? 'active' : ''}`}
+                            onClick={() => setSidebarOpen(false)}
                         >
                             <span className="nav-icon">{item.icon}</span>
                             {item.label}
@@ -120,7 +147,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     {(user.role === 'owner' || user.role === 'admin') && (
                         <>
                             <span className="nav-section" style={{ marginTop: 16 }}>Management</span>
-                            <Link href="/portal" className="nav-link">
+                            <Link href="/portal" className="nav-link" onClick={() => setSidebarOpen(false)}>
                                 <span className="nav-icon">🏢</span>
                                 Property Portal
                             </Link>
@@ -130,7 +157,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     {user.is_superadmin && (
                         <>
                             <span className="nav-section" style={{ marginTop: 16 }}>Admin</span>
-                            <Link href="/admin" className="nav-link">
+                            <Link href="/admin" className="nav-link" onClick={() => setSidebarOpen(false)}>
                                 <span className="nav-icon">⚙️</span>
                                 Platform Admin
                             </Link>

@@ -198,13 +198,14 @@ Sheers Software Sdn Bhd
 ```
 Hi [Name], good [morning/afternoon].
 
-I'm Ahmad from Sheers Software in KL. We've built an AI concierge
-specifically for Malaysian hotels — captures every WhatsApp, email,
-and website inquiry 24/7, and hands your team a daily report showing
-leads recovered overnight.
+I'm Ahmad from Sheers Software in KL. Quick question — how much is
+[Property name] paying in OTA commission monthly?
 
-[Property name] looks like a great fit for what we do. Would you be
-open to a 15-minute call to see if it makes sense for your property?
+We built Nocturn AI so hotels can capture direct bookings on
+WhatsApp, email, and web 24/7 at 3% instead of 15–18%. RM 199/mo
+platform fee, live in 48 hours, 30-day recovery guarantee.
+
+Would a 15-minute call make sense to see if we're a fit?
 
 Ahmad Basyir
 a.basyir@sheerssoft.com
@@ -217,31 +218,31 @@ a.basyir@sheerssoft.com
 
 > **Use when:** No WhatsApp number available; email only
 
-**Subject:** `After-hours inquiry recovery — [Hotel Name]`
+**Subject:** `Stop paying 18% to Agoda — [Hotel Name]`
 
 ```
 Hi [Name],
 
-Quick question: how many WhatsApp and email inquiries does
-[Hotel Name] receive after 6pm?
+Quick question: what percentage of [Hotel Name]'s bookings come
+through Agoda or Booking.com, and what commission are you paying?
 
-For most hotels in [City], the answer is somewhere between 10 and
-40 — and the vast majority go unanswered until morning. By then,
-the guest has booked on Agoda.
+For most hotels in [City], OTAs are collecting 15–18% on bookings
+that often started as a direct WhatsApp or email inquiry — guests
+who were already trying to reach the hotel.
 
-We built Nocturn AI specifically for this problem — an AI concierge
-that responds to every WhatsApp, email, and website inquiry in
-under 30 seconds, 24/7, and captures the lead for your morning team.
-
-It takes 48 hours to set up. No PMS integration needed. No IT project.
+We built Nocturn AI to capture those direct bookings instead. AI
+responds to every WhatsApp, email, and website inquiry in under
+30 seconds, 24/7. We charge RM 199/month plus 3% only on bookings
+we actually facilitate. No PMS integration. No IT project. Live
+in 48 hours.
 
 Happy to show you a 15-minute demo using a sample property in [City].
-Would [Day] or [Day] work for a call?
+Would [Day] or [Day] work?
 
 Ahmad Basyir Azahari
 Founder, Sheers Software Sdn Bhd
 a.basyir@sheerssoft.com · +601163263808
-ai.sheerssoft.com
+sheerssoft.com
 ```
 
 ---
@@ -514,12 +515,12 @@ Open a blank calculator or share your pre-calculated estimate:
 
 > *"Based on [X] daily inquiries, [ADR], and a conservative 20% conversion rate on after-hours leads — you have approximately **RM [amount]/month** in revenue at risk from unanswered inquiries. That's not counting what you're paying Booking.com to capture the leads you're dropping."*
 
-> *"The pilot is free. 30 days. We handle the entire setup — connect your WhatsApp number, drop a script tag on your website if you have one, forward your reservation email. Your team spends 30 minutes with me sharing your rates, room types, and FAQs. You're live in 48 hours."*
+> *"We charge RM 199 a month and 3% only on direct bookings we actually close for you. Compare that to what you're paying Booking.com — 15–18% on every booking, including guests who were already trying to reach you directly. Setup is a one-time RM 999. We handle everything — connect your WhatsApp number, drop a script tag on your website, configure your email. Your team spends 30 minutes with me sharing your rates, room types, and FAQs. You're live in 48 hours."*
 
-> *"After 30 days, you'll have hard numbers: inquiries captured, leads recovered, estimated revenue. If it doesn't show value, you walk away — no contract, no credit card. But I don't think you'll want to."*
+> *"And here's our guarantee: if in 30 days we haven't demonstrated revenue recovery, we waive the following month's platform fee. We only win when you win."*
 
 **Close question:**
-> *"Does the 30-day pilot make sense to try? I can have you live by [specific date]."*
+> *"Does RM 199 a month plus 3% on bookings we recover make sense for [Hotel Name]? I can have you live by [specific date]."*
 
 ---
 
@@ -556,13 +557,14 @@ Est. monthly revenue at risk: RM [calculated]
 OTA commission comparison:    RM [ADR × 0.18 × leads] avoided
 
 ──────────────────────────────────────────────
-WHAT THE PILOT INCLUDES (FREE, 30 DAYS)
+WHAT'S INCLUDED — RM 999 SETUP + RM 199/MONTH
 ──────────────────────────────────────────────
 ✅ Full Nocturn AI setup — WhatsApp + Web widget + Email
 ✅ AI knowledge base trained on [Hotel Name]'s rates and facilities
 ✅ Live in 48 hours — we handle the technical setup
 ✅ Daily GM morning report from Day 1
-✅ Guest Insight Report at Day 30
+✅ 30-day revenue recovery guarantee
+✅ 3% performance fee only on confirmed bookings we facilitate
 ✅ Direct WhatsApp line to me for any issue
 
 ──────────────────────────────────────────────
@@ -575,13 +577,16 @@ Day 7:  First weekly review call with you
 Day 30: ROI review — decide together if continuing makes sense
 
 ──────────────────────────────────────────────
-AFTER THE PILOT
+ONGOING — REVENUE PARTNER PLAN
 ──────────────────────────────────────────────
-If the numbers speak for themselves:
-  Starter (< 100 rooms):      RM 1,500/month
-  Professional (100–300 rms): RM 3,000/month
-  Enterprise (300+ rooms):    RM 5,000+/month
-No contracts. Cancel anytime.
+  Platform fee:    RM 199/month (all channels + dashboard)
+  Setup fee:       RM 999 one-time (already quoted above)
+  Performance fee: 3% on confirmed direct bookings we facilitate
+
+  You pay 3%. OTAs charge 15–18%.
+  30-day revenue recovery guarantee — if we don't prove value,
+  next month's platform fee is waived.
+  No contracts. Cancel anytime.
 
 ──────────────────────────────────────────────
 

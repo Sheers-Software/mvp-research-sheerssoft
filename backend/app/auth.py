@@ -111,10 +111,14 @@ async def get_current_user(
             detail="User account not found. Contact support.",
         )
 
-    # Update last login timestamp
-    from datetime import datetime, timezone
-    user.last_login_at = datetime.now(timezone.utc)
-    await db.commit()
+    # Update last login timestamp — wrapped in try/except to avoid crashing on DB permission issues
+    try:
+        from datetime import datetime, timezone
+        user.last_login_at = datetime.now(timezone.utc)
+        await db.commit()
+    except Exception as e:
+        logger.warning("Could not update last login timestamp", error=str(e))
+        await db.rollback() # Ensure transaction is cleared
 
     return user
 

@@ -1,0 +1,1 @@
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="nocturn-backend" AND textPayload:"Incremental DDL skipped"' --project=nocturn-ai-487207 --limit=5 --format=json

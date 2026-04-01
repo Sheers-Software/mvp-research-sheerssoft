@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/lib/auth';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 const navItems = [
@@ -24,12 +24,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const { user, loading, logout } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => {
         if (!loading && !user) {
             router.replace('/login');
         }
     }, [user, loading, router]);
+
+    useEffect(() => {
+        setSidebarOpen(false);
+    }, [pathname]);
 
     if (loading) {
         return (
@@ -43,7 +48,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     return (
         <div className="layout">
-            <aside className="sidebar">
+            {/* Mobile top bar */}
+            <header className="mobile-header">
+                <button
+                    className="hamburger"
+                    onClick={() => setSidebarOpen((o) => !o)}
+                    aria-label="Toggle navigation"
+                >
+                    <span />
+                    <span />
+                    <span />
+                </button>
+                <span className="mobile-header-brand">Nocturn AI</span>
+                <span className="text-sm text-muted" style={{ flexShrink: 0 }}>Admin</span>
+            </header>
+
+            {/* Sidebar overlay */}
+            <div
+                className={`sidebar-overlay${sidebarOpen ? ' sidebar-open' : ''}`}
+                onClick={() => setSidebarOpen(false)}
+            />
+
+            <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
                 <div className="sidebar-brand">
                     <h2>Nocturn AI</h2>
                     <p>SheersSoft Admin</p>
@@ -56,6 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             key={item.href}
                             href={item.href}
                             className={`nav-link ${pathname === item.href ? 'active' : ''}`}
+                            onClick={() => setSidebarOpen(false)}
                         >
                             <span className="nav-icon">{item.icon}</span>
                             {item.label}

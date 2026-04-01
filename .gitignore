@@ -55,3 +55,7 @@ backend/scan_pooler.py
 backend/test_api.py
 backend/test_db.py
 backend/found_region.txt
+
+# Leads raw data
+leads/output/*.json
+!leads/output/DiscoveryCallSim.txt

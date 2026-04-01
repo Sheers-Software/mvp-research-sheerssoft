@@ -119,7 +119,7 @@ export default function DashboardPage() {
     return (
         <div>
             {/* Header */}
-            <div className="flex items-center justify-between" style={{ marginBottom: 32 }}>
+            <div className="page-header">
                 <div>
                     <h1>{live.property_name}</h1>
                     <p className="text-muted text-sm" style={{ marginTop: 4 }}>
@@ -217,7 +217,7 @@ export default function DashboardPage() {
                             Full Analytics →
                         </Link>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24 }}>
+                    <div className="grid grid-4" style={{ gap: 24 }}>
                         <div>
                             <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--success)' }}>
                                 RM {t.estimated_revenue_recovered.toLocaleString('en-MY', { maximumFractionDigits: 0 })}
@@ -247,7 +247,7 @@ export default function DashboardPage() {
             )}
 
             {/* Quick actions */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+            <div className="grid grid-3" style={{ gap: 16 }}>
                 <Link href="/dashboard/conversations" style={{ textDecoration: 'none' }}>
                     <div className="card" style={{ padding: '20px 24px', cursor: 'pointer', transition: 'border-color 0.2s', borderColor: live.handed_off_conversations > 0 ? 'var(--accent)' : undefined }}>
                         <div style={{ fontSize: 24, marginBottom: 8 }}>💬</div>

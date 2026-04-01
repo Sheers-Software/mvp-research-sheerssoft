@@ -1,7 +1,37 @@
 # Website Alignment Brief
 ## Nocturn AI · ai.sheerssoft.com & sheerssoft.com
-### Version 1.0 · 18 Mar 2026
+### Version 1.0 · 18 Mar 2026 · **Status Review: 31 Mar 2026**
 ### Cross-referenced with: prd.md v2.1, gtm_execution_plan.md v1.1, website_design_brief.md, revenue_methodology.md, product_gap.md v1.3
+
+---
+
+> ## ⚠️ STATUS NOTE — 31 Mar 2026
+>
+> This document was written against the **old** sheerssoft.com website. The website has been **significantly updated** with a new URL (sheerssoft-website-203184798103.asia-southeast1.run.app). Many P1/P2 issues from this audit have been resolved:
+>
+> | Old Issue | Status |
+> |-----------|--------|
+> | A1 — Pricing wrong (RM 599 vs RM 1,500) | ✅ Resolved — new model: RM 199/mo + RM 999 setup + 3% performance fee |
+> | B1 — "50 languages" claim | ✅ Resolved — new site correctly states Malaysian hospitality-specific training |
+> | B2 — "Booking engine integration" | ✅ Resolved — new site does not claim booking engine integration |
+> | B3 — "Scale Globally" | ✅ Resolved — new site is Malaysia-focused |
+> | B5 — "Autonomously handles bookings" | ✅ Resolved — new site uses correct inquiry/lead capture framing |
+> | B6 — "Refund every penny" | ✅ Resolved — new guarantee: waive following month if no recovery |
+>
+> **Remaining open items to re-audit against the new website:**
+> - Market statistics (70% vs 90% manual channel bookings) — verify in new site
+> - Research provenance ("9 operators, 4 countries") — verify in new site
+> - Research quotes vs customer testimonials — verify attribution in new site
+> - "Hotel Genius" product — verify removed from new site
+> - Monthly Guest Insights Report visibility — verify featured in new site
+> - Analytics depth description — verify in new site
+>
+> **New alignment concerns introduced by new website:**
+> - Application intake at /apply is now primary GTM entry. Backend `Application` model must be wired to this form.
+> - Founding Cohort / limited enrollment positioning — ensure admin pipeline can handle application reviews.
+> - Performance fee tracking (3%) — Stripe integration or manual invoicing workflow must account for this.
+>
+> The rest of this document reflects the **original audit** as written on 18 Mar 2026 and is preserved for reference. Re-run a fresh audit against the new website before next GTM push.
 
 ---
 

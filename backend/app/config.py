@@ -125,8 +125,12 @@ class Settings(BaseSettings):
             "INTERNAL_SCHEDULER_SECRET",
         ]
 
+        import os
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("PROJECT_ID") or "nocturn-ai-487207"
+
         client = None
         for key in secrets_to_fetch:
+            # First, check if already in env (e.g. from Cloud Run secret mapping)
             current_val = getattr(self, key.lower(), "")
             if not current_val:
                 try:
@@ -135,19 +139,20 @@ class Settings(BaseSettings):
                             client = secretmanager.SecretManagerServiceClient()
                         except Exception as client_err:
                             logger.warning(f"Failed to initialize Secret Manager client: {client_err}")
-                            break  # Stop trying to fetch secrets if client fails to init
+                            break
 
-                    name = f"projects/nocturn-ai-487207/secrets/{key}/versions/latest"
+                    name = f"projects/{project_id}/secrets/{key}/versions/latest"
                     response = client.access_secret_version(request={"name": name})
                     fetched_val = response.payload.data.decode("UTF-8").strip().lstrip("\ufeff")
 
                     setattr(self, key.lower(), fetched_val)
                     logger.info(f"Successfully loaded {key} from GCP Secret Manager.")
                 except Exception as e:
-                    logger.warning(
-                        f"Could not load {key} from Secret Manager. "
-                        f"Error: {e}"
-                    )
+                    # Log as debug in production to avoid clutter, unless it's a critical missing secret
+                    if self.is_production:
+                        logger.debug(f"Could not load {key} from Secret Manager: {e}")
+                    else:
+                        logger.warning(f"Could not load {key} from Secret Manager: {e}")
 
         # Post-fetch fixups
         if self.database_url.startswith("postgresql://"):

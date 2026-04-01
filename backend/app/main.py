@@ -153,12 +153,12 @@ async def lifespan(app: FastAPI):
         )
     ]
 
-    async with engine.begin() as conn:
-        for name, sql in migrations:
-            try:
+    for name, sql in migrations:
+        try:
+            async with engine.begin() as conn:
                 await conn.execute(text(sql))
-            except Exception as e:
-                logger.debug(f"Incremental DDL skipped [{name}]: schema already up to date or insufficient privileges", error=str(e))
+        except Exception as e:
+            logger.debug(f"Incremental DDL skipped [{name}]: schema already up to date or insufficient privileges", error=str(e))
     
     logger.info("Incremental column migrations sweep completed")
 

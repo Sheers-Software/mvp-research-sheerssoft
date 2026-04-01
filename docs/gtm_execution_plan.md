@@ -481,7 +481,7 @@ Numbers:
 "[Zul's quote about the product]"
 — Zul [Last name], Reservation Manager, Vivatel KL
 
-Setup: 48 hours · Monthly cost: RM 1,500 · No long-term contract
+Setup: 48 hours · RM 999 one-time setup · RM 199/month + 3% on facilitated bookings · No long-term contract
 ```
 
 If the numbers are modest (e.g., RM 920 recovered instead of RM 9,315), publish them anyway. An honest RM 920 in 30 days beats a fabricated RM 12,400. The next property wants to know what is real.
@@ -525,7 +525,7 @@ From `building-successful-saas-guide.md`: *"3–5 customer calls/week. Non-negot
 These calls are not pitches. They are discovery conversations. Questions to rotate through:
 - "What did you do last night when an inquiry came in after your team left?"
 - "How do you currently know which leads are worth calling back?"
-- "What would need to be true for you to pay RM 1,500/month for this?"
+- "What would need to be true for you to feel that RM 199/month plus 3% on bookings we close is a good deal?"
 - "If this product disappeared tomorrow, what would you miss?"
 - "What do you use today instead of this?"
 
@@ -550,8 +550,8 @@ Document every call. Share patterns with the product team weekly.
 - Minutes 25–35: Present the paid plan options
 - Minutes 35–45: Handle objections, agree on next step
 
-**The pitch (from opportunity_2_playbook.md 60-second version):**
-> *"Vivatel received [X] inquiries after hours last month. Your AI handled all of them in under 30 seconds and captured [Y] leads. Based on your RM 230 ADR, we estimate RM [Z] in recovered revenue — against a RM 1,500 monthly subscription. That's [multiplier]× return. The Starter plan is RM 1,500/month, no contract. We invoice monthly. Want to continue?"*
+**The pitch (from opportunity_2_playbook.md 60-second version — updated pricing 31 Mar 2026):**
+> *"Vivatel received [X] inquiries after hours last month. Your AI handled all of them in under 30 seconds and captured [Y] leads. Based on your RM 230 ADR, we estimate RM [Z] in recovered revenue. Our fee is RM 199/month plus 3% only on confirmed bookings we facilitated. Compare that to what Agoda charges you — 15–18% on every booking. Want to continue?"*
 
 Do not over-complicate the pitch. Ask for the business.
 
@@ -560,17 +560,17 @@ Do not over-complicate the pitch. Ask for the business.
 ### Task C3.2 — Pricing Presentation
 **During the pilot review call**
 
-Present two options, not three. Too many options create decision paralysis:
+> **Updated 31 Mar 2026:** Flat-tier pricing (Starter/Professional) retired. Present the single Revenue Partner Plan.
 
-| | Starter | Professional |
-|---|---|---|
-| **Price** | RM 1,500/month | RM 3,000/month |
-| **Channels** | WhatsApp + Web Widget | + Email + Multi-property |
-| **Reports** | Daily email | Daily + Weekly summary |
-| **Support** | Email | Priority WhatsApp |
-| **Best for** | Single property pilot | Revenue-focused GM |
+| Component | Amount |
+|-----------|--------|
+| **Platform fee** | RM 199/month |
+| **Setup** | RM 999 one-time (already paid / credited from pilot) |
+| **Performance fee** | 3% on confirmed direct bookings facilitated by Nocturn AI |
 
-**Anchor on Professional first.** If they hesitate, drop to Starter. Never open with the lowest price.
+**Anchor on value:** "You're paying 15–18% to OTAs. We charge 3% only on what we actually close for you. The RM 199/month covers the platform, dashboard, and daily GM report."
+
+**Simple close:** "Continuing is RM 199 a month. The 3% is self-funding — it only triggers when we win a booking for you."
 
 **Invoicing:** Manual invoice for first 3 customers. Stripe is not required. Use a simple PDF invoice from Wave or similar. Collect by bank transfer (Maybank or RHB). Add payment details to the proposal.
 
@@ -582,7 +582,7 @@ Present two options, not three. Too many options create decision paralysis:
 | Objection | Response |
 |-----------|----------|
 | "Can we continue free for another month?" | "I'd love to, but we need to invest in your property specifically — KB updates, integration improvements. That requires us to be on a paid relationship. I can offer 50% off the first month." |
-| "It's expensive for a chatbot" | "It's not a chatbot — it recovered RM [Z] for you last month. The subscription is [X]× covered by one confirmed booking. How many bookings did you get from the leads it captured?" |
+| "It's expensive for a chatbot" | "It's not a chatbot, and it's not expensive — RM 199/month plus 3% only on bookings we close. You pay Agoda 15–18% on every booking. We charge 3% only on the ones we win for you. The comparison is with your OTA bill, not with chatbot software." |
 | "I need to check with my GM / owner" | "Of course. Can we have a 20-minute call with them this week? I'll bring the numbers." |
 | "The system made some mistakes" | "Yes, and we fixed them in real time. Here are the 3 KB updates we made. That's normal in the first month. Month 2 will be sharper because we know your property now." |
 | "We're evaluating other solutions" | "Which ones? I'd like to know what you're comparing us against. Most of the alternatives either don't support BM or require 3-month onboarding. What specifically are they offering?" |
@@ -599,9 +599,11 @@ Issue within 24 hours of verbal agreement. Delay kills deals.
 Invoice contents:
 - Sheers Software Sdn Bhd (company name, SSM registration, bank details)
 - Vivatel Kuala Lumpur
-- Service: Nocturn AI — Starter Plan
+- Service: Nocturn AI — Revenue Partner Plan
 - Period: [Month] 2026
-- Amount: RM 1,500 (or agreed amount)
+- Platform fee: RM 199
+- Performance fee: 3% × RM [confirmed bookings value] = RM [amount]
+- Total: RM [199 + performance fee]
 - Payment due: 14 days
 - Bank: [Bank name, account number]
 
@@ -663,7 +665,7 @@ Now you have a real case study. Use it. Email each of the 3 active conversations
 >
 > *[Name], we just completed 30 days with Vivatel KL. [X] inquiries handled, [Y] leads captured, RM [Z] recovered. I promised to share real numbers before asking for anything.*
 >
-> *Can I show you the same for your property — on a free 30-day pilot with zero commitment?*
+> *Can I show you the same for your property? RM 999 setup, live in 48 hours, RM 199/month after that plus 3% only on confirmed bookings we close. We have a 30-day recovery guarantee — if we don't prove value, we waive the next month.*
 
 **Do not send this email and wait.** Follow up by WhatsApp or call within 48 hours if no reply.
 

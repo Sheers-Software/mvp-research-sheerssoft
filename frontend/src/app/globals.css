@@ -246,7 +246,12 @@ textarea.input { resize: vertical; min-height: 80px; }
 .grid-4 { grid-template-columns: repeat(4, 1fr); }
 
 @media (max-width: 768px) {
-  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 420px) {
+  .grid-4 { grid-template-columns: 1fr; }
 }
 
 /* ─── Typography ─── */
@@ -664,4 +669,120 @@ tbody tr:last-child td {
   animation: confetti-fall 3s ease-in-out forwards;
   z-index: 300;
   pointer-events: none;
+}
+
+/* ─── Mobile Top Bar ─── */
+.mobile-header {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  align-items: center;
+  padding: 0 16px;
+  z-index: 60;
+  gap: 12px;
+}
+
+.mobile-header-brand {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex: 1;
+  letter-spacing: -0.01em;
+}
+
+.hamburger {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 6px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.hamburger:hover { background: var(--bg-primary); }
+
+.hamburger span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--text-secondary);
+  border-radius: 2px;
+  transition: all var(--transition-fast);
+}
+
+/* ─── Sidebar Overlay (mobile) ─── */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 45;
+}
+
+/* ─── Page Header ─── */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+/* ─── Responsive Layout ─── */
+@media (max-width: 768px) {
+  .mobile-header {
+    display: flex;
+  }
+
+  .sidebar {
+    transform: translateX(-260px);
+    transition: transform var(--transition-default);
+  }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .sidebar-overlay.sidebar-open {
+    display: block;
+  }
+
+  .main-content {
+    margin-left: 0;
+    padding: 72px 16px 32px;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .page-header h1 {
+    font-size: 22px;
+  }
+
+  .stat-card .stat-value {
+    font-size: 22px;
+  }
+
+  .kanban {
+    flex-direction: column;
+  }
+
+  .kanban-column {
+    min-width: unset;
+  }
+
+  .table-container {
+    font-size: 13px;
+  }
 }
