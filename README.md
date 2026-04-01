@@ -2,11 +2,11 @@
 
 An AI-powered hotel inquiry capture system that recovers revenue lost after hours, tracks granular ROI, and is a fully multi-tenant SaaS platform built by SheersSoft.
 
-**v0.5.2** — Routing & Infrastructure Patch: Fixed `self-provision` 404 missing route bug inside Docker container and correctly mapped GCP Secret Manager to `nocturn-ai`.
+**v0.5.3** — Daily GM Report: Full 9 AM revenue briefing with 4 KPI cards (revenue recovered, OTA fees saved, inquiries handled, guest sentiment %), queued leads table, and Gemini-generated sentiment summary.
 
 ## Architecture
 
-- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.5.2
+- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.5.3
 - **Frontend:** Next.js 14 + TypeScript
 - **Database:** Supabase PostgreSQL 17 + pgvector — user `nocturn_app`, transaction pooler (port 6543, ap-southeast-2)
 - **Auth:** Supabase Auth (magic links) + local JWT fallback
@@ -31,8 +31,9 @@ An AI-powered hotel inquiry capture system that recovers revenue lost after hour
 8. **Service Health Dashboard:** 9 parallel health checks (DB, Redis, Gemini, OpenAI, Anthropic, SendGrid, Twilio, Meta WhatsApp, Supabase) with 20s cache and auto-refresh.
 9. **Support Chatbot:** Reuses the core AI engine on a dedicated `nocturn-ai-support` property. Detects handoff intent and escalates to SheersSoft staff.
 10. **Automated Follow-up Engine:** AI re-engages cold leads at 24h, 72h, and 7-day intervals.
-11. **Monthly Guest Insights Report:** Gemini pipeline processes 30 days of transcripts — sentiment, recurring objections, FAQs.
-12. **PII Encryption & PDPA Delete:** Fernet encryption on guest PII fields at rest. Right-to-delete endpoint anonymizes all data for a guest identifier.
+11. **Daily GM Report (9 AM Briefing):** Automated email sent every morning at 9:00 AM MYT summarising the previous day. Four KPI cards: Revenue Recovered (estimated from leads captured), OTA Fees Saved (vs. commission route), Inquiries Handled (with missed/dropped counts), and Guest Sentiment % (Gemini-analysed). Includes a queued leads table (name, channel, request, estimated value with high-value badge) and a Gemini-generated sentiment summary paragraph. Marks the `first_morning_report_sent` onboarding milestone on first delivery.
+12. **Monthly Guest Insights Report:** Gemini pipeline processes 30 days of transcripts — sentiment, recurring objections, FAQs.
+13. **PII Encryption & PDPA Delete:** Fernet encryption on guest PII fields at rest. Right-to-delete endpoint anonymizes all data for a guest identifier.
 
 ## Getting Started
 
@@ -101,10 +102,10 @@ gcloud builds submit \
 
 After deploy, recreate Cloud Scheduler jobs if needed:
 ```bash
-# Daily report (7:30am KL time)
+# Daily GM Report (9:00am KL time)
 gcloud scheduler jobs create http nocturn-daily-report \
   --location=asia-southeast1 --project=nocturn-ai-487207 \
-  --schedule="30 7 * * *" --time-zone="Asia/Kuala_Lumpur" \
+  --schedule="0 9 * * *" --time-zone="Asia/Kuala_Lumpur" \
   --uri="https://nocturn-backend-<hash>-as.a.run.app/api/v1/internal/run-daily-report" \
   --message-body='{}' --headers="X-Internal-Secret=<INTERNAL_SCHEDULER_SECRET>"
 ```
@@ -207,7 +208,7 @@ SystemConfig (key-value store for maintenance mode, platform settings)
 │   │   │   ├── email.py             # SendGrid delivery
 │   │   │   ├── insights.py          # Monthly 30-day transcript analysis
 │   │   │   ├── pii_encryption.py    # Fernet field-level PII encryption
-│   │   │   ├── scheduler.py         # APScheduler (dev/demo only)
+│   │   │   ├── scheduler.py         # APScheduler (dev/demo only) + Daily GM Report generator
 │   │   │   ├── stripe_service.py    # Stripe checkout session
 │   │   │   └── system_config.py     # Maintenance mode DB config
 │   │   └── core/
@@ -295,6 +296,7 @@ cd backend && python seed_demo_data.py
 - [x] **v0.5.0: Local Dev Stack + Demo Readiness** — local postgres/redis in docker-compose, google-genai SDK upgrade, gemini-embedding-001, RAG threshold fix, shadow pilot infrastructure (audit_only_mode, weekly audit report, /admin/shadow-pilots)
 - [x] **v0.5.1: Infrastructure Hardening** — GCP Secret Manager project ID corrected (nocturn-ai-487207), cloudbuild.yaml SA fixed, LLM fallback chain reordered (Haiku as secondary), Docker frontend proxy URL fixed (backend:8080), Anthropic API key provisioned, WhatsApp GTM lead pipeline (10k leads, 330 WhatsApp-ready)
 - [x] **v0.5.2: Routing & Infrastructure Patch** — Fixed `self-provision` 404 missing route bug inside backend build and correctly mapped GCP Secret Manager project to `nocturn-ai`.
+- [x] **v0.5.3: Daily GM Report** — Full 9 AM revenue briefing email: 4 KPI cards (revenue recovered, OTA fees saved, inquiries handled, guest sentiment %), queued leads table with high-value badge, Gemini-generated sentiment summary, `first_morning_report_sent` onboarding milestone. Cloud Scheduler cron `0 9 * * *`.
 
 ## Database & Supabase Notes
 
