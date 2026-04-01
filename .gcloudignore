@@ -1,0 +1,32 @@
+.gcloudignore
+.git
+.gitignore
+
+# Frontend dependencies (built inside Docker)
+frontend/node_modules/
+frontend/.next/
+
+# Python caches
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+.pytest_cache/
+backend/.pytest_cache/
+
+# Dev/local files
+.env
+.env.*
+*.log
+.DS_Store
+
+# Large assets not needed for build
+leads/
+memory/
+docs/
+scripts/
+*.xlsx
+*.pdf
+
+# IDE
+.vscode/
+.idea/
