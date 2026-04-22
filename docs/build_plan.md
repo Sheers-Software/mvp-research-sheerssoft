@@ -1,13 +1,13 @@
 # Build Plan
 ## Nocturn AI — AI Inquiry Capture & Conversion Engine
-### Version 2.3 · 25 Mar 2026 · Original Ship Date: 11 Mar 2026
+### Version 2.4 · 20 Apr 2026
 ### Aligned with [product_context.md](./product_context.md) · Steered by [building-successful-saas-guide.md](./building-successful-saas-guide.md)
-### Cross-referenced with: [portal_architecture.md](./portal_architecture.md), [product_gap.md](./product_gap.md) v1.2, [prd.md](./prd.md) v2.1
-### Implementation Status: v0.5.0 · All GCP compute spun down — ready for next deploy
+### Cross-referenced with: [portal_architecture.md](./portal_architecture.md), [product_gap.md](./product_gap.md) v1.2, [prd.md](./prd.md) v2.4
+### Implementation Status: v0.5 · Shadow Pilot infrastructure complete · Sprint 2.6 (Hybrid Co-Pilot) is next
 
 ---
 
-## Remaining Blockers to Pilot Go-Live (as of 23 Mar 2026)
+## Remaining Blockers to Pilot Go-Live (as of 20 Apr 2026)
 
 P0 product code is **complete**. The remaining blockers are infra tasks and field work only.
 
@@ -17,16 +17,34 @@ P0 product code is **complete**. The remaining blockers are infra tasks and fiel
 | 2 | **Staff cannot reply from dashboard** | ✅ **RESOLVED** — v0.3.1. Reply box live in conversations view, replies forwarded to WhatsApp/web. | — |
 | 3 | **Daily email report blocked in production** | ✅ **RESOLVED** — `SENDGRID_API_KEY` + `SENDGRID_FROM_EMAIL` in Secret Manager. 4 Cloud Scheduler jobs created and verified. Note: deleted in 2026-03-23 GCP cleanup — recreate on next deploy. | Recreate 4 Cloud Scheduler jobs on next production deploy. |
 | 4 | **`FERNET_ENCRYPTION_KEY` missing** | ✅ **RESOLVED** — Key confirmed in Secret Manager. PII encryption active. | — |
-| 5 | **Bilingual (BM) responses untested end-to-end** | ❌ **FIELD WORK** — 50-question test suite written but not run. Half-day. **P0 blocker — must pass ≥80% before first client go-live.** | Run via Twilio sandbox. Must pass ≥80% (see `docs/bm_test_execution_plan.md`). |
-| 6 | **Pilot property KB not populated** | ❌ **FIELD WORK** — No KB ingested for first pilot property. 1 day on-site or via admin KB ingestion tool. | KB session: collect rate card, room types, FAQs, policies. Ingest via `/admin/kb-ingestion` or `python backend/scripts/ingest_kb.py`. |
+| 5 | **Bilingual (BM) responses untested end-to-end** | ❌ **FIELD WORK** | Run 50-question test suite via Twilio sandbox (≥80% pass) |
+| 6 | **Pilot property KB not populated** | ❌ **FIELD WORK** | 1-day KB ingestion session (rate card + Google Sheet inventory) |
 | 7 | **"Lost" status missing from leads filter UI** | ✅ **RESOLVED** — v0.3.1. Lost filter live in leads view. | — |
 | 8 | **Tenant self-service portal not built** | ✅ **RESOLVED** — v0.4. Full `/portal` + `/welcome` wizard shipped. | — |
 | 9 | **Shadow Pilot infrastructure** | ✅ **SPRINT 2.5 BUILT** — All dev items complete. One infra item remains: Cloud Scheduler job for `/run-weekly-audit-report` (create on next GCP deploy). Day 7 AM notification not yet built. | Create Cloud Scheduler job on next deploy. Build AM notification (see Sprint 2.5 below). |
-| 10 | **`WHATSAPP_API_TOKEN` and `WHATSAPP_APP_SECRET` missing from Secret Manager** | ❌ **INFRA** — Required for Meta Cloud API in production. Shadow pilots use Twilio (already configured). Blocks Stage 3 (full product) for first client. | Add to GCP Secret Manager before first Stage 3 client go-live. |
+| 10 | **`WHATSAPP_API_TOKEN` and `WHATSAPP_APP_SECRET` missing from Secret Manager** | ❌ **INFRA** | Required for Stage 3 (full Meta Cloud API after virtual office). Not needed for hybrid path. Add before Stage 3 go-live. |
+
+**All other blockers resolved in v0.3.1–v0.5.** Dashboard now opens to revenue KPI cards. Shadow pilot infrastructure complete. Staff reply drafting live.
 
 ---
 
-## v0.5 — After-Hours Revenue Audit + GCP Production (Current Sprint)
+## Sprint 2.6 — Hybrid AI Co-Pilot (Next Sprint)
+
+**Goal**: Hotels get AI-drafted replies in the dashboard while they send manually via their existing WhatsApp Business App (multi-device). No Meta API required. Google Sheet inventory sync for live availability.
+
+**Background:** This sprint has NOT yet started. All items below are planned deliverables.
+
+**What to Build**
+| Item | Status | Notes |
+|------|--------|-------|
+| Hybrid reply drafting UI (dashboard → "Copy to WhatsApp" or one-click forward) | ❌ Not built | Core co-pilot UX |
+| Google Sheet real-time inventory reader (2-minute polling for availability) | ❌ Not built | Replaces live Meta API inventory |
+| FPX/DuitNow payment link generator embedded in AI reply drafts | ❌ Not built | Same-day cash conversion |
+| Daily GM report update: "RM X recovered today (same-day cash vs OTA 30-day delay)" | ❌ Not built | Hybrid-aware analytics |
+
+**Why this comes next:** Shadow pilot infrastructure is complete (v0.5). The hybrid co-pilot is what transforms a shadow pilot (observe only) into a revenue-generating product launch without waiting for Meta Cloud API approval.
+
+## v0.5 — After-Hours Revenue Audit + GCP Production (Previous Sprint)
 
 ### What Was Built
 
@@ -49,9 +67,14 @@ P0 product code is **complete**. The remaining blockers are infra tasks and fiel
 
 ---
 
-## Sprint 2.5 — Shadow Pilot Infrastructure (Mostly Complete)
+## Sprint 2.5 — Shadow Pilot → Hybrid Onboarding (Mostly Complete)
 
-> **Goal:** Complete the three-stage sales funnel. A SheersSoft AM can provision a shadow pilot for a prospect in 5 minutes from the admin panel. The GM gets a real-data audit email on Day 7 automatically.
+> **Goal:** 7-day proof → hybrid go-live in 48 hours.
+
+**Key Changes from previous plan**:
+- Shadow pilot now uses Twilio or hotel's secondary WhatsApp number for audit-only logging.
+- Day 7 audit email → immediate hybrid onboarding (no waiting for Meta API).
+- Virtual office (RM2/day) is now the explicit path to full automation (post-pilot).
 
 | Task | Owner | Deliverable | Status |
 |------|-------|-------------|--------|
@@ -222,7 +245,7 @@ This is not optional. This screen sells the product.
 | **25–26** | Pilot UAT (User Acceptance Testing) | Product | Deploy to production. Pilot client team tests for 2 days with real scenarios. Collect feedback. | All features complete |
 | **26–27** | Bug fixes from UAT | Dev | Address blockers found during pilot testing. | UAT feedback |
 | **27** | Property onboarding guide + FAQ | Product | One-pager: how to get started, what the AI can/can't do, how to update KB, how to read reports. | Onboarding flow finalized |
-| **28** | **🎉 FIRST PILOT GO LIVE** | Both | First pilot property's WhatsApp + website widget are live with real guests. Dashboard is online. GM receives first daily report the next morning. | All above |
+| **28** | **🎉 FIRST PILOT GO LIVE** | Both | Hybrid Co-Pilot is live. Dashboard is online with AI-drafted replies. GM receives first daily report the next morning. | All above |
 
 **Quality Gates:**
 - [x] Graceful fallback for LLM failures (template response sent to guest)
@@ -263,6 +286,16 @@ This is not optional. This screen sells the product.
 | 5 | Calendar reminder for Day 7 call set |
 | 6 | Day 7 audit email tested in staging before prospect goes live |
 
+**Updated Go-Live Checklist (Hybrid Path — 48 hours):**
+
+1. Property KB + Google Sheet inventory link populated
+2. Hotel links their existing WhatsApp Business number to multi-device (free)
+3. AI Co-Pilot dashboard provisioned
+4. First daily revenue report sent at 7 AM
+5. 30-day revenue-recovery guarantee signed
+
+**Full Meta Cloud API is now Stage 3 (optional, after virtual office fix).**
+
 ---
 
 ## 2.5 SaaS Infrastructure — Activation Status
@@ -291,11 +324,10 @@ This is not optional. This screen sells the product.
 1. ✅ `FERNET_ENCRYPTION_KEY`, `SENDGRID_API_KEY` confirmed in Secret Manager
 2. ✅ Cloud SQL removed — database migrated to Supabase (`nocturn_app` user, transaction pooler)
 3. ✅ GCP Secret Manager is the sole source of all secrets (no .env fallbacks)
-4. ⚠️ **Recreate Cloud Scheduler jobs** on next production deploy (deleted 2026-03-23)
+4. ⚠️ **Recreate Cloud Scheduler jobs on next production deploy** (5 jobs deleted 2026-03-23: `run-daily-report`, `run-followups`, `run-insights`, `cleanup-leads`, `run-weekly-audit-report`)
 5. Add `ANTHROPIC_API_KEY`, `WHATSAPP_API_TOKEN`, `WHATSAPP_APP_SECRET` to Secret Manager when available
-6. Create 4 Cloud Scheduler jobs on next deploy
-3. Configure live Stripe webhook → update `STRIPE_WEBHOOK_SECRET`
-4. Custom domain mapping (optional): `api.sheerssoft.com` / `app.sheerssoft.com`
+6. Configure live Stripe webhook → update `STRIPE_WEBHOOK_SECRET`
+7. Custom domain mapping (optional): `api.sheerssoft.com` / `app.sheerssoft.com`
 
 ---
 
@@ -397,4 +429,4 @@ The product is **shipped** when ALL of these are true:
 
 ---
 
-*Ship in 28 days. Prove ROI in 7. Close 10 customers in 60. The plan is tight, the scope is intentionally small, and every feature earns its place by answering one question: "Does this make the GM open the dashboard tomorrow morning?" Self-service onboarding (v0.4) means each new client can go live without a SheersSoft engineer in the loop. Aligned with [product_context.md](./product_context.md).*
+*Ship hybrid in 7 days. Prove RM X recovered in first week. Close 10 customers in 60. This is the Zero-to-One path that works with your home-address Meta blocker and zero capital. Self-service onboarding (v0.4) means each new client can go live without a SheersSoft engineer in the loop. Aligned with [product_context.md](./product_context.md).*

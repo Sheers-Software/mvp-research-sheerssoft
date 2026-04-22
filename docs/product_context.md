@@ -50,7 +50,7 @@
 | Attribute | Value | Rationale |
 |-----------|-------|-----------|
 | **Property type** | 3–4 star independent / mid-tier branded only | Budget hotels lack margin; 5-star has complex procurement. Sweet spot has budget + pain. |
-| **Size** | 50–300 rooms | Below 50 = too few inquiries. Above 300 = enterprise sales cycle. |
+| **Size** | 40–150 rooms | Below 40 = too few inquiries. Above 150 = enterprise sales cycle. Sweet spot has budget + pain. |
 | **Location** | Malaysia only (v1) | Same timezone, PDPA, BM/EN, local relationships. No regional sprawl. |
 | **Booking mix** | >50% manual channels (WhatsApp, phone, email) | OTAs don't need this product. Manual = after-hours gap. |
 | **Pain signal** | No after-hours coverage; 2–5 person reservations team | Must be actively losing leads. Pre-qualify: >20 inquiries/day. |
@@ -95,9 +95,9 @@
 
 | Price Band | Motion | Nocturn Fit |
 |------------|--------|-------------|
-| < RM 500/mo | Self-serve | N/A — below our floor |
-| RM 1,500–2,000/mo (Starter/Pro) | Sales-assisted | Demo call, onboarding support, pilot handholding |
-| RM 3,000–5,000+/mo (Pro/Enterprise) | Full sales process | ROI review, GM presentation, contract |
+| < RM 199/mo | Self-serve | N/A — below our floor |
+| RM 199/mo + RM 999 setup + 3% (Revenue Partner) | Sales-assisted | Demo call, onboarding support, pilot handholding. KB built by SheersSoft in 48 hrs. |
+| Enterprise (custom) | Full sales process | ROI review, GM presentation, contract — not v1 target |
 
 **Mismatch kill:** Don't build enterprise sales infrastructure for a RM 1,500 product. Don't expect self-serve conversion at RM 5,000.
 
@@ -290,4 +290,6 @@ Use this section to validate PRD, Build Plan, and Architecture:
 - [ ] **Case study metrics:** Replace unverified benchmarks with real pilot data once available
 - [ ] **Product naming:** Nocturn AI (public) / Sheers Software Sdn Bhd (legal)
 - [ ] **Unit economics:** CAC, LTV, churn tracked from first paying customer; performance fee % tracked separately
-- [ ] **ICP ruthlessness:** Malaysian hotels, room count entry now at <30 (disqualifier per apply form); target 30–150+ rooms
+- [ ] **ICP ruthlessness:** Malaysian hotels, 40–150 rooms (NOT 50–300); target independent 3–4 star, WhatsApp-primary
+- [ ] **Hybrid Co-Pilot path (ADDED 20 Apr 2026):** Default launch is Hybrid (no Meta API required). AI drafts replies in dashboard, hotel staff sends via WhatsApp Business App multi-device. Full Meta Cloud API (Stage 3) activates after virtual office address resolves.
+- [ ] **Shadow Pilot:** 7-day Twilio or secondary number audit; Day 7 email → SheersSoft calls → Hybrid onboarding. Not a full product ask. No Meta API transfer required at this stage.

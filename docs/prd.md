@@ -1,26 +1,22 @@
 # Product Requirements Document (PRD)
 ## Nocturn AI — AI Inquiry Capture & Conversion Engine
-### Version 2.3 · 25 Mar 2026
+### Version 2.4 · 20 Apr 2026
 ### Aligned with [product_context.md](./product_context.md) · Ground truth: [opportunity_2_playbook.md](./opportunity_2_playbook.md)
 ### Cross-referenced with: [portal_architecture.md](./portal_architecture.md), [product_gap.md](./product_gap.md), [gtm_execution_plan.md](./gtm_execution_plan.md)
 
 ---
 
-## 1. Problem Statement
+## 1. Problem Statement (2026 Reality)
 
-Malaysian hotels receive **90% of bookings through manual channels** — WhatsApp, phone, email, and walk-ins. After 6pm, reservations desks close and inquiries are dropped. At mid-tier properties, a team handles 200–300 touchpoints on busy days with 30% needing manual follow-up — a pattern confirmed across the target segment. **Revenue literally falls on the floor every night.**
+Independent Malaysian 3–4 star hotels (40–150 rooms) still lose 57.35% of bookings to OTAs while their own WhatsApp/email inquiries (30–50+/day) go unanswered after 6 PM. Guests default to Agoda/Booking.com → hotel waits 30–60 days for net payout while wages (RM1,700+), utilities (+20–30%), and staff turnover crush cash flow.
 
-Meanwhile, hotels pay **15–25% commission** on every OTA booking. Every direct inquiry they fail to answer pushes the guest toward Booking.com or Agoda — where the hotel pays for what should have been free.
-
-Hotels also operate **blind to their own after-hours volume**. Most GMs estimate they receive "a few messages" after 10pm — the actual number is typically 3–5x their estimate. The data does not exist until someone installs a listener. The after-hours audit solves this blind spot before asking for any commitment.
-
-**No product today captures, responds to, and converts inquiries across WhatsApp, web, and email — 24/7 — and proves the revenue impact to the GM.**
+**No product today turns those direct inquiries into same-day FPX/DuitNow bookings while proving the exact RM recovered.**
 
 ---
 
 ## 2. Product Vision
 
-> An AI-powered, always-on concierge that captures every hotel inquiry — WhatsApp, web, email — converts them into bookings, and proves to the GM exactly how much revenue was recovered from leads that would have been lost.
+An AI-powered Direct-Booking Closer that sits on top of the hotel's existing WhatsApp Business App + Google Sheet and delivers **15%+ recovered direct revenue (same-day cash + 15–30% OTA commission savings) in as little as 7 days**.
 
 ### Design Principles
 
@@ -40,20 +36,14 @@ Hotels also operate **blind to their own after-hours volume**. Most GMs estimate
 
 ### Primary ICP (Ideal Customer Profile) — Ruthlessly Narrow
 
-> *"Pick the smallest viable market segment that can sustain your business. You can expand later."*
+- Independent 3–4 star Malaysian hotels (40–150 rooms)
+- WhatsApp is primary booking channel (>60% of inquiries)
+- No PMS (or legacy Excel/Google Sheet only)
+- GM/Revenue Manager is the buyer
+- Heavy OTA dependency + cash-flow pain from delayed payouts
+- Locations: Klang Valley, Penang, Johor Bahru first
 
-| Attribute | Value | Rationale |
-|---|---|---|
-| **Property Type** | Independent and mid-tier brand hotels (3–4 star) only | Budget lacks margin; 5-star has enterprise procurement |
-| **Size** | 40–150 rooms | Under 40: insufficient inquiry volume to prove ROI. Over 150: procurement delays the sale. |
-| **Location** | Klang Valley, Penang, JB (initial market) | Dense enough to reference clients to each other. PDPA, BM/EN, local relationships. No regional sprawl until PMF. |
-| **Dark Window** | Front desk closes at or before 10pm (skeleton crew only) | The night auditor does not answer WhatsApp. 10pm–8am = dead zone. This is the product's value window. |
-| **Channel Dependency** | WhatsApp is primary booking inquiry channel (>60% of manual inquiries) | Email and phone hotels exist but are lower urgency — WhatsApp guests expect instant replies. |
-| **OTA Dependency** | Paying 15%+ Agoda / Booking.com commission | Makes the "OTA displacement" portion of the audit financially visceral to the GM. |
-| **Decision Maker** | GM or Revenue Manager (NOT IT) | IT blocks deals. GMs care about revenue |
-| **Budget** | RM 499–2,800/month | Value-based: 10–30% of estimated monthly recovery from after-hours leads |
-
-**Explicitly NOT in v1:** Budget hostels, Airbnb-style, 5-star chains, properties with <15 inquiries/day.
+**Explicitly NOT**: Chains, budget hostels, 5-star, properties <20 inquiries/day.
 
 ### User Personas
 
@@ -77,6 +67,18 @@ Hotels also operate **blind to their own after-hours volume**. Most GMs estimate
 ## 4. Feature Requirements
 
 ### 4.1 v1 Scope — Ship This
+
+#### F0: Hybrid AI Co-Pilot (P0 — Ship First)
+| Attribute | Detail |
+|---|---|
+| **User Story** | *As a hotel GM, I receive AI-drafted WhatsApp/email replies in my dashboard — complete with availability from our Google Sheet and an FPX payment link — and send them with one click via my existing WhatsApp Business App. No Meta API required.* |
+| **Flow** | Guest messages hotel's WhatsApp Business App → Hotel opens dashboard → AI drafts reply in <5 seconds including availability + FPX/DuitNow link → Hotel sends with one click or copies to WhatsApp Business App |
+| **Data Source** | Google Sheet inventory (2-minute polling) as availability source until full Meta API integration |
+| **Response Target** | <60 seconds end-to-end (beats manual 8–24 hr delays) |
+| **Success Metric** | 15%+ shift to direct bookings with same-day cash in first 7 days (proven in daily GM report) |
+| **Acceptance Criteria** | AI-drafted replies appear in dashboard within 5 seconds. FPX/DuitNow payment link included. Hotel can send via one-click forward or copy-paste. Daily GM report shows RM recovered (same-day vs OTA 30-day delay). |
+
+**F1–F9**: All features below now support hybrid as default, full automation (Meta Cloud API) as Stage 3.
 
 #### F1: AI Conversation Engine
 | Attribute | Detail |
@@ -153,7 +155,7 @@ Hotels also operate **blind to their own after-hours volume**. Most GMs estimate
 | **Content** | Leads captured · Est. revenue recovered · Conversations handled · Pending handoffs (count + urgency) · One-click CTA to full dashboard |
 | **Schedule** | Daily at **7:00am** property-local time. Triggered by Cloud Scheduler → `POST /api/v1/internal/run-daily-report`. |
 | **Format** | Mobile-optimised HTML. Concise. Read in bed before the GM gets up. |
-| **Production Blockers** | ⚠️ Not yet functional in production: (1) `SENDGRID_API_KEY` missing from GCP Secret Manager; (2) Cloud Scheduler `run-daily-report` job not created. Both required before pilot go-live. |
+| **Production Blockers** | ✅ **Resolved (v0.3.2)** — `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL` in Secret Manager. Cloud Scheduler jobs were created, verified (HTTP 200), and **deleted in 2026-03-23 GCP cleanup**. Must be recreated on next production deploy before daily reports resume. Internal endpoints (`/api/v1/internal/run-daily-report`) are live and tested. |
 | **Acceptance Criteria** | Reports send at 7:00am after blockers resolved. Data matches dashboard. Mobile-optimised. One-click link to authenticated session. |
 
 #### F9: After-Hours Revenue Audit Calculator
@@ -271,15 +273,13 @@ Targets aligned with `gtm_execution_plan.md` 90-day scorecard:
 
 ---
 
-## 6. Pricing — Performance-Based Revenue Partner Model
-
-> **Updated 31 Mar 2026:** Pricing model has pivoted to a performance-aligned structure. Old flat-tier subscriptions (Boutique RM 499 / Independent RM 1,200 / Premium RM 2,800) are retired. See [product_context.md](./product_context.md) Section 6 for full context.
+## 6. Pricing — Performance-Based (Updated 20 Apr 2026)
 
 | Component | Amount | Notes |
 |-----------|--------|-------|
 | **Platform Fee** | RM 199/month | Full omni-channel access + dashboard + daily GM report |
 | **Setup + AI Training** | RM 999 one-time | 48-hour implementation by SheersSoft team |
-| **Performance Fee** | 3% on confirmed direct bookings facilitated by Nocturn AI | Outcome-aligned — zero bookings = zero performance fee |
+| **Performance Fee** | 3% only on confirmed direct bookings closed by Nocturn AI | Outcome-aligned — zero bookings = zero performance fee |
 
 **Guarantee:** 30-day revenue recovery guarantee — if we don't demonstrate recovery, next month's platform fee is waived.
 
@@ -388,14 +388,14 @@ New client login
 
 ### 9.1 Validated v1.x Roadmap
 
-**Pre-pilot deliverables** — status as of v2.3:
+**Pre-pilot deliverables** — status as of v2.4 (actual):
 - ✅ After-Hours Revenue Audit calculator at `/audit` (v0.5)
 - ✅ AuditRecord model + audit endpoints (v0.5)
 - ✅ Internal admin revenue audit tool at `/admin/tools/revenue-audit` (v0.5)
 - ✅ `ENVIRONMENT=production` in cloudbuild.yaml (v0.5)
-- ❌ `audit_only_mode` flag on Property — Shadow Pilot Mode (Sprint 2.5)
-- ❌ Weekly audit email + scheduler job (Sprint 2.5)
-- ❌ Shadow pilot provisioning in admin panel (Sprint 2.5)
+- ✅ `audit_only_mode` flag on Property — Shadow Pilot Mode (v0.5)
+- ✅ Weekly audit email + scheduler job (v0.5)
+- ✅ Shadow pilot provisioning in admin panel (v0.5)
 - ✅ Dashboard home shows revenue KPI cards (rebuilt v0.3.1)
 - ✅ Staff reply input in conversations view (v0.3.1)
 - ✅ "Lost" status filter in leads UI (v0.3.1)
@@ -408,7 +408,13 @@ New client login
 - ✅ `/welcome` 5-step onboarding wizard (v0.4)
 - ✅ Role-based auth callback routing (v0.4)
 - ✅ `/admin/kb-ingestion` tool for SheersSoft operators (v0.4)
-- ❌ 50-question BM/Manglish test suite run at ≥80% pass rate (half-day field work — P0 blocker)
+- ❌ 50-question BM/Manglish test suite run at ≥80% pass rate (half-day field work — **P0 blocker**)
+
+**Sprint 2.6 — Hybrid Co-Pilot (Next Sprint, NOT yet built):**
+- ❌ Hybrid AI Co-Pilot reply drafting UI (dashboard → "Copy to WhatsApp")
+- ❌ Google Sheet real-time inventory reader
+- ❌ FPX/DuitNow payment link generator in AI replies
+- ❌ Daily GM report: "RM X recovered today (same-day cash vs OTA 30-day delay)"
 
 **Post-pilot roadmap** (after first real-world data):
 
@@ -433,10 +439,10 @@ The codebase contains infrastructure built ahead of validation. This table track
 | SuperAdmin dashboard (`/admin`) | ✅ **Active (internal ops)** | SheersSoft ops tool — tenant management, scheduler config, maintenance mode, service health. Never shown to hotel clients. |
 | Stripe billing (checkout, subscriptions) | ❌ **Dormant** | Activate when pilot-to-paid conversion is proven; manual invoicing until ≥3 paying tenants. |
 | Support chatbot + ticket system | ✅ **Active** | `/portal/support` allows tenant users to submit and view tickets. Backend ticket CRUD live. |
-| Application intake form | ✅ **Active (primary entry point)** | Founding Cohort application at /apply is now the primary GTM entry point per new website (31 Mar 2026). Fields: hotel name, city, room count, after-hours process, WhatsApp number. Backend `Application` model + `/api/v1/applications` endpoint must be wired to this form. |
+| Application intake form | ✅ **Active (primary entry point, v0.4)** | Founding Cohort application at /apply is now the primary GTM entry point per new website (31 Mar 2026). Fields: hotel name, city, room count, after-hours process, WhatsApp number. Backend `Application` model + `/api/v1/applications` endpoint are live. |
 | Tenant self-service portal (`/portal`, `/welcome`) | ✅ **Active** | Full portal built in v0.4: KB self-management, team management, channel status, billing, support. `/welcome` 5-step onboarding wizard live. |
 | After-Hours Revenue Audit (`/audit`, AuditRecord, audit endpoints) | ✅ **Active** | Built in v0.5. Public calculator + superadmin submissions pipeline. |
-| Shadow Pilot Mode (`audit_only_mode`, shadow provisioning, weekly email) | ❌ **Pending (Sprint 2.5)** | Core to the new three-stage sales funnel. Block on go-live until complete. |
+| Shadow Pilot Mode (`audit_only_mode`, shadow provisioning, weekly email) | ✅ **Active (v0.5.1)** | Shadow pilot + hybrid onboarding path complete. Core to the three-stage sales funnel. |
 
 **Rule for activating dormant features:** Follow the decision tree in `product_gap.md` Section 7. A feature unlocks only when its release condition is met — not when it is technically ready.
 

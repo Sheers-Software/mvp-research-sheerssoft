@@ -2,11 +2,11 @@
 
 An AI-powered hotel inquiry capture system that recovers revenue lost after hours, tracks granular ROI, and is a fully multi-tenant SaaS platform built by SheersSoft.
 
-**v0.5.3** — Daily GM Report: Full 9 AM revenue briefing with 4 KPI cards (revenue recovered, OTA fees saved, inquiries handled, guest sentiment %), queued leads table, and Gemini-generated sentiment summary.
+**v0.5.4** — Document Alignment & Hybrid-First Model Refinement: Synchronized all core documentation (PRD, Build Plan, Architecture) to reflect the shift to Hybrid Co-Pilot as the default launch path. Fixed stale security and infra references across the docs.
 
 ## Architecture
 
-- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.5.3
+- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.5.4
 - **Frontend:** Next.js 14 + TypeScript
 - **Database:** Supabase PostgreSQL 17 + pgvector — user `nocturn_app`, transaction pooler (port 6543, ap-southeast-2)
 - **Auth:** Supabase Auth (magic links) + local JWT fallback
@@ -295,8 +295,8 @@ cd backend && python seed_demo_data.py
 - [x] **v0.4.0: Self-Service Onboarding & Tenant Portal** — `/welcome` wizard, `/portal` owner layer, KB self-service, role-based auth routing, generic ICP (not Vivatel-specific)
 - [x] **v0.5.0: Local Dev Stack + Demo Readiness** — local postgres/redis in docker-compose, google-genai SDK upgrade, gemini-embedding-001, RAG threshold fix, shadow pilot infrastructure (audit_only_mode, weekly audit report, /admin/shadow-pilots)
 - [x] **v0.5.1: Infrastructure Hardening** — GCP Secret Manager project ID corrected (nocturn-ai-487207), cloudbuild.yaml SA fixed, LLM fallback chain reordered (Haiku as secondary), Docker frontend proxy URL fixed (backend:8080), Anthropic API key provisioned, WhatsApp GTM lead pipeline (10k leads, 330 WhatsApp-ready)
-- [x] **v0.5.2: Routing & Infrastructure Patch** — Fixed `self-provision` 404 missing route bug inside backend build and correctly mapped GCP Secret Manager project to `nocturn-ai`.
 - [x] **v0.5.3: Daily GM Report** — Full 9 AM revenue briefing email: 4 KPI cards (revenue recovered, OTA fees saved, inquiries handled, guest sentiment %), queued leads table with high-value badge, Gemini-generated sentiment summary, `first_morning_report_sent` onboarding milestone. Cloud Scheduler cron `0 9 * * *`.
+- [x] **v0.5.4: Document Alignment & Hybrid-First Refinement** — Synchronised PRD v2.4, Build Plan, and Architecture. Corrected stale ICP room counts (standardised to 40–150), fixed retired pricing model references, and updated production infra statuses (FERNET, SendGrid, Scheduler).
 
 ## Database & Supabase Notes
 

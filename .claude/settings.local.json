@@ -120,7 +120,10 @@
       "WebFetch(domain:dreamina.capcut.com)",
       "WebFetch(domain:www.capcut.com)",
       "Bash(gcloud iam:*)",
-      "WebFetch(domain:sheerssoft-website-203184798103.asia-southeast1.run.app)"
+      "WebFetch(domain:sheerssoft-website-203184798103.asia-southeast1.run.app)",
+      "WebFetch(domain:hyros.com)",
+      "Bash(find /h/Source/repos/mvp-research-sheerssoft/frontend/src -name globals.css -o -name *.css)",
+      "Bash(gcloud logging:*)"
     ]
   }
 }

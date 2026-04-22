@@ -1,228 +1,219 @@
 # Product Gap Analysis
 ## Nocturn AI — What to Build, What to Drop, How to Get Paid
-### Version 1.3 · 18 Mar 2026
-### Cross-referenced with: prd.md v2.0, portal_architecture.md, gtm_execution_plan.md, workflow_zero_to_paid.md, revenue_methodology.md
+### Version 1.4 · 20 Apr 2026
+### Cross-referenced with: prd.md v2.4, architecture.md v2.4, build_plan.md v2.4, portal_architecture.md, workflow_zero_to_paid.md, revenue_methodology.md
 
 ---
 
-## Current Status Snapshot
+## Current Status Snapshot (as of 20 Apr 2026)
 
 | Area | Status |
 |------|--------|
-| AI engine (WhatsApp, Web, BM/EN) | ✅ Live on Cloud Run |
-| Dashboard home — KPI cards | ✅ Done (rebuilt, shows revenue/leads/inquiries) |
-| Staff reply from dashboard | ✅ Done (conversations view has reply box) |
-| "Lost" filter in leads | ✅ Done |
-| Maintenance mode (backend + UI + banner) | ✅ Done — Phase 1.5 complete |
+| AI engine (WhatsApp Meta + Twilio, Web Chat, BM/EN) | ✅ Live (Cloud Run — GCP deploy paused since 23 Mar 2026) |
+| Dashboard home — KPI cards (revenue/leads/inquiries) | ✅ Done (v0.3.1) |
+| Staff reply from dashboard (conversations view) | ✅ Done (v0.3.1) |
+| "Lost" filter in leads | ✅ Done (v0.3.1) |
+| Maintenance mode (backend + admin toggle + tenant banner) | ✅ Done (v0.3.2) |
+| Service health dashboard (`/admin/health`) | ✅ Done (v0.3.2) |
 | Magic link auth (Supabase PKCE) | ✅ Done — superadmin restricted to `a.basyir@sheerssoft.com` |
-| Daily email in production | ✅ Done — `SENDGRID_API_KEY` configured, 4 Cloud Scheduler jobs live |
-| FERNET encryption key | ✅ Done — `FERNET_ENCRYPTION_KEY` in Secret Manager |
-| BM end-to-end test (50 questions) | ❌ Not run |
-| Vivatel KB population | ❌ Requires Zul session |
-| Service health dashboard (`/admin/health`) | ✅ Done — Phase 1.5 I1.2 |
-| Announcements system | ❌ Not built — Phase 1.5 |
-| `/portal` tenant management layer | ❌ Not built — Phase 4 |
-| `/welcome` onboarding wizard | ❌ Not built — Phase 4 |
+| Daily email in production (SendGrid + 4 Cloud Scheduler jobs) | ✅ Done (v0.3.2) — Note: jobs deleted in 2026-03-23 GCP cleanup; recreate on next deploy |
+| FERNET encryption key | ✅ Done — `FERNET_ENCRYPTION_KEY` confirmed in Secret Manager |
+| Infra migration (Supabase-only DB, Secret Manager) | ✅ Done (v0.3.3) |
+| `/portal` tenant management layer | ✅ Done (v0.4) — KB, team, channels, billing, support |
+| `/welcome` onboarding wizard (5 steps) | ✅ Done (v0.4) |
+| Role-based auth callback routing | ✅ Done (v0.4) |
+| `/admin/kb-ingestion` tool | ✅ Done (v0.4) |
+| Application intake form (`/apply`) | ✅ Done (v0.4) — primary GTM entry point |
+| After-Hours Revenue Audit calculator (`/audit`) | ✅ Done (v0.5) |
+| `AuditRecord` model + endpoints | ✅ Done (v0.5) |
+| `/admin/tools/revenue-audit` admin tool | ✅ Done (v0.5) |
+| `audit_only_mode` flag on Property | ✅ Done (v0.5) |
+| Weekly audit email + `run_weekly_audit_report` scheduler job | ✅ Done (v0.5) |
+| `/admin/shadow-pilots` provisioning page | ✅ Done (v0.5) |
+| Announcements model (DB table + migration) | ✅ Model/table exists — backend routes in superadmin.py |
+| **Hybrid AI Co-Pilot reply drafting UI** | ❌ Not built (Sprint 2.6) |
+| **Google Sheet real-time inventory reader** | ❌ Not built (Sprint 2.6) |
+| **FPX/DuitNow payment link generator in AI replies** | ❌ Not built (Sprint 2.6) |
+| BM end-to-end test (50 questions) | ❌ Not run — **P0 blocker** |
+| First pilot property KB not populated | ❌ Not done — **P0 field work** |
 
 ---
 
-## 1. The Situation
+## 1. The Situation (20 Apr 2026)
 
-The codebase is at v0.3.1. The AI engine works. The backend is live on Cloud Run. The dashboard home shows revenue KPIs. Staff can reply to guests from the dashboard. **The remaining blockers to first payment are infra tasks (SendGrid key, Cloud Scheduler) and field work (BM test, Vivatel KB session) — no remaining product code is required to go to pilot.**
+The codebase is at **v0.5** (v0.5.2 per `main.py`). The shadow pilot infrastructure is complete — a SheersSoft AM can provision a shadow pilot for a prospect in 5 minutes from the admin panel, and the GM gets a real-data audit email on Day 7 automatically.
 
-The portal architecture has been designed and Phase 1.5 (SheersSoft internal controls) is underway. This enables safe multi-tenant operation once Vivatel goes live.
+**The remaining gap to first paid client:**
+1. Run the 50-question BM/Manglish test suite (half-day) — must pass ≥80%
+2. Populate first pilot property KB (1-day field session)
+3. Build Sprint 2.6 Hybrid Co-Pilot features (3–5 days dev) — converts shadow pilot → revenue-generating co-pilot
+
+**Key hybrid model insight (20 Apr 2026):** The Meta Cloud API home-address verification blocker means we cannot auto-send via WhatsApp. The Hybrid Co-Pilot sidesteps this: AI drafts the reply in the dashboard, hotel staff sends via their existing WhatsApp Business App (multi-device). Hotels get 80% of the value today while Meta registration is resolved.
 
 ---
 
-## 2. The Bridge — Path to First Payment
+## 2. The Bridge — Path to First Revenue
 
 ```
-Step 1: GM opens dashboard → SEES revenue ✅ DONE
-Step 2: GM sees leads with full conversation context ✅ DONE
-Step 3: Staff replies from dashboard → guest receives it on WhatsApp ✅ DONE
-Step 4: GM gets email at 7am confirming last night's numbers ✅ DONE (SendGrid + Scheduler live)
-Step 5: BM test passes ≥80% ❌ NOT RUN
-Step 6: Vivatel KB populated ❌ NEEDS ZUL SESSION
-Step 7: GM says "this is working" → invoice paid ← TARGET
+Step 1: Shadow pilot provisioned → GM gets Day 7 audit email      ✅ INFRASTRUCTURE READY
+Step 2: BM test passes ≥80%                                        ❌ NOT RUN (half-day)
+Step 3: First pilot KB populated                                    ❌ NEEDS FIELD SESSION (1 day)
+Step 4: Sprint 2.6 Hybrid Co-Pilot UI built                        ❌ NOT BUILT (2–3 days dev)
+Step 5: Hotel tries co-pilot → AI drafts → staff sends → guest books ← TARGET
+Step 6: GM sees "RM X recovered today" in morning report → signs up paid
 ```
 
 ---
 
 ## 3. Remaining Obstacles to First Payment
 
-### ~~Obstacle C: Daily Email Not Live in Production~~ — ✅ RESOLVED
+### Obstacle A: BM Test Not Run — ❌ FIELD WORK (P0)
+**Status:** 50-question BM/Manglish test suite exists at `docs/bm_test_suite.md`. Execution plan at `docs/bm_test_execution_plan.md`. Not run end-to-end via real WhatsApp.
 
-**Status:** `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL` configured in Secret Manager. All 4 Cloud Scheduler jobs created and verified:
-- `nocturn-daily-report` — 7:30am MYT daily
-- `nocturn-followups` — every hour MYT
-- `nocturn-insights` — 8am MYT on 1st of each month
-- `nocturn-keepalive` — every 6 hours MYT (ping /health to prevent cold starts)
-
-Manual trigger test passed (HTTP 200) on 18 Mar 2026. Old duplicate jobs (`daily-report`, `run-followups`, `run-insights`, `db-keepalive`) deleted.
+**Fix:** Run via Twilio sandbox. Must pass ≥80% before first client go-live.
 
 ---
 
-### ~~Obstacle D: PII Encryption Key Missing~~ — ✅ RESOLVED
+### Obstacle B: Pilot Property KB Empty — ❌ FIELD WORK (P0)
+**Status:** No KB ingested for first pilot property.
 
-**Status:** `FERNET_ENCRYPTION_KEY` confirmed in GCP Secret Manager. PII field-level encryption is active for new leads.
-
----
-
-### Obstacle E: BM Test Not Run
-
-**Status:** BM logic exists and is untested end-to-end via real WhatsApp.
-
-**Fix:** Run the 50-question suite from `docs/bm_test_suite.md` via Twilio sandbox → Vivatel test number. Must pass ≥80%. See `docs/bm_test_execution_plan.md` for execution steps.
-
----
-
-### Obstacle F: Vivatel KB Empty
-
-**Status:** No knowledge base ingested for Vivatel property. AI will hallucinate or give generic answers until this is done.
-
-**Fix:** 90-minute session with Zul. Collect all 28 KB intake questions (see `docs/workflow_zero_to_paid.md` Stage 4). Ingest via:
+**Fix:** 90-minute session with GM/property contact. Ingest via `/admin/kb-ingestion` or:
 ```bash
-python backend/scripts/ingest_kb.py --property-slug vivatel-kl --file vivatel_kb.md
+python backend/scripts/ingest_kb.py --property-slug [slug] --file [property]_kb.md
 ```
+
+---
+
+### Obstacle C: Hybrid Co-Pilot Not Built — ❌ DEV (Sprint 2.6)
+**Status:** Shadow pilot infrastructure shows GMs the problem. Hybrid co-pilot is how they experience the solution. Without it, the shadow pilot conversion asks GMs to still trust on faith.
+
+**Required deliverables (Sprint 2.6):**
+- Hybrid reply drafting UI in `/dashboard/conversations`: AI-drafted reply appears in sidebar when a guest message comes in. "Copy to WhatsApp" button + optional forward
+- Google Sheet inventory reader: 2-minute polling of hotel's Google Sheet for room availability; injects into AI system prompt
+- FPX/DuitNow link generator: when AI detects booking intent, embed a payment link in the draft
+- Analytics update: "RM X recovered today (same-day vs OTA 30-day)" in daily GM report
+
+---
+
+### ~~Obstacle D: Cloud Scheduler Jobs Missing~~ — ✅ PARTIALLY RESOLVED
+**Status:** Jobs were confirmed live (nocturn-daily-report, nocturn-followups, nocturn-insights, nocturn-keepalive, run-weekly-audit-report) but **deleted in 2026-03-23 GCP cleanup**. Must recreate on next production deploy.
+
+---
+
+### ~~Obstacle E: WHATSAPP_API_TOKEN missing~~ — ❌ STAGE 3 ONLY
+**Status:** Not in Secret Manager. Not needed for Shadow Pilot (Twilio) or Hybrid Co-Pilot path. Required only for Stage 3 (full Meta Cloud API auto-send) after virtual office address verification is resolved.
 
 ---
 
 ## 4. Feature Priority Matrix
 
-### 4.1 ✅ DONE — Blockers Cleared
+### 4.1 ✅ DONE — Everything Built Through v0.5
 
-| Feature | Completed |
-|---------|-----------|
-| Dashboard home → KPI cards (money slide) | ✅ v0.3.1 |
-| Staff reply from dashboard conversations | ✅ v0.3.1 |
-| "Lost" status filter in leads | ✅ v0.3.1 |
-| Maintenance mode (backend + admin toggle + tenant banner) | ✅ v0.3.1 |
-| Magic link auth — superadmin restricted to explicit email | ✅ v0.3.1 |
+All items from `portal_architecture.md` Phases 1–5 are complete. Shadow pilot infrastructure (Sprint 2.5) is complete.
+
+See `build_plan.md` Section "v0.5 — What Was Built" for the full feature list with ✅ status on every item.
 
 ---
 
-### 4.2 ❌ Still Needed Before Pilot (Infra + Field Work Only)
+### 4.2 ❌ Must Build Now (Sprint 2.6 — Hybrid Co-Pilot)
 
 | Task | Type | Effort | Owner |
 |------|------|--------|-------|
-| ~~Add `SENDGRID_API_KEY` to Secret Manager~~ | ✅ Done | — | — |
-| ~~Create 4 Cloud Scheduler jobs~~ | ✅ Done — `nocturn-daily-report`, `nocturn-followups`, `nocturn-insights`, `nocturn-keepalive` | — | — |
-| ~~Add `FERNET_ENCRYPTION_KEY` to Secret Manager~~ | ✅ Done | — | — |
+| Hybrid reply drafting sidebar in conversations view | Dev | 1 day | Ahmad Basyir |
+| Google Sheet inventory reader (2-min polling) | Dev | 0.5 day | Ahmad Basyir |
+| FPX/DuitNow payment link generator | Dev | 0.5 day | Ahmad Basyir |
+| Daily GM report: "RM X recovered today" (hybrid-aware) | Dev | 0.5 day | Ahmad Basyir |
 | BM 50-question end-to-end test | Field test | Half day | Ahmad Basyir |
-| Vivatel KB population session with Zul | Field work | 1 day | Ahmad Basyir + Zul |
+| Pilot KB population session | Field work | 1 day | Ahmad Basyir |
 
-**Total remaining: 1.5 days of field work. All infra and product code is complete.**
-
----
-
-### 4.3 Build Next — Phase 1.5 Internal Controls (Parallel with Pilot)
-
-These protect the quality of the pilot and all subsequent relationships. Build while Vivatel is live so they're ready before the second tenant.
-
-| Feature | Status | Priority | Effort |
-|---------|--------|----------|--------|
-| Maintenance mode | ✅ Done | — | — |
-| Service health dashboard (`/admin/health`) | ✅ Done | — | — |
-| Announcements system (backend + admin + tenant banner) | ❌ Not built | After health | 3 days |
+**Total: ~4.5 days dev + 1.5 days field work. This is Sprint 2.6.**
 
 ---
 
-### 4.4 Build Before Phase 4 — Tenant Self-Service
+### 4.3 Build Next — After First Pilot Live (Sprint 3+)
 
-These remove the per-tenant engineering time dependency. Required before onboarding the 3rd+ tenant without a SheersSoft engineer in the loop.
-
-| Feature | Portal | When |
-|---------|--------|------|
-| `/portal` tenant home (multi-property summary) | `/portal` | 2nd paying tenant |
-| KB management UI (add/edit/delete documents) | `/portal/kb` | 2nd paying tenant |
-| `/welcome` onboarding wizard (5-step) | `/welcome` | 3rd tenant |
-| Team management (invite + roles + property scope) | `/portal/team` | 3rd tenant |
-| Channel status + retry UI | `/portal/channels` | 4th tenant |
+| Feature | When |
+|---------|------|
+| Day 7 AM notification to SheersSoft AM | Sprint 3 — completes the auto-conversion loop |
+| Announcements system (UI: admin compose + tenant inbox banner) | Sprint 3 — backend model/table already exists |
+| Confirmed revenue ("Mark as Booked") + actual revenue metric | After 30 days of pilot data |
+| Week-over-week comparison in daily email | After 14+ days of data |
+| `/dashboard/insights` — AI performance + KB gaps | After 30+ days of per-property data |
 
 ---
 
-### 4.5 Build at Scale (5+ Paying Tenants)
+### 4.4 Build at Scale (5+ Paying Tenants)
 
 | Feature | Why Wait |
 |---------|----------|
-| Confirmed revenue field ("Mark as Booked") | Needs real booking data to be meaningful |
-| `/dashboard/insights` — AI performance + KB gaps | Needs 30+ days of per-property data |
-| Week-over-week comparison in daily email | Needs 14+ days of history |
 | Billing portal (Stripe Customer Portal) | Manual invoicing until ≥10 tenants |
-| Mobile-responsive dashboard | Desktop-first is fine for 3-4 star hotel GMs |
+| Mobile-responsive dashboard | Desktop-first is fine for hotel GMs |
 | `staff_tier` RBAC (manager/revenue/ops) | No tenant has asked for this yet |
+| Meta Cloud API (Stage 3 full automation) | After virtual office address verified + 5 paying pilots |
+| F&B Revenue Intelligence | 5 paying customers first |
 
 ---
 
-### 4.6 Drop (Do Not Build in v1 — Reconfirmed)
+### 4.5 Drop (Do Not Build in v1 — Reconfirmed)
 
 | Feature | Why to Drop |
 |---------|-------------|
-| Gamified onboarding progress tracker | Replaced by KPI dashboard. No GM asked for this. |
-| Application intake form (ai.sheerssoft.com/apply) | No inbound advertising driving traffic. |
-| Support chatbot (nocturn-ai-support property) | Zero support tickets. Build when customer base justifies it. |
-| Email channel inbound (SendGrid inbox) | Malaysian hotels use WhatsApp. Not validated. |
-| Voice / image AI capabilities | No customer has asked. Don't add until core is proven. |
-| F&B Intelligence (Opportunity #1) | Right direction, wrong timing. 5 paying customers first. |
+| Automated PDF report generation for audit | Post-PMF. Text email is sufficient. |
+| Voice / image AI capabilities | No customer has asked. Don't add. |
+| Email channel inbound (SendGrid inbox) | Malaysian hotels use WhatsApp. Unvalidated. |
+| Gamified onboarding progress tracker | Dashboard KPI cards replaced this. No GM asked. |
+| F&B Intelligence, Guest Recognition KYC | Right direction, wrong timing. 5 paying customers first. |
 
-**Note on items previously listed as "drop" that are NOW being built:**
-- `SuperAdmin dashboard` — now `/admin` with maintenance + health + announcements. This is SheersSoft ops infrastructure, not a customer feature. Correct to build.
-- `Supabase Auth` — magic link login is live and working. This was the right call.
-- `TenantMembership hierarchy` — portal separation (`/portal` vs `/dashboard`) is the right architecture. Build Phase 4 when it unblocks scaling.
+> **Items previously listed as "Drop" that are now BUILT and ACTIVE:**
+> - Application intake form (`/apply`) — primary GTM entry point
+> - Shadow Pilot provisioning (`/admin/shadow-pilots`) — live
+> - Tenant portal (`/portal`, `/welcome`) — live
+> - Support chatbot property — architecture exists
 
 ---
 
 ## 5. What "Getting Paid" Looks Like
 
-### Direct Path (Vivatel Pilot)
+### Path A — Hybrid Co-Pilot (Primary, 7-day close)
 
 ```
-Now (18 Mar) → 2 infra tasks (SendGrid + Scheduler + FERNET) → 2h
-→ BM test (half day) → Vivatel KB session (1 day with Zul)
-→ Deploy to production → Vivatel UAT (2 days supervised)
-→ 7 days of real data → Pilot review call (Day 30) → Invoice
+Shadow pilot launched (Day 0) → Day 7 audit email → GM calls
+  → Sprint 2.6 Hybrid Co-Pilot demo → KB + Google Sheet ingested (1 day)
+  → Hotel tries co-pilot for 3 days → first direct booking closed
+  → GM sees "RM X recovered today" in morning report
+  → Invoice: RM 999 setup + RM 199/mo + 3% performance
 ```
 
-**Target: First invoice by Day 28–30 (mid-April 2026).**
-
-### Next Priority After Pilot Launch
-
-While monitoring Vivatel (days 8–14), build Phase 1.5 remaining items:
-1. **Service health dashboard** — know before tenants know when a service degrades
-2. **Announcements system** — communicate maintenance to tenants without personal WhatsApp
-
-These are complete before the second tenant onboards, ensuring professional ops at scale.
+### Path B — Full Auto (Stage 3, deferred)
+After Hybrid proves ROI → virtual office address verified → Meta Cloud API registration → full auto-send.
 
 ---
 
-## 6. The Revenue Formula (Canonical)
+## 6. The Revenue Formula (Canonical — Unchanged)
 
 Per `revenue_methodology.md`:
 
 ```
 Estimated Revenue Recovered = Sum of (lead nights × property ADR) × 20%
   where: lead nights defaults to 1 if not captured
-         ADR defaults to property setting (Vivatel ~RM 230)
+         ADR defaults to property setting (target ~RM 230)
          20% = conservative conversion assumption
 
 Cost Savings = AI-handled inquiries × 0.25 hrs × RM 25/hr
 ```
 
-**Example (Vivatel, 30 days):**
-- 20 after-hours leads × RM 230 ADR × 20% = **RM 920 estimated revenue recovered**
-- 400 AI-handled inquiries × 0.25 hrs × RM 25 = **RM 2,500 cost savings**
-- Total value: **RM 3,420/month** vs RM 1,500 subscription fee → 2.3× ROI
+**Hybrid-specific update:** "Actual revenue recovered" will come from leads where staff sent an AI-drafted reply via WhatsApp Business App and the guest subsequently confirmed a booking. This is tracked via the "Mark as Booked" flow (Sprint 3 target).
 
 ---
 
 ## 7. Decision Rule for New Feature Requests
 
-1. **Does it unblock the first invoice?** → Build immediately.
-2. **Does it protect the quality of the pilot?** → Build during pilot (Phase 1.5).
-3. **Does it remove per-tenant engineering time?** → Build before 3rd tenant (Phase 4).
+1. **Does it unblock the first hybrid co-pilot demo?** → Build immediately (Sprint 2.6).
+2. **Does it protect the quality of the pilot?** → Build during pilot (Sprint 3).
+3. **Does it remove per-tenant engineering time?** → Build before 3rd tenant.
 4. **Does it help retain/upsell 5+ paying properties?** → Build at scale.
 5. **None of the above?** → Drop.
 
 ---
 
-*v1.3 update: All infra tasks for P0 complete — SendGrid, FERNET, 4 Cloud Scheduler jobs live and verified. Daily report confirmed working (HTTP 200 on manual trigger). Remaining pilot blockers are field work only: BM test (half day) and Vivatel KB session (1 day with Zul). Phase 1.5 at 2/3: announcements system (I1.3) is next product task.*
+*v1.4 update (20 Apr 2026): All portal, welcome wizard, shadow pilot, audit infrastructure confirmed ✅ complete. Application intake confirmed ✅ active. Three remaining gaps: BM test (P0 field work), pilot KB (P0 field work), Sprint 2.6 Hybrid Co-Pilot (3–5 days dev). Cloud Scheduler jobs must be recreated on next GCP deploy.*

@@ -1,9 +1,9 @@
 # System Architecture
 ## Nocturn AI — AI Inquiry Capture & Conversion Engine
-### Version 2.3 · 25 Mar 2026
+### Version 2.4 · 20 Apr 2026
 ### Aligned with [product_context.md](./product_context.md) · Steered by [building-successful-saas-guide.md](./building-successful-saas-guide.md)
-### Cross-referenced with: [portal_architecture.md](./portal_architecture.md), [prd.md](./prd.md) v2.1
-### Implementation Status: v0.3.3 · All GCP compute spun down (2026-03-23) · Database: Supabase PostgreSQL 17 (ap-southeast-2)
+### Cross-referenced with: [portal_architecture.md](./portal_architecture.md), [prd.md](./prd.md) v2.4
+### Implementation Status: v0.5 · Shadow Pilot infrastructure complete · Sprint 2.6 (Hybrid Co-Pilot) is next
 
 ---
 
@@ -173,6 +173,19 @@ Guest message (Twilio shadow number)
 |---|---|---|
 | Microservices (separate conversation, AI, analytics services) | **Rejected** | 2-person team. 28-day deadline. Network overhead between services adds latency. Debugging distributed systems is a time sink. |
 | Modular monolith (single FastAPI app, clean module boundaries) | **Chosen** | One deployment unit. Sub-millisecond inter-module calls. Can be split later if scale demands it (it won't for 100 properties). |
+
+### 3.1.1 New Hybrid-First Design Decision (20 Apr 2026)
+
+**Hybrid Co-Pilot Flow (Zero Meta API required)**
+
+Guest → WhatsApp Business App (hotel's existing number)  
+→ Hotel forwards or multi-device opens message  
+→ Nocturn AI (dashboard) reads → drafts reply + FPX link (using Google Sheet inventory)  
+→ Hotel sends with one click (or copy-paste)  
+
+This path delivers the 15% revenue recovery outcome **today** while we fix the home-address Meta verification via virtual office (RM2/day).
+
+**Full Meta Cloud API is now optional Stage 3** (after first 5 pilots prove ROI).
 
 > At Google, we called this "monolith until it hurts." At 100 properties × 2,000 conversations/month, a single well-tuned container handles this easily. A Cloud Run instance with 2 vCPU and 4GB RAM can process ~50 concurrent conversations.
 
@@ -536,6 +549,19 @@ handoff:{property_id} → Pub/Sub channel for real-time staff alerts
 
 ### 6.1 Guest Message Flow (All Channels)
 
+> **Updated 20 Apr 2026 — Hybrid Path (primary):**
+>
+> Guest message → hotel's WhatsApp Business App (multi-device)  
+> → Hotel opens dashboard → AI drafts reply in <5 seconds  
+> → Hotel forwards/sends → guest receives FPX-ready quote  
+> → Conversation logged → daily revenue report updated
+>
+> **Latency target remains <60 seconds end-to-end for hybrid (still beats manual 8–24 hr delays).**
+>
+> All other architecture sections (monolith, Supabase + pgvector, etc.) remain unchanged and support both hybrid and full-auto paths.
+
+#### 6.1.1 Full-Auto Flow (Stage 3 — Meta Cloud API)
+
 ```mermaid
 sequenceDiagram
     participant G as Guest
@@ -748,6 +774,7 @@ POST   /api/v1/internal/run-daily-report
 POST   /api/v1/internal/run-followups
 POST   /api/v1/internal/run-insights
 POST   /api/v1/internal/cleanup-leads
+POST   /api/v1/internal/run-weekly-audit-report  # Day 7 shadow pilot audit email (v0.5) ✅
 
 # ─── SuperAdmin (SheersSoft internal — require_superadmin) ───────────────
 GET    /api/v1/superadmin/metrics                # Platform-wide KPIs ✅
@@ -872,7 +899,7 @@ Attach a Cloud Build GitHub trigger on `main` for automatic deploys.
 
 - **Rate limiting**: SlowAPI middleware. 100 req/min per widget API key. 500 req/min per WhatsApp webhook.
 - **Input sanitization**: All guest messages sanitized before LLM prompt injection (strip special tokens, limit length).
-- **PII handling**: Guest phone/email encrypted at field level using Fernet symmetric encryption. Decrypted only at display time. ⚠️ `FERNET_ENCRYPTION_KEY` not yet in GCP Secret Manager — PII encryption is bypassed until this secret is added. Add before first paying tenant.
+- **PII handling**: Guest phone/email encrypted at field level using Fernet symmetric encryption. Decrypted only at display time. ✅ `FERNET_ENCRYPTION_KEY` confirmed in GCP Secret Manager (v0.3.2). PII encryption is active.
 - **API key rotation**: Property API keys can be rotated without downtime.
 - **Maintenance mode**: `MaintenanceModeMiddleware` in `app/middleware.py` intercepts all requests when `maintenance_mode.enabled = true` in `system_config`. Returns HTTP 503 with JSON to guests. Exempt: `/api/v1/superadmin/*`, `/api/v1/internal/*`, `/api/v1/system/info`, `/health`. In-process 30s TTL cache; cache busted immediately on toggle. Activated from `/admin/system`.
 - **Superadmin restriction**: `SUPERADMIN_EMAILS` is an explicit comma-separated allowlist (no domain wildcards). Bidirectional sync on every login — users removed from the list are immediately downgraded on next login.
