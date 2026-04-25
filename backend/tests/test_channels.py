@@ -71,11 +71,21 @@ async def test_whatsapp_incoming_message(client: AsyncClient):
         from app.models import Property
         from decimal import Decimal
         
+        from sqlalchemy import text as sa_text
+        async with async_session() as db:
+            # Remove stale test properties to prevent MultipleResultsFound on re-runs
+            await db.execute(sa_text(
+                "DELETE FROM conversations WHERE property_id IN "
+                "(SELECT id FROM properties WHERE whatsapp_number = '1234567890')"
+            ))
+            await db.execute(sa_text("DELETE FROM properties WHERE whatsapp_number = '1234567890'"))
+            await db.commit()
+
         async with async_session() as db:
             prop = Property(
-                name="Test Property", 
-                whatsapp_number="1234567890", 
-                adr=Decimal("100"), 
+                name="Test Property",
+                whatsapp_number="1234567890",
+                adr=Decimal("100"),
                 ota_commission_pct=Decimal("15"),
                 timezone="Asia/Kuala_Lumpur",
                 plan_tier="pilot",

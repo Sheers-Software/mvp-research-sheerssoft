@@ -16,10 +16,15 @@ async def test_analytics_revenue_calculation(client):
     """
     # 1. Setup Data
     async with async_session() as db:
-        # Clean up existing properties to ensure we get the one we create
+        # Clean up existing data (order matters for FK constraints)
         await db.execute(text("DELETE FROM leads"))
         await db.execute(text("DELETE FROM messages"))
+        await db.execute(text("DELETE FROM shadow_pilot_conversations"))
+        await db.execute(text("DELETE FROM shadow_pilot_analytics_daily"))
         await db.execute(text("DELETE FROM conversations"))
+        await db.execute(text("DELETE FROM analytics_daily"))
+        await db.execute(text("DELETE FROM kb_documents"))
+        await db.execute(text("DELETE FROM onboarding_progress"))
         await db.execute(text("DELETE FROM properties"))
         await db.commit()
 
@@ -94,13 +99,10 @@ async def test_analytics_revenue_calculation(client):
     # Lead 3 is ignored (not after hours)
     
     assert "estimated_revenue_recovered" in data
-    # Float comparison
-    assert abs(data["estimated_revenue_recovered"] - 700.0) < 0.1
-    assert data["leads_captured"] == 3 # All leads today? Logic says leads captured today.
-    # Logic in analytics.py for leads_captured:
-    # select(func.count(Lead.id)).where(Lead.captured_at >= today_start...)
-    # So it should be 3.
-    
+    # analytics.py applies 20% conversion rate: (500 + 200) * 0.20 = 140.0
+    assert abs(data["estimated_revenue_recovered"] - 140.0) < 0.1
+    assert data["leads_captured"] == 3 # All leads captured today
+
     assert data["after_hours_inquiries"] == 2 # Conv1, Conv2
     
     # Verify Operations View Metrics
