@@ -76,6 +76,29 @@ function fmtK(n: number) {
     return fmt(n);
 }
 
+// ─── Shared input styles ──────────────────────────────────────────────────────
+
+const selectStyle: React.CSSProperties = {
+    width: '100%',
+    background: 'var(--bg3)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--text)',
+    padding: '10px 14px',
+    fontSize: 14,
+    fontFamily: 'inherit',
+    outline: 'none',
+    appearance: 'none',
+};
+
+const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: 12,
+    fontWeight: 500,
+    marginBottom: 10,
+    color: 'var(--text2)',
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AuditPage() {
@@ -144,36 +167,38 @@ export default function AuditPage() {
     return (
         <div style={{
             minHeight: '100vh',
-            background: 'var(--bg-primary)',
-            color: 'var(--text-primary)',
-            fontFamily: 'Inter, sans-serif',
+            background: 'var(--bg)',
+            color: 'var(--text)',
+            fontFamily: 'Inter, -apple-system, system-ui, sans-serif',
         }}>
             {/* Header */}
             <div style={{
-                background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, transparent 60%)',
-                borderBottom: '1px solid var(--border-subtle)',
-                padding: '48px 24px 40px',
+                background: 'var(--bg2)',
+                borderBottom: '1px solid var(--border)',
+                padding: '44px 24px 36px',
                 textAlign: 'center',
             }}>
-                <div style={{ maxWidth: 720, margin: '0 auto' }}>
+                <div style={{ maxWidth: 680, margin: '0 auto' }}>
                     <div style={{
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 8,
-                        background: 'var(--accent-subtle)',
-                        border: '1px solid rgba(99,102,241,0.3)',
+                        background: 'var(--teal-bg)',
+                        border: '0.5px solid rgba(29,158,117,0.3)',
                         borderRadius: 'var(--radius-full)',
-                        padding: '6px 16px',
-                        fontSize: 13,
-                        color: 'var(--text-accent)',
+                        padding: '5px 14px',
+                        fontSize: 12,
+                        color: 'var(--teal)',
                         marginBottom: 20,
+                        fontWeight: 500,
+                        letterSpacing: '0.02em',
                     }}>
                         Free · No account required · Instant results
                     </div>
-                    <h1 style={{ fontSize: 40, fontWeight: 800, lineHeight: 1.15, marginBottom: 16 }}>
+                    <h1 style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.2, marginBottom: 14, color: 'var(--text)', letterSpacing: '-0.02em' }}>
                         After-Hours Revenue Audit
                     </h1>
-                    <p style={{ fontSize: 18, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                    <p style={{ fontSize: 16, color: 'var(--text2)', lineHeight: 1.65 }}>
                         How much is your hotel losing every night because nobody answers WhatsApp?
                         Enter your numbers and find out in 30 seconds.
                     </p>
@@ -182,92 +207,78 @@ export default function AuditPage() {
 
             {/* Main layout */}
             <div style={{
-                maxWidth: 1100,
+                maxWidth: 1060,
                 margin: '0 auto',
-                padding: '40px 24px 80px',
+                padding: '36px 24px 80px',
                 display: 'grid',
                 gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)',
-                gap: 32,
+                gap: 28,
                 alignItems: 'start',
             }}>
 
                 {/* LEFT — Inputs */}
                 <div style={{
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border-default)',
+                    background: 'var(--bg2)',
+                    border: '1px solid var(--border)',
                     borderRadius: 'var(--radius-lg)',
-                    padding: 32,
+                    padding: 28,
                 }}>
-                    <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 28 }}>Your Hotel Details</h2>
+                    <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 24, color: 'var(--text)' }}>Your Hotel Details</h2>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
 
                         {/* Room count */}
                         <div>
-                            <label style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 10, color: 'var(--text-secondary)' }}>
-                                Number of rooms
-                            </label>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <label style={labelStyle}>Number of rooms</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                                 <input
                                     type="range"
                                     min={20} max={200} step={5}
                                     value={inputs.room_count}
                                     onChange={e => setInputs(p => ({ ...p, room_count: +e.target.value }))}
-                                    style={{ flex: 1, accentColor: 'var(--accent)' }}
+                                    style={{ flex: 1, accentColor: 'var(--teal)' }}
                                 />
                                 <span style={{
-                                    minWidth: 52,
+                                    minWidth: 48,
                                     textAlign: 'right',
-                                    fontWeight: 700,
-                                    fontSize: 20,
-                                    color: 'var(--text-accent)',
+                                    fontWeight: 600,
+                                    fontSize: 18,
+                                    color: 'var(--teal)',
                                 }}>{inputs.room_count}</span>
                             </div>
                         </div>
 
                         {/* ADR */}
                         <div>
-                            <label style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 10, color: 'var(--text-secondary)' }}>
-                                Average room rate (RM / night)
-                            </label>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <label style={labelStyle}>Average room rate (RM / night)</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                                 <input
                                     type="range"
                                     min={80} max={800} step={10}
                                     value={inputs.adr}
                                     onChange={e => setInputs(p => ({ ...p, adr: +e.target.value }))}
-                                    style={{ flex: 1, accentColor: 'var(--accent)' }}
+                                    style={{ flex: 1, accentColor: 'var(--teal)' }}
                                 />
                                 <span style={{
-                                    minWidth: 76,
+                                    minWidth: 72,
                                     textAlign: 'right',
-                                    fontWeight: 700,
-                                    fontSize: 20,
-                                    color: 'var(--text-accent)',
+                                    fontWeight: 600,
+                                    fontSize: 18,
+                                    color: 'var(--teal)',
                                 }}>RM {inputs.adr}</span>
                             </div>
                         </div>
 
                         {/* Daily messages */}
                         <div>
-                            <label style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 10, color: 'var(--text-secondary)' }}>
-                                Daily WhatsApp messages
-                            </label>
+                            <label style={labelStyle}>Daily WhatsApp messages</label>
                             <select
                                 value={inputs.daily_msgs === null ? '' : String(inputs.daily_msgs)}
                                 onChange={e => setInputs(p => ({
                                     ...p,
                                     daily_msgs: e.target.value === '' ? null : +e.target.value,
                                 }))}
-                                style={{
-                                    width: '100%',
-                                    background: 'var(--bg-input)',
-                                    border: '1px solid var(--border-default)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    color: 'var(--text-primary)',
-                                    padding: '10px 14px',
-                                    fontSize: 14,
-                                }}
+                                style={selectStyle}
                             >
                                 {DAILY_MSG_OPTIONS.map(o => (
                                     <option key={String(o.value)} value={o.value === null ? '' : String(o.value)}>
@@ -279,21 +290,11 @@ export default function AuditPage() {
 
                         {/* Front desk close */}
                         <div>
-                            <label style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 10, color: 'var(--text-secondary)' }}>
-                                Front desk goes to skeleton crew / closes
-                            </label>
+                            <label style={labelStyle}>Front desk goes to skeleton crew / closes</label>
                             <select
                                 value={inputs.front_desk_close}
                                 onChange={e => setInputs(p => ({ ...p, front_desk_close: e.target.value }))}
-                                style={{
-                                    width: '100%',
-                                    background: 'var(--bg-input)',
-                                    border: '1px solid var(--border-default)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    color: 'var(--text-primary)',
-                                    padding: '10px 14px',
-                                    fontSize: 14,
-                                }}
+                                style={selectStyle}
                             >
                                 {CLOSURE_OPTIONS.map(o => (
                                     <option key={o.value} value={o.value}>{o.label}</option>
@@ -303,21 +304,11 @@ export default function AuditPage() {
 
                         {/* OTA commission */}
                         <div>
-                            <label style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 10, color: 'var(--text-secondary)' }}>
-                                OTA commission rate (Agoda / Booking.com)
-                            </label>
+                            <label style={labelStyle}>OTA commission rate (Agoda / Booking.com)</label>
                             <select
                                 value={inputs.ota_commission_rate}
                                 onChange={e => setInputs(p => ({ ...p, ota_commission_rate: +e.target.value }))}
-                                style={{
-                                    width: '100%',
-                                    background: 'var(--bg-input)',
-                                    border: '1px solid var(--border-default)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    color: 'var(--text-primary)',
-                                    padding: '10px 14px',
-                                    fontSize: 14,
-                                }}
+                                style={selectStyle}
                             >
                                 {OTA_OPTIONS.map(o => (
                                     <option key={o.value} value={o.value}>{o.label}</option>
@@ -329,50 +320,51 @@ export default function AuditPage() {
                 </div>
 
                 {/* RIGHT — Results */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
                     {results ? (
                         <>
                             {/* Primary metric */}
                             <div style={{
-                                background: 'linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(99,102,241,0.05) 100%)',
-                                border: '1px solid rgba(99,102,241,0.4)',
+                                background: 'linear-gradient(135deg, rgba(29,158,117,0.15) 0%, rgba(29,158,117,0.04) 100%)',
+                                border: '1px solid rgba(29,158,117,0.3)',
                                 borderRadius: 'var(--radius-lg)',
-                                padding: '32px 28px',
+                                padding: '28px 24px',
                                 textAlign: 'center',
                                 position: 'relative',
                                 overflow: 'hidden',
                             }}>
-                                <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
                                     Conservative annual leakage
                                 </div>
                                 <div style={{
-                                    fontSize: 52,
-                                    fontWeight: 800,
-                                    color: '#f87171',
+                                    fontSize: 46,
+                                    fontWeight: 700,
+                                    color: 'var(--red)',
                                     lineHeight: 1,
                                     marginBottom: 8,
-                                    opacity: calculating ? 0.5 : 1,
+                                    opacity: calculating ? 0.45 : 1,
                                     transition: 'opacity 0.2s',
+                                    letterSpacing: '-0.02em',
                                 }}>
                                     {fmtK(results.conservative_annual)}
                                 </div>
-                                <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
+                                <div style={{ fontSize: 13, color: 'var(--text2)' }}>
                                     per year in recoverable revenue
                                 </div>
                             </div>
 
                             {/* Breakdown */}
                             <div style={{
-                                background: 'var(--bg-card)',
-                                border: '1px solid var(--border-default)',
+                                background: 'var(--bg2)',
+                                border: '1px solid var(--border)',
                                 borderRadius: 'var(--radius-lg)',
-                                padding: '24px 28px',
+                                padding: '20px 24px',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: 16,
+                                gap: 14,
                             }}>
-                                <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                <h3 style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                                     Breakdown
                                 </h3>
                                 {[
@@ -387,13 +379,13 @@ export default function AuditPage() {
                                         justifyContent: 'space-between',
                                         alignItems: 'center',
                                         paddingBottom: 12,
-                                        borderBottom: '1px solid var(--border-subtle)',
+                                        borderBottom: '1px solid var(--border)',
                                     }}>
-                                        <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{row.label}</span>
+                                        <span style={{ fontSize: 13, color: 'var(--text2)' }}>{row.label}</span>
                                         <span style={{
-                                            fontSize: 15,
-                                            fontWeight: (row as any).bold ? 700 : 500,
-                                            color: (row as any).bold ? 'var(--text-primary)' : 'var(--text-accent)',
+                                            fontSize: 14,
+                                            fontWeight: (row as any).bold ? 600 : 500,
+                                            color: (row as any).bold ? 'var(--text)' : 'var(--teal)',
                                         }}>
                                             {row.value}{row.unit ? ` ${row.unit}` : ''}
                                         </span>
@@ -403,27 +395,27 @@ export default function AuditPage() {
 
                             {/* ROI */}
                             <div style={{
-                                background: 'var(--success-bg)',
-                                border: '1px solid rgba(52,211,153,0.3)',
+                                background: 'var(--teal-bg)',
+                                border: '1px solid rgba(29,158,117,0.25)',
                                 borderRadius: 'var(--radius-lg)',
-                                padding: '20px 28px',
+                                padding: '18px 24px',
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
                             }}>
                                 <div>
-                                    <div style={{ fontSize: 13, color: 'var(--success)', marginBottom: 4 }}>
-                                        Nocturn AI ROI (RM 499/mo)
+                                    <div style={{ fontSize: 12, color: 'var(--teal)', marginBottom: 4 }}>
+                                        Nocturn AI ROI (RM 199/month + RM 999 setup)
                                     </div>
-                                    <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--success)' }}>
+                                    <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--teal)' }}>
                                         {results.roi_multiple}x return
                                     </div>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
-                                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                                    <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>
                                         Net Year 1 recovery
                                     </div>
-                                    <div style={{ fontSize: 22, fontWeight: 700 }}>
+                                    <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>
                                         {fmtK(results.annual_net_recovery)}
                                     </div>
                                 </div>
@@ -432,37 +424,37 @@ export default function AuditPage() {
                             {/* CTA */}
                             {submitted ? (
                                 <div style={{
-                                    background: 'var(--success-bg)',
-                                    border: '1px solid rgba(52,211,153,0.3)',
+                                    background: 'var(--teal-bg)',
+                                    border: '1px solid rgba(29,158,117,0.3)',
                                     borderRadius: 'var(--radius-lg)',
-                                    padding: '24px 28px',
+                                    padding: '22px 24px',
                                     textAlign: 'center',
                                 }}>
-                                    <div style={{ fontSize: 20, marginBottom: 8 }}>Report sent!</div>
-                                    <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
+                                    <div style={{ fontSize: 18, marginBottom: 8, color: 'var(--teal)', fontWeight: 600 }}>Report sent!</div>
+                                    <p style={{ color: 'var(--text2)', fontSize: 13 }}>
                                         Check your inbox. We'll be in touch within 24 hours to walk through your numbers.
                                     </p>
                                 </div>
                             ) : !showGate ? (
                                 <button
                                     onClick={() => setShowGate(true)}
-                                    className="btn btn-primary"
-                                    style={{ width: '100%', padding: '14px 24px', fontSize: 15, fontWeight: 600 }}
+                                    className="btn btn-primary btn-lg w-full"
+                                    style={{ fontSize: 14, letterSpacing: '0.01em' }}
                                 >
                                     Get Full Report + Start Free 30-Day Pilot
                                 </button>
                             ) : (
                                 <div style={{
-                                    background: 'var(--bg-card)',
-                                    border: '1px solid var(--border-default)',
+                                    background: 'var(--bg2)',
+                                    border: '1px solid var(--border)',
                                     borderRadius: 'var(--radius-lg)',
-                                    padding: '24px 28px',
+                                    padding: '22px 24px',
                                 }}>
-                                    <h3 style={{ fontWeight: 700, marginBottom: 4 }}>Get your personalised report</h3>
-                                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
+                                    <h3 style={{ fontWeight: 600, marginBottom: 4, color: 'var(--text)', fontSize: 15 }}>Get your personalised report</h3>
+                                    <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 18 }}>
                                         We'll email your full audit + a 30-day free pilot proposal. No setup fee. No contract.
                                     </p>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                         {[
                                             { label: 'Your name', value: contactName, setter: setContactName, placeholder: 'Ahmad Farid', required: true },
                                             { label: 'Hotel name', value: hotelName, setter: setHotelName, placeholder: 'Hotel Selangor', required: true },
@@ -470,7 +462,7 @@ export default function AuditPage() {
                                             { label: 'WhatsApp (optional)', value: phone, setter: setPhone, placeholder: '+60 12-345 6789', required: false },
                                         ].map(f => (
                                             <div key={f.label}>
-                                                <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                                                <label style={{ display: 'block', fontSize: 11, color: 'var(--text2)', marginBottom: 5 }}>
                                                     {f.label}{f.required && ' *'}
                                                 </label>
                                                 <input
@@ -478,16 +470,25 @@ export default function AuditPage() {
                                                     value={f.value}
                                                     onChange={e => f.setter(e.target.value)}
                                                     placeholder={f.placeholder}
-                                                    className="form-input"
-                                                    style={{ width: '100%' }}
+                                                    style={{
+                                                        width: '100%',
+                                                        background: 'var(--bg3)',
+                                                        border: '1px solid var(--border)',
+                                                        borderRadius: 'var(--radius-sm)',
+                                                        color: 'var(--text)',
+                                                        padding: '9px 12px',
+                                                        fontSize: 13,
+                                                        fontFamily: 'inherit',
+                                                        outline: 'none',
+                                                    }}
                                                 />
                                             </div>
                                         ))}
                                         <button
                                             onClick={handleSubmit}
                                             disabled={submitting || !contactName || !hotelName || !email}
-                                            className="btn btn-primary"
-                                            style={{ marginTop: 8 }}
+                                            className="btn btn-primary w-full"
+                                            style={{ marginTop: 6 }}
                                         >
                                             {submitting ? 'Sending...' : 'Send My Audit Report'}
                                         </button>
@@ -497,7 +498,7 @@ export default function AuditPage() {
 
                         </>
                     ) : (
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 280 }}>
                             <div className="loader" />
                         </div>
                     )}
@@ -508,20 +509,20 @@ export default function AuditPage() {
             <div style={{
                 textAlign: 'center',
                 padding: '0 24px 48px',
-                color: 'var(--text-muted)',
-                fontSize: 13,
-                maxWidth: 640,
+                color: 'var(--text3)',
+                fontSize: 12,
+                maxWidth: 580,
                 margin: '0 auto',
+                lineHeight: 1.65,
             }}>
                 Conservative estimate using a 40% discount on industry benchmarks.
                 Actual recovery depends on your property's WhatsApp response rates and guest booking behaviour.
-                Powered by <strong style={{ color: 'var(--text-secondary)' }}>Nocturn AI</strong> by SheersSoft.
+                Powered by <strong style={{ color: 'var(--text2)' }}>Nocturn AI</strong> by SheersSoft.
             </div>
 
-            {/* Mobile responsive */}
             <style>{`
                 @media (max-width: 768px) {
-                    div[style*="gridTemplateColumns"] {
+                    div[style*="gridTemplateColumns: minmax"] {
                         grid-template-columns: 1fr !important;
                     }
                 }

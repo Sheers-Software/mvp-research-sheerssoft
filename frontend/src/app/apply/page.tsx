@@ -80,7 +80,7 @@ export default function ApplyPage() {
                 Thanks, <strong>{form.contact_name.split(' ')[0]}</strong>. Our team will review your application
                 and reach out to <strong>{form.email}</strong> within 1 business day.
               </p>
-              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>
+              <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 8 }}>
                 While you wait, browse the{' '}
                 <a href="https://ai.sheerssoft.com" target="_blank" rel="noopener">
                   Nocturn AI features
@@ -252,7 +252,7 @@ export default function ApplyPage() {
                     </div>
 
                     {error && (
-                      <p style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</p>
+                      <p style={{ color: 'var(--red)', fontSize: 12 }}>{error}</p>
                     )}
 
                     <button
@@ -261,7 +261,7 @@ export default function ApplyPage() {
                       disabled={submitting}
                     >
                       {submitting ? (
-                        <><span className="loader" style={{ width: 18, height: 18 }} /> Submitting...</>
+                        <><span className="loader" style={{ width: 16, height: 16 }} /> Submitting...</>
                       ) : (
                         'Request access →'
                       )}

@@ -7,12 +7,12 @@ import { apiGet } from '@/lib/api';
 import Link from 'next/link';
 
 const navItems = [
-    { href: '/dashboard', label: 'Home', icon: '🏠' },
-    { href: '/dashboard/conversations', label: 'Conversations', icon: '💬' },
-    { href: '/dashboard/leads', label: 'Leads', icon: '🎯' },
-    { href: '/dashboard/analytics', label: 'Analytics', icon: '📊' },
-    { href: '/dashboard/insights', label: 'Insights', icon: '💡' },
-    { href: '/dashboard/settings', label: 'Settings', icon: '⚙️' },
+    { href: '/dashboard', label: 'Home' },
+    { href: '/dashboard/conversations', label: 'Conversations' },
+    { href: '/dashboard/leads', label: 'Leads' },
+    { href: '/dashboard/analytics', label: 'Analytics' },
+    { href: '/dashboard/insights', label: 'Insights' },
+    { href: '/dashboard/settings', label: 'Settings' },
 ];
 
 interface PropertyInfo {
@@ -115,7 +115,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <span />
                 </button>
                 <span className="mobile-header-brand">Nocturn AI</span>
-                {property && <span className="text-sm text-muted" style={{ flexShrink: 0 }}>{property.name}</span>}
+                {property && <span className="text-sm" style={{ flexShrink: 0, color: 'var(--text3)' }}>{property.name}</span>}
             </header>
 
             {/* Sidebar overlay — closes sidebar when tapping outside on mobile */}
@@ -139,16 +139,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             className={`nav-link ${pathname === item.href ? 'active' : ''}`}
                             onClick={() => setSidebarOpen(false)}
                         >
-                            <span className="nav-icon">{item.icon}</span>
                             {item.label}
                         </Link>
                     ))}
 
                     {(user.role === 'owner' || user.role === 'admin') && (
                         <>
-                            <span className="nav-section" style={{ marginTop: 16 }}>Management</span>
+                            <span className="nav-section" style={{ marginTop: 8 }}>Management</span>
                             <Link href="/portal" className="nav-link" onClick={() => setSidebarOpen(false)}>
-                                <span className="nav-icon">🏢</span>
                                 Property Portal
                             </Link>
                         </>
@@ -156,22 +154,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                     {user.is_superadmin && (
                         <>
-                            <span className="nav-section" style={{ marginTop: 16 }}>Admin</span>
+                            <span className="nav-section" style={{ marginTop: 8 }}>Admin</span>
                             <Link href="/admin" className="nav-link" onClick={() => setSidebarOpen(false)}>
-                                <span className="nav-icon">⚙️</span>
                                 Platform Admin
                             </Link>
                         </>
                     )}
                 </nav>
 
-                <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border-subtle)' }}>
+                <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)' }}>
                     <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
-                        <span className="text-sm">{user.full_name}</span>
+                        <span className="text-sm" style={{ color: 'var(--text2)' }}>{user.full_name}</span>
                         <span className="badge badge-success">Staff</span>
                     </div>
                     <button className="btn btn-ghost btn-sm w-full" onClick={logout}>
-                        Logout
+                        Sign out
                     </button>
                 </div>
             </aside>
@@ -182,31 +179,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     .filter((a) => !dismissedAnnIds.has(a.id))
                     .map((ann) => {
                         const isUrgent = ann.type === 'incident' || ann.type === 'maintenance';
-                        const color = ann.type === 'incident' ? 'var(--danger)' : ann.type === 'feature' ? 'var(--info)' : 'var(--warning)';
-                        const icon = ann.type === 'incident' ? '🚨' : ann.type === 'feature' ? '✨' : ann.type === 'billing' ? '💳' : '🔧';
+                        const color = ann.type === 'incident' ? 'var(--red)' : ann.type === 'feature' ? 'var(--purple)' : 'var(--amber)';
                         return (
                             <div key={ann.id} style={{
-                                background: `${color}12`,
-                                border: `1px solid ${color}35`,
+                                background: `${color === 'var(--red)' ? 'rgba(226,75,74,0.08)' : color === 'var(--purple)' ? 'rgba(127,119,221,0.08)' : 'rgba(239,159,39,0.08)'}`,
+                                border: `1px solid ${color === 'var(--red)' ? 'rgba(226,75,74,0.2)' : color === 'var(--purple)' ? 'rgba(127,119,221,0.2)' : 'rgba(239,159,39,0.2)'}`,
                                 borderRadius: 8,
-                                padding: '10px 16px',
-                                marginBottom: 12,
+                                padding: '10px 14px',
+                                marginBottom: 10,
                                 display: 'flex',
                                 alignItems: 'flex-start',
                                 justifyContent: 'space-between',
                                 gap: 12,
                             }}>
                                 <div className="flex items-start gap-sm">
-                                    <span>{icon}</span>
                                     <div>
-                                        <strong style={{ fontSize: 13, color }}>{ann.title}</strong>
-                                        <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{ann.body}</p>
+                                        <strong style={{ fontSize: 12, color }}>{ann.title}</strong>
+                                        <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>{ann.body}</p>
                                     </div>
                                 </div>
                                 {!isUrgent && (
                                     <button
                                         onClick={() => setDismissedAnnIds((s) => new Set([...s, ann.id]))}
-                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16, padding: 0, flexShrink: 0 }}
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 16, padding: 0, flexShrink: 0, lineHeight: 1 }}
                                     >
                                         ×
                                     </button>
@@ -218,19 +213,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {/* Maintenance mode banner */}
                 {maintenance?.enabled && !bannerDismissed && (
                     <div style={{
-                        background: 'rgba(245, 158, 11, 0.12)',
-                        border: '1px solid rgba(245, 158, 11, 0.35)',
+                        background: 'rgba(239, 159, 39, 0.08)',
+                        border: '1px solid rgba(239, 159, 39, 0.22)',
                         borderRadius: 8,
-                        padding: '10px 16px',
-                        marginBottom: 20,
+                        padding: '10px 14px',
+                        marginBottom: 18,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         gap: 12,
                     }}>
                         <div className="flex items-center gap-sm">
-                            <span>🔧</span>
-                            <span style={{ fontSize: 13, color: 'var(--warning)' }}>
+                            <span style={{ fontSize: 13, color: 'var(--amber)' }}>
                                 <strong>Scheduled maintenance:</strong>{' '}
                                 {maintenance.message || 'Platform maintenance in progress.'}
                                 {maintenance.eta && ` Expected completion: ${maintenance.eta}`}
@@ -238,7 +232,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         </div>
                         <button
                             onClick={() => setBannerDismissed(true)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16, padding: 0 }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 16, padding: 0, lineHeight: 1 }}
                         >
                             ×
                         </button>

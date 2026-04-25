@@ -44,20 +44,17 @@ function KpiCard({
     value,
     sub,
     color,
-    icon,
 }: {
     label: string;
     value: string;
     sub?: string;
-    color: string;
-    icon: string;
+    color?: string;
 }) {
     return (
         <div className="stat-card">
-            <div className="stat-icon">{icon}</div>
             <div className="stat-label">{label}</div>
-            <div className="stat-value" style={{ color }}>{value}</div>
-            {sub && <div className="text-xs text-muted" style={{ marginTop: 2 }}>{sub}</div>}
+            <div className="stat-value" style={{ color: color || 'var(--text)' }}>{value}</div>
+            {sub && <div className="stat-sub">{sub}</div>}
         </div>
     );
 }
@@ -96,9 +93,9 @@ export default function DashboardPage() {
     if (noProperty || !live) {
         return (
             <div className="empty-state" style={{ marginTop: 80 }}>
-                <div className="empty-icon">🏨</div>
-                <p>No property configured yet.</p>
-                <p className="text-sm text-muted" style={{ marginTop: 8 }}>
+                <div className="empty-icon" style={{ fontSize: 32, opacity: 0.4 }}>◎</div>
+                <p style={{ color: 'var(--text2)', fontSize: 14, marginTop: 8 }}>No property configured yet.</p>
+                <p className="text-sm" style={{ marginTop: 6, color: 'var(--text3)' }}>
                     Your account manager is setting up your property. You&apos;ll see live data here once your AI concierge goes live.
                 </p>
             </div>
@@ -122,87 +119,79 @@ export default function DashboardPage() {
             <div className="page-header">
                 <div>
                     <h1>{live.property_name}</h1>
-                    <p className="text-muted text-sm" style={{ marginTop: 4 }}>
+                    <p className="text-sm" style={{ marginTop: 4, color: 'var(--text3)' }}>
                         Today · {today}
                     </p>
                 </div>
                 {live.handed_off_conversations > 0 && (
                     <Link href="/dashboard/conversations" className="btn btn-primary btn-sm">
-                        ⚡ {live.handed_off_conversations} pending handoff{live.handed_off_conversations !== 1 ? 's' : ''}
+                        {live.handed_off_conversations} pending handoff{live.handed_off_conversations !== 1 ? 's' : ''}
                     </Link>
                 )}
             </div>
 
-            {/* Today's live KPIs — the money slide */}
+            {/* Today's live KPIs */}
             {hasActivity ? (
                 <>
                     <div className="grid grid-4 animate-in" style={{ marginBottom: 8 }}>
                         <KpiCard
                             label="Revenue Recovered"
                             value={`RM ${live.estimated_revenue_recovered.toLocaleString('en-MY', { maximumFractionDigits: 0 })}`}
-                            sub={live.actual_revenue_recovered > 0 ? `RM ${live.actual_revenue_recovered.toLocaleString('en-MY', { maximumFractionDigits: 0 })} confirmed` : 'estimated'}
-                            color="var(--success)"
-                            icon="💰"
+                            sub={live.actual_revenue_recovered > 0 ? `RM ${live.actual_revenue_recovered.toLocaleString('en-MY', { maximumFractionDigits: 0 })} confirmed` : 'estimated today'}
+                            color="var(--teal)"
                         />
                         <KpiCard
                             label="Leads Captured"
                             value={live.leads_captured.toString()}
                             sub="from AI conversations"
-                            color="var(--warning)"
-                            icon="🎯"
+                            color="var(--amber)"
                         />
                         <KpiCard
                             label="Inquiries Handled"
                             value={live.total_inquiries.toString()}
                             sub={`${aiPct}% by AI`}
-                            color="var(--accent)"
-                            icon="💬"
+                            color="var(--text)"
                         />
                         <KpiCard
                             label="After-Hours"
                             value={live.after_hours_inquiries.toString()}
-                            sub={live.after_hours_inquiries > 0 ? `${live.after_hours_responded} responded` : 'no overnight inquiries yet'}
-                            color="var(--info)"
-                            icon="🌙"
+                            sub={live.after_hours_inquiries > 0 ? `${live.after_hours_responded} responded` : 'no overnight yet'}
+                            color="var(--purple)"
                         />
                     </div>
 
-                    <div className="grid grid-4 animate-in" style={{ marginBottom: 32 }}>
+                    <div className="grid grid-4 animate-in" style={{ marginBottom: 28 }}>
                         <KpiCard
                             label="Cost Savings"
                             value={`RM ${live.cost_savings.toLocaleString('en-MY', { maximumFractionDigits: 0 })}`}
                             sub="vs. manual handling"
-                            color="var(--info)"
-                            icon="📉"
+                            color="var(--purple)"
                         />
                         <KpiCard
                             label="Avg Response"
                             value={live.avg_response_time_sec > 0 ? `${live.avg_response_time_sec.toFixed(1)}s` : '—'}
                             sub="end-to-end"
-                            color="var(--success)"
-                            icon="⚡"
+                            color="var(--teal)"
                         />
                         <KpiCard
                             label="AI Handled"
                             value={live.inquiries_handled_by_ai.toString()}
                             sub={`${live.inquiries_handled_manually} needed staff`}
-                            color="var(--success)"
-                            icon="🤖"
+                            color="var(--teal)"
                         />
                         <KpiCard
                             label="Active Now"
                             value={live.active_conversations.toString()}
                             sub={live.active_conversations > 0 ? 'conversations in progress' : 'no active conversations'}
-                            color="var(--accent)"
-                            icon="🔴"
+                            color="var(--text)"
                         />
                     </div>
                 </>
             ) : (
-                <div className="card animate-in" style={{ textAlign: 'center', padding: '48px 32px', marginBottom: 32, borderColor: 'rgba(99,102,241,0.15)' }}>
-                    <div style={{ fontSize: 48, marginBottom: 16 }}>📡</div>
-                    <h3 style={{ marginBottom: 8 }}>AI concierge is live and listening</h3>
-                    <p className="text-muted text-sm">
+                <div className="card animate-in" style={{ textAlign: 'center', padding: '44px 32px', marginBottom: 28 }}>
+                    <div style={{ fontSize: 28, marginBottom: 14, color: 'var(--text3)' }}>◎</div>
+                    <h3 style={{ marginBottom: 8, color: 'var(--text2)', fontWeight: 500 }}>AI concierge is live and listening</h3>
+                    <p style={{ fontSize: 13, color: 'var(--text3)' }}>
                         No inquiries yet today. When guests message on WhatsApp or your web widget, their conversations and leads will appear here in real time.
                     </p>
                 </div>
@@ -210,49 +199,52 @@ export default function DashboardPage() {
 
             {/* 30-day summary */}
             {t && (t.total_inquiries > 0 || t.leads_captured > 0) && (
-                <div className="card animate-in" style={{ marginBottom: 32 }}>
+                <div className="card animate-in" style={{ marginBottom: 28 }}>
                     <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
-                        <h3 style={{ fontSize: 14, color: 'var(--text-muted)' }}>Last 30 Days</h3>
+                        <h3 style={{ fontSize: 12, color: 'var(--text3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Last 30 Days</h3>
                         <Link href="/dashboard/analytics" className="text-sm text-accent" style={{ textDecoration: 'none' }}>
-                            Full Analytics →
+                            Full analytics →
                         </Link>
                     </div>
-                    <div className="grid grid-4" style={{ gap: 24 }}>
+                    <div className="grid grid-4" style={{ gap: 20 }}>
                         <div>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--success)' }}>
+                            <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--teal)', letterSpacing: '-0.02em' }}>
                                 RM {t.estimated_revenue_recovered.toLocaleString('en-MY', { maximumFractionDigits: 0 })}
                             </div>
-                            <div className="text-xs text-muted" style={{ marginTop: 2 }}>Revenue Recovered</div>
+                            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>Revenue Recovered</div>
                         </div>
                         <div>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--warning)' }}>
+                            <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--amber)', letterSpacing: '-0.02em' }}>
                                 {t.leads_captured}
                             </div>
-                            <div className="text-xs text-muted" style={{ marginTop: 2 }}>Leads Captured</div>
+                            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>Leads Captured</div>
                         </div>
                         <div>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent)' }}>
+                            <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.02em' }}>
                                 {t.total_inquiries}
                             </div>
-                            <div className="text-xs text-muted" style={{ marginTop: 2 }}>Total Inquiries</div>
+                            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>Total Inquiries</div>
                         </div>
                         <div>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--info)' }}>
+                            <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--purple)', letterSpacing: '-0.02em' }}>
                                 {t.avg_response_time_sec > 0 ? `${t.avg_response_time_sec.toFixed(1)}s` : '—'}
                             </div>
-                            <div className="text-xs text-muted" style={{ marginTop: 2 }}>Avg Response</div>
+                            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>Avg Response</div>
                         </div>
                     </div>
                 </div>
             )}
 
             {/* Quick actions */}
-            <div className="grid grid-3" style={{ gap: 16 }}>
+            <div className="grid grid-3" style={{ gap: 14 }}>
                 <Link href="/dashboard/conversations" style={{ textDecoration: 'none' }}>
-                    <div className="card" style={{ padding: '20px 24px', cursor: 'pointer', transition: 'border-color 0.2s', borderColor: live.handed_off_conversations > 0 ? 'var(--accent)' : undefined }}>
-                        <div style={{ fontSize: 24, marginBottom: 8 }}>💬</div>
-                        <h4>Conversations</h4>
-                        <p className="text-sm text-muted" style={{ marginTop: 4 }}>
+                    <div className="card" style={{
+                        padding: '18px 22px',
+                        cursor: 'pointer',
+                        borderColor: live.handed_off_conversations > 0 ? 'rgba(29,158,117,0.4)' : undefined,
+                    }}>
+                        <h4 style={{ marginBottom: 6 }}>Conversations</h4>
+                        <p className="text-sm" style={{ color: 'var(--text3)' }}>
                             {live.active_conversations > 0
                                 ? `${live.active_conversations} active · ${live.handed_off_conversations} need attention`
                                 : 'View all guest conversations'}
@@ -261,10 +253,9 @@ export default function DashboardPage() {
                 </Link>
 
                 <Link href="/dashboard/leads" style={{ textDecoration: 'none' }}>
-                    <div className="card" style={{ padding: '20px 24px', cursor: 'pointer' }}>
-                        <div style={{ fontSize: 24, marginBottom: 8 }}>🎯</div>
-                        <h4>Leads</h4>
-                        <p className="text-sm text-muted" style={{ marginTop: 4 }}>
+                    <div className="card" style={{ padding: '18px 22px', cursor: 'pointer' }}>
+                        <h4 style={{ marginBottom: 6 }}>Leads</h4>
+                        <p className="text-sm" style={{ color: 'var(--text3)' }}>
                             {live.leads_captured > 0
                                 ? `${live.leads_captured} captured today — follow up now`
                                 : 'Track and convert captured leads'}
@@ -273,10 +264,9 @@ export default function DashboardPage() {
                 </Link>
 
                 <Link href="/dashboard/analytics" style={{ textDecoration: 'none' }}>
-                    <div className="card" style={{ padding: '20px 24px', cursor: 'pointer' }}>
-                        <div style={{ fontSize: 24, marginBottom: 8 }}>📊</div>
-                        <h4>Analytics</h4>
-                        <p className="text-sm text-muted" style={{ marginTop: 4 }}>
+                    <div className="card" style={{ padding: '18px 22px', cursor: 'pointer' }}>
+                        <h4 style={{ marginBottom: 6 }}>Analytics</h4>
+                        <p className="text-sm" style={{ color: 'var(--text3)' }}>
                             Full 7, 30, 90-day charts and revenue breakdown
                         </p>
                     </div>
@@ -284,9 +274,9 @@ export default function DashboardPage() {
             </div>
 
             {/* Revenue formula transparency */}
-            <p className="text-xs text-muted" style={{ marginTop: 24, textAlign: 'center' }}>
+            <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 20, textAlign: 'center' }}>
                 Revenue estimated as: leads captured × property ADR × 20% conversion rate.{' '}
-                <Link href="/dashboard/analytics" className="text-accent" style={{ textDecoration: 'none' }}>
+                <Link href="/dashboard/analytics" style={{ color: 'var(--teal)', textDecoration: 'none' }}>
                     See full breakdown →
                 </Link>
             </p>
