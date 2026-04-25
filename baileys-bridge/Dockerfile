@@ -1,17 +1,23 @@
 FROM node:20-alpine
 
+# Baileys and its dependencies need git + build tools
+RUN apk add --no-cache git python3 make g++
+
 WORKDIR /app
 
-# Install dependencies
-COPY package*.json ./
-RUN npm ci --omit=dev || npm install --production
+# Copy manifests and install ALL deps (including devDeps needed for tsc)
+COPY package.json ./
+RUN npm install
 
-# Copy source and build
+# Build TypeScript
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
-# Create sessions directory
+# Prune devDependencies for leaner production image
+RUN npm prune --production
+
+# Persistent session storage
 RUN mkdir -p /sessions
 
 ENV NODE_ENV=production
