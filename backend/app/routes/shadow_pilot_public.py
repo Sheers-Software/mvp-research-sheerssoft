@@ -16,9 +16,22 @@ from app.services.shadow_pilot_reporter import compute_weekly_rollup
 router = APIRouter()
 
 
-def _verify_dashboard_token(property_slug: str, token: str, prop: Property) -> None:
-    """Verify the token-gated dashboard JWT."""
+
+@router.get("/shadow/{property_slug}/summary")
+async def get_shadow_summary(
+    property_slug: str,
+    token: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Token-gated shadow pilot summary for GM dashboard.
+    No session auth required — token-only verification.
+
+    Token is validated BEFORE the property DB lookup so that invalid/expired
+    tokens always return 401, never 404 (which would leak slug existence).
+    """
     settings = get_settings()
+    # Validate token structure and expiry before touching the DB
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
     except jwt.ExpiredSignatureError:
@@ -31,25 +44,14 @@ def _verify_dashboard_token(property_slug: str, token: str, prop: Property) -> N
 
     if payload.get("type") != "shadow_dashboard":
         raise HTTPException(status_code=401, detail="Invalid token type.")
-    if str(payload.get("property_id")) != str(prop.id):
-        raise HTTPException(status_code=401, detail="Token does not match property.")
 
-
-@router.get("/shadow/{property_slug}/summary")
-async def get_shadow_summary(
-    property_slug: str,
-    token: str = Query(...),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Token-gated shadow pilot summary for GM dashboard.
-    No session auth required — token-only verification.
-    """
     prop = await db.scalar(select(Property).where(Property.slug == property_slug))
     if not prop:
         raise HTTPException(status_code=404, detail="Property not found.")
 
-    _verify_dashboard_token(property_slug, token, prop)
+    # Verify token belongs to this property
+    if str(payload.get("property_id")) != str(prop.id):
+        raise HTTPException(status_code=403, detail="Token does not match property.")
 
     today = datetime.now(timezone.utc).date()
     rollup = await compute_weekly_rollup(db, prop, today)

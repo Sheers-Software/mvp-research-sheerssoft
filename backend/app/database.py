@@ -2,6 +2,8 @@
 Async SQLAlchemy database engine and session management.
 """
 
+from uuid import uuid4
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 from app.config import get_settings
@@ -14,13 +16,20 @@ settings = get_settings()
 # transaction mode. SQLAlchemy's own pooling + PgBouncer transaction mode causes
 # "prepared statement does not exist" errors because named prepared statements
 # created on one server connection are not visible on another.
-# statement_cache_size=0: disable asyncpg's client-side prepared statement cache
-# so queries are sent as simple/unnamed statements instead of named prepared ones.
+#
+# statement_cache_size=0: disable asyncpg's client-side prepared statement cache.
+# prepared_statement_name_func: even with cache disabled, asyncpg still uses named
+# prepared statements internally.  Supplying a UUID-based name function ensures each
+# statement gets a globally unique name so PgBouncer never sees a duplicate across
+# connections, regardless of pool mode.
 engine = create_async_engine(
     settings.database_url,
     echo=not settings.is_production,
     poolclass=NullPool,
-    connect_args={"statement_cache_size": 0},
+    connect_args={
+        "statement_cache_size": 0,
+        "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",
+    },
 )
 
 async_session = async_sessionmaker(

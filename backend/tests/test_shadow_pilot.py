@@ -27,9 +27,15 @@ from httpx import AsyncClient
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 def _make_property(**overrides):
-    """Build a minimal in-memory Property object (no DB)."""
+    """Build a minimal in-memory Property-like object (no DB, no SQLAlchemy session).
+
+    Uses MagicMock(spec=Property) so attribute reads/writes work freely without
+    triggering SQLAlchemy's ORM instrumentation, which requires a mapped instance
+    state (``_sa_instance_state``) that only exists when objects are created via
+    the normal ORM constructor or session machinery.
+    """
     from app.models import Property
-    p = Property.__new__(Property)
+    p = MagicMock(spec=Property)
     p.id = overrides.get("id", uuid.uuid4())
     p.slug = overrides.get("slug", "test-hotel")
     p.name = overrides.get("name", "Test Hotel")
@@ -90,7 +96,9 @@ class TestProcessor:
 
         prop = _make_property()
         db = _make_mock_db()
-        db.scalar.return_value = prop  # property lookup returns our mock prop
+        # scalar is called three times: property lookup, existing-conv lookup, prior-conv lookup.
+        # Return prop for the first call, then None for the next two (no existing/prior conv).
+        db.scalar.side_effect = [prop, None, None]
 
         with patch("app.services.shadow_pilot_processor.classify_intent",
                    return_value=("room_booking", 0.9, "room booking", "en")):
@@ -121,7 +129,7 @@ class TestProcessor:
         prop = _make_property()
 
         # Existing open conversation for the same phone hash
-        existing_conv = ShadowPilotConversation.__new__(ShadowPilotConversation)
+        existing_conv = MagicMock(spec=ShadowPilotConversation)
         existing_conv.last_guest_message_at = datetime.now(timezone.utc) - timedelta(minutes=30)
         existing_conv.message_count_guest = 1
         existing_conv.updated_at = datetime.now(timezone.utc)
@@ -177,7 +185,7 @@ class TestProcessor:
         prop = _make_property()
 
         guest_time = datetime.now(timezone.utc) - timedelta(minutes=45)
-        conv = ShadowPilotConversation.__new__(ShadowPilotConversation)
+        conv = MagicMock(spec=ShadowPilotConversation)
         conv.first_guest_message_at = guest_time
         conv.first_staff_reply_at = None
         conv.last_staff_reply_at = None
@@ -474,7 +482,7 @@ class TestTokenGatedDashboard:
         async with async_session() as db:
             prop_a = Property(
                 name="Token Test Hotel A",
-                slug="token-test-a",
+                slug=f"token-test-{uuid.uuid4().hex[:8]}",
                 adr=Decimal("200"),
                 ota_commission_pct=Decimal("15"),
                 timezone="Asia/Kuala_Lumpur",
@@ -509,7 +517,8 @@ class TestZeroReplyGate:
 
         prop = _make_property()
         db = _make_mock_db()
-        db.scalar.return_value = prop
+        # scalar called three times: property lookup, existing-conv lookup, prior-conv lookup
+        db.scalar.side_effect = [prop, None, None]
 
         # Patch httpx at the module level to catch any stray HTTP calls
         with patch("httpx.AsyncClient.post", new=AsyncMock()) as mock_http_post, \
