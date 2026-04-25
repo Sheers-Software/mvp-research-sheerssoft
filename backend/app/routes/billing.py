@@ -16,7 +16,7 @@ from app.auth import get_current_user
 from app.config import get_settings
 from app.database import get_db
 from app.models import Tenant
-from app.services.stripe_service import create_checkout_session
+from app.services.stripe_service import create_checkout_session, create_subscription_session
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +70,48 @@ async def generate_checkout(
     except Exception as e:
         logger.error(f"Error generating checkout session: {e}")
         raise HTTPException(status_code=500, detail="Failed to generate checkout session")
+
+
+class SubscribeRequest(BaseModel):
+    tenant_id: str
+    success_url: str
+    cancel_url: str
+
+
+@router.post("/subscribe", summary="Start RM 199/month recurring subscription")
+async def subscribe(
+    request: SubscribeRequest,
+    _user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Creates a Stripe Checkout Session (mode=subscription) for the RM 199/month
+    platform fee. Redirects to Stripe-hosted page; webhook completes activation.
+    """
+    try:
+        result = await db.execute(
+            select(Tenant).where(Tenant.id == uuid.UUID(request.tenant_id))
+        )
+        tenant = result.scalar_one_or_none()
+        if not tenant:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        if tenant.subscription_status == "active" and tenant.stripe_subscription_id:
+            raise HTTPException(status_code=400, detail="Tenant already has an active subscription")
+
+        url = await create_subscription_session(
+            tenant_id=request.tenant_id,
+            stripe_customer_id=tenant.stripe_customer_id,
+            success_url=request.success_url,
+            cancel_url=request.cancel_url,
+        )
+        return {"checkout_url": url}
+    except HTTPException:
+        raise
+    except ValueError as ve:
+        raise HTTPException(status_code=500, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Error creating subscription session: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create subscription session")
 
 
 @router.post("/webhook", summary="Stripe Webhook Listener")

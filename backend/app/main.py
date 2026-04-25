@@ -244,7 +244,14 @@ async def lifespan(app: FastAPI):
         (
             "audit_records_disable_rls",
             "ALTER TABLE audit_records DISABLE ROW LEVEL SECURITY;"
-        )
+        ),
+        (
+            "properties_shadow_pilot_report_sent_at",
+            """
+            ALTER TABLE properties
+                ADD COLUMN IF NOT EXISTS shadow_pilot_report_sent_at TIMESTAMPTZ;
+            """
+        ),
     ]
 
     for name, sql in migrations:

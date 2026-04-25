@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -252,6 +253,103 @@ async def staff_reply(
         "content": content,
         "sent_at": msg.sent_at.isoformat(),
         "channel": conv.channel,
+    }
+
+
+class DraftReplyRequest(BaseModel):
+    language: str = "both"  # "en" | "bm" | "both"
+
+
+@router.post("/conversations/{conversation_id}/draft-reply")
+async def draft_reply(
+    conversation_id: str,
+    body: DraftReplyRequest,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(verify_jwt),
+):
+    """
+    Generate an AI draft reply for a conversation.
+    Does NOT persist or send anything — staff reviews and sends manually.
+    Returns draft text in English, BM, or both.
+    """
+    from app.models import Property, KBDocument
+    from app.services.conversation import _call_llm
+    from app.services import search_knowledge_base
+
+    result = await db.execute(
+        select(Conversation)
+        .where(Conversation.id == uuid.UUID(conversation_id))
+        .options(selectinload(Conversation.messages))
+    )
+    conv = result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    prop_result = await db.execute(
+        select(Property).where(Property.id == conv.property_id)
+    )
+    prop = prop_result.scalar_one_or_none()
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    # Fetch relevant KB context for the last guest message
+    sorted_msgs = sorted(conv.messages, key=lambda m: m.sent_at)
+    last_guest_msg = next(
+        (m.content for m in reversed(sorted_msgs) if m.role == "guest"), ""
+    )
+    kb_context = ""
+    if last_guest_msg:
+        try:
+            kb_docs = await search_knowledge_base(db, conv.property_id, last_guest_msg, limit=3)
+            kb_context = "\n\n".join(d.content for d in kb_docs) if kb_docs else ""
+        except Exception:
+            kb_context = ""
+
+    # Build recent conversation history (last 8 messages)
+    recent = sorted_msgs[-8:]
+    history_text = "\n".join(
+        f"{'Guest' if m.role == 'guest' else 'Staff/AI'}: {m.content}"
+        for m in recent
+    )
+
+    system_prompt = (
+        f"You are a hospitality AI assistant helping staff at {prop.name} draft WhatsApp replies.\n"
+        f"Generate a warm, professional reply that the hotel staff will review before sending.\n"
+        f"Keep replies concise (2-4 sentences max). Use Malaysian hospitality norms.\n"
+        f"SST is 8%. Tourism Tax is RM 10/room/night. Apply public holiday surcharges if relevant.\n\n"
+        f"PROPERTY KNOWLEDGE BASE:\n{kb_context}\n\n"
+        f"CONVERSATION HISTORY:\n{history_text}\n\n"
+        f"Generate the reply in BOTH English AND Bahasa Malaysia.\n"
+        f"Format your response EXACTLY as:\n"
+        f"EN: <english reply>\n"
+        f"BM: <bahasa malaysia reply>"
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"Draft a reply to the guest's last message: {last_guest_msg}"},
+    ]
+
+    try:
+        raw, _, model_used = await _call_llm(messages, max_tokens=300, temperature=0.5)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LLM call failed: {e}")
+
+    # Parse EN/BM from response
+    draft_en = raw
+    draft_bm = raw
+    if "EN:" in raw and "BM:" in raw:
+        parts = raw.split("BM:", 1)
+        draft_en = parts[0].replace("EN:", "").strip()
+        draft_bm = parts[1].strip()
+    elif "EN:" in raw:
+        draft_en = raw.split("EN:", 1)[1].strip()
+
+    return {
+        "draft_en": draft_en,
+        "draft_bm": draft_bm,
+        "model_used": model_used,
+        "conversation_id": conversation_id,
     }
 
 

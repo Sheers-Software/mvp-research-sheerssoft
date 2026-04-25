@@ -303,7 +303,15 @@ async def send_weekly_report_email(prop: Property, rollup: ShadowPilotWeeklyRoll
 
 
 async def run_shadow_pilot_weekly_reports(db: AsyncSession) -> dict:
-    """Check all shadow pilots and send report for those at day 7, 14, 21..."""
+    """
+    Check all shadow pilots and send report when property-relative Day 7 is reached.
+
+    Logic (runs daily via Cloud Scheduler):
+    - First report: send once when days_active >= 7 and shadow_pilot_report_sent_at is None.
+      Marks shadow_pilot_report_sent_at so subsequent runs skip this property.
+    - Subsequent weekly reports: send when days_active is a multiple of 7 AFTER the first
+      report was already sent (Day 14, 21, 28...).
+    """
     today = datetime.now(timezone.utc).date()
     props = list(await db.scalars(
         select(Property).where(Property.shadow_pilot_mode == True)
@@ -313,12 +321,28 @@ async def run_shadow_pilot_weekly_reports(db: AsyncSession) -> dict:
         if not prop.shadow_pilot_start_date:
             continue
         days_active = (today - prop.shadow_pilot_start_date.date()).days
-        if days_active > 0 and days_active % 7 == 0:
-            rollup = await compute_weekly_rollup(db, prop, today)
-            ok = await send_weekly_report_email(prop, rollup)
-            if ok:
-                sent.append(prop.name)
-                await _notify_sheers_am(prop, rollup)
+        if days_active < 7:
+            continue
+
+        is_first_report = prop.shadow_pilot_report_sent_at is None
+        is_weekly_followup = (
+            not is_first_report
+            and days_active > 7
+            and days_active % 7 == 0
+        )
+
+        if not (is_first_report or is_weekly_followup):
+            continue
+
+        rollup = await compute_weekly_rollup(db, prop, today)
+        ok = await send_weekly_report_email(prop, rollup)
+        if ok:
+            sent.append(prop.name)
+            await _notify_sheers_am(prop, rollup)
+            if is_first_report:
+                prop.shadow_pilot_report_sent_at = datetime.now(timezone.utc)
+                await db.commit()
+
     return {"sent_count": len(sent), "properties": sent}
 
 

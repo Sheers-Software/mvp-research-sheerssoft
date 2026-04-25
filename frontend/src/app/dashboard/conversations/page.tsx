@@ -82,6 +82,11 @@ export default function ConversationsPage() {
     const [actionLoading, setActionLoading] = useState('');
     const [replyText, setReplyText] = useState('');
     const [replySending, setReplySending] = useState(false);
+    const [draftEn, setDraftEn] = useState('');
+    const [draftBm, setDraftBm] = useState('');
+    const [draftLang, setDraftLang] = useState<'en' | 'bm'>('en');
+    const [draftLoading, setDraftLoading] = useState(false);
+    const [draftCopied, setDraftCopied] = useState(false);
 
     // Resolve property ID from dashboard stats
     useEffect(() => {
@@ -106,9 +111,35 @@ export default function ConversationsPage() {
             .finally(() => setLoading(false));
     }, [propertyId, filter]);
 
+    const generateDraft = async (id: string) => {
+        setDraftLoading(true);
+        setDraftEn('');
+        setDraftBm('');
+        setDraftCopied(false);
+        try {
+            const data = await apiPost<{ draft_en: string; draft_bm: string }>(
+                `/conversations/${id}/draft-reply`,
+                { language: 'both' }
+            );
+            setDraftEn(data.draft_en || '');
+            setDraftBm(data.draft_bm || '');
+        } catch { } finally {
+            setDraftLoading(false);
+        }
+    };
+
+    const copyDraft = () => {
+        const text = draftLang === 'en' ? draftEn : draftBm;
+        setReplyText(text);
+        setDraftCopied(true);
+        setTimeout(() => setDraftCopied(false), 2000);
+    };
+
     const openDetail = async (id: string) => {
         setSelectedId(id);
         setDetailLoading(true);
+        setDraftEn('');
+        setDraftBm('');
         try {
             const data = await apiGet<ConversationDetail>(`/conversations/${id}`);
             setDetail(data);
@@ -296,6 +327,73 @@ export default function ConversationsPage() {
                                         </div>
                                     ))}
                                 </div>
+
+                                {/* AI Draft Sidebar */}
+                                {detail.status !== 'resolved' && (
+                                    <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border-subtle)', background: 'rgba(99,102,241,0.04)' }}>
+                                        <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
+                                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                🤖 AI Draft
+                                            </span>
+                                            <div className="flex gap-sm">
+                                                <button
+                                                    className={`btn btn-sm ${draftLang === 'en' ? 'btn-primary' : 'btn-ghost'}`}
+                                                    style={{ fontSize: 11, padding: '2px 8px' }}
+                                                    onClick={() => setDraftLang('en')}
+                                                >EN</button>
+                                                <button
+                                                    className={`btn btn-sm ${draftLang === 'bm' ? 'btn-primary' : 'btn-ghost'}`}
+                                                    style={{ fontSize: 11, padding: '2px 8px' }}
+                                                    onClick={() => setDraftLang('bm')}
+                                                >BM</button>
+                                            </div>
+                                        </div>
+                                        {(draftEn || draftBm) ? (
+                                            <>
+                                                <div style={{
+                                                    background: 'var(--surface-elevated)',
+                                                    border: '1px solid var(--border-subtle)',
+                                                    borderRadius: 8,
+                                                    padding: '8px 12px',
+                                                    fontSize: 13,
+                                                    lineHeight: 1.5,
+                                                    color: 'var(--text-primary)',
+                                                    marginBottom: 8,
+                                                    whiteSpace: 'pre-wrap',
+                                                    minHeight: 48,
+                                                }}>
+                                                    {draftLang === 'en' ? draftEn : draftBm}
+                                                </div>
+                                                <div className="flex gap-sm">
+                                                    <button
+                                                        className="btn btn-primary btn-sm"
+                                                        onClick={copyDraft}
+                                                        style={{ fontSize: 12 }}
+                                                    >
+                                                        {draftCopied ? '✓ Copied to reply' : '📋 Use this draft'}
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-ghost btn-sm"
+                                                        onClick={() => generateDraft(detail.id)}
+                                                        disabled={draftLoading}
+                                                        style={{ fontSize: 12 }}
+                                                    >
+                                                        {draftLoading ? '...' : '↺ Regenerate'}
+                                                    </button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <button
+                                                className="btn btn-ghost btn-sm"
+                                                onClick={() => generateDraft(detail.id)}
+                                                disabled={draftLoading}
+                                                style={{ fontSize: 12, width: '100%' }}
+                                            >
+                                                {draftLoading ? '⟳ Generating draft…' : '✦ Generate AI Draft'}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
 
                                 {/* Staff reply input */}
                                 {detail.status !== 'resolved' && (

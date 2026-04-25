@@ -75,8 +75,9 @@ class Settings(BaseSettings):
     # Stripe
     stripe_api_key: str = ""
     stripe_webhook_secret: str = ""
-    stripe_currency: str = "usd"          # e.g. "usd" or "myr"
-    stripe_setup_fee_amount: int = 15000  # Smallest currency unit (cents/sen); 15000 = $150 USD
+    stripe_currency: str = "myr"
+    stripe_setup_fee_amount: int = 99900   # RM 999.00 in sen
+    stripe_monthly_fee_amount: int = 19900  # RM 199.00 in sen (recurring subscription)
 
     # Environment
     environment: str = "development"

@@ -347,6 +347,7 @@ class Property(Base):
     shadow_pilot_dashboard_token: Mapped[str | None] = mapped_column(Text)
     shadow_pilot_dashboard_token_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     avg_stay_nights: Mapped[float] = mapped_column(Numeric(5, 2), default=1.0, server_default="1.0")
+    shadow_pilot_report_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Relationships
     tenant: Mapped["Tenant | None"] = relationship(back_populates="properties")

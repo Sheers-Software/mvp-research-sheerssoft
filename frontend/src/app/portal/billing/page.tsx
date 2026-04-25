@@ -77,8 +77,9 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function PortalBillingPage() {
-    const { tenantTier } = useTenant();
+    const { tenantTier, tenantId } = useTenant();
     const [upgrading, setUpgrading] = useState(false);
+    const [subscribing, setSubscribing] = useState(false);
     const [error, setError] = useState('');
 
     const handleUpgrade = async () => {
@@ -93,6 +94,27 @@ export default function PortalBillingPage() {
             setError((e instanceof Error ? e.message : String(e)) || 'Failed to start upgrade. Please contact support.');
         } finally {
             setUpgrading(false);
+        }
+    };
+
+    const handleSubscribe = async () => {
+        if (!tenantId) { setError('Tenant not found. Please reload the page.'); return; }
+        setSubscribing(true);
+        setError('');
+        try {
+            const origin = window.location.origin;
+            const data = await apiPost<{ checkout_url: string }>('/billing/subscribe', {
+                tenant_id: tenantId,
+                success_url: `${origin}/portal/billing?subscribed=1`,
+                cancel_url: `${origin}/portal/billing`,
+            });
+            if (data?.checkout_url) {
+                window.location.href = data.checkout_url;
+            }
+        } catch (e: unknown) {
+            setError((e instanceof Error ? e.message : String(e)) || 'Failed to start subscription. Please contact support.');
+        } finally {
+            setSubscribing(false);
         }
     };
 
@@ -134,11 +156,18 @@ export default function PortalBillingPage() {
                     ))}
                 </div>
 
-                <div className="flex items-center gap-sm">
+                <div className="flex items-center gap-sm" style={{ flexWrap: 'wrap' }}>
                     <button
                         className="btn btn-primary btn-sm"
+                        onClick={handleSubscribe}
+                        disabled={subscribing || upgrading}
+                    >
+                        {subscribing ? 'Redirecting…' : '✦ Activate RM 199/month'}
+                    </button>
+                    <button
+                        className="btn btn-ghost btn-sm"
                         onClick={handleUpgrade}
-                        disabled={upgrading}
+                        disabled={upgrading || subscribing}
                     >
                         {upgrading ? 'Redirecting…' : '⬆ Upgrade Plan'}
                     </button>
@@ -146,6 +175,9 @@ export default function PortalBillingPage() {
                         Contact Support
                     </Link>
                 </div>
+                <p className="text-xs text-muted" style={{ marginTop: 8 }}>
+                    RM 199/month · No contract · Cancel anytime · 3% performance fee on confirmed direct bookings only
+                </p>
             </div>
 
             {/* All plan tiers for comparison */}
