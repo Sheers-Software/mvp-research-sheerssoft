@@ -66,18 +66,30 @@ export default function AuthCallbackPage() {
                 const { access_token } = await res.json();
                 localStorage.setItem('nocturn_token', access_token);
 
-                const profileRes = await fetch('/api/v1/auth/me', {
-                    headers: { Authorization: `Bearer ${access_token}` },
-                });
-                if (!profileRes.ok) {
-                    const text = await profileRes.text();
-                    let detail = 'Failed to load profile. Please try again.';
-                    try { detail = JSON.parse(text).detail || detail; } catch { /* non-JSON error body */ }
-                    throw new Error(detail);
+                // Fetch profile with retry for transient failures
+                let user: any = null;
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    const profileRes = await fetch('/api/v1/auth/me', {
+                        headers: { Authorization: `Bearer ${access_token}` },
+                    });
+                    if (profileRes.ok) {
+                        user = await profileRes.json();
+                        break;
+                    }
+                    if (profileRes.status === 401 || profileRes.status === 403 || profileRes.status === 404) {
+                        const text = await profileRes.text();
+                        let detail = 'Account not found. Contact support.';
+                        try { detail = JSON.parse(text).detail || detail; } catch { /* non-JSON */ }
+                        throw new Error(detail);
+                    }
+                    if (attempt < 3) {
+                        await new Promise(r => setTimeout(r, attempt * 1000));
+                    } else {
+                        throw new Error('Failed to load profile. Please try again.');
+                    }
                 }
-                const user = await profileRes.json();
-                // Full reload so AuthProvider re-reads the token from localStorage
-                let dest = '/dashboard';
+                // Route based on role — full reload so AuthProvider re-reads token
+                let dest: string;
                 if (user.is_superadmin) {
                     dest = '/admin';
                 } else if (user.role === 'owner' || user.role === 'admin') {
@@ -85,7 +97,8 @@ export default function AuthCallbackPage() {
                 } else if (user.role === 'staff') {
                     dest = '/dashboard';
                 } else {
-                    dest = '/welcome';
+                    // Auto-provisioned but no org membership yet — don't drop into /welcome wizard
+                    dest = '/login?error=no_org';
                 }
                 window.location.replace(dest);
             } catch (err: any) {

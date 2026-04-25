@@ -12,7 +12,15 @@ export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [sent, setSent] = useState(false);
-    const [error, setError] = useState('');
+    const [error, setError] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('error') === 'no_org') {
+                return "Your account was created but you haven't been added to any organization yet. Contact your admin.";
+            }
+        }
+        return '';
+    });
     const [submitting, setSubmitting] = useState(false);
 
     // Redirect if already logged in

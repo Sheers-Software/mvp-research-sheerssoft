@@ -215,12 +215,11 @@ async def supabase_token_exchange(
 def _compute_onboarding_score(progress: OnboardingProgress) -> int:
     """Compute onboarding completion score (0-100) from OnboardingProgress record."""
     score = 10  # account_created always true
-    # channels_connected: all statuses in active/skipped
-    channels_connected = all(
-        s in ("active", "skipped")
-        for s in [progress.whatsapp_status, progress.email_status, progress.website_status]
-    )
-    if channels_connected:
+    # channels_connected: at least one channel active, OR all channels active/skipped
+    channel_statuses = [progress.whatsapp_status, progress.email_status, progress.website_status]
+    has_active_channel = any(s == "active" for s in channel_statuses)
+    all_resolved = all(s in ("active", "skipped") for s in channel_statuses)
+    if has_active_channel or all_resolved:
         score += 20
     if progress.kb_populated:
         score += 20
@@ -288,6 +287,7 @@ async def get_my_profile(
         if progress:
             score = _compute_onboarding_score(progress)
             onboarding_completed = score >= 60
+            logger.info("Onboarding score", email=user.email, score=score, completed=onboarding_completed)
 
     return UserProfileResponse(
         id=user.id,
