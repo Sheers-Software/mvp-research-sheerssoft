@@ -26,7 +26,7 @@ steps:
       - '-c'
       - |
         docker build \
-          --build-arg NEXT_PUBLIC_API_URL=https://nocturn-backend-343745766874.asia-southeast1.run.app \
+          --build-arg NEXT_PUBLIC_API_URL=https://nocturn-backend-owtn645vea-as.a.run.app \
           --build-arg NEXT_PUBLIC_SUPABASE_URL=$$SUPABASE_URL \
           --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=$$SUPABASE_ANON_KEY \
           -t ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$COMMIT_SHA \
@@ -91,8 +91,8 @@ steps:
       - --memory=1Gi
       - --timeout=300
       - --cpu-throttling
-      - --set-env-vars=ENVIRONMENT=production,FRONTEND_URL=https://nocturn-frontend-343745766874.asia-southeast1.run.app,SUPERADMIN_EMAILS=a.basyir@sheerssoft.com,ALLOWED_ORIGINS=https://nocturn-frontend-343745766874.asia-southeast1.run.app,PROJECT_ID=$PROJECT_ID
-      - --set-secrets=DATABASE_URL=DATABASE_URL:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,JWT_SECRET=JWT_SECRET:latest,STRIPE_API_KEY=STRIPE_API_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,SENDGRID_API_KEY=SENDGRID_API_KEY:latest,WHATSAPP_PHONE_NUMBER_ID=WHATSAPP_PHONE_NUMBER_ID:latest,WHATSAPP_VERIFY_TOKEN=WHATSAPP_VERIFY_TOKEN:latest,FERNET_ENCRYPTION_KEY=FERNET_ENCRYPTION_KEY:latest,ADMIN_PASSWORD=ADMIN_PASSWORD:latest,INTERNAL_SCHEDULER_SECRET=INTERNAL_SCHEDULER_SECRET:latest,SUPABASE_URL=SUPABASE_URL:latest,SUPABASE_ANON_KEY=SUPABASE_ANON_KEY:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest
+      - --set-env-vars=ENVIRONMENT=production,FRONTEND_URL=https://nocturn-frontend-owtn645vea-as.a.run.app,SUPERADMIN_EMAILS=a.basyir@sheerssoft.com,ALLOWED_ORIGINS=https://nocturn-frontend-owtn645vea-as.a.run.app,PROJECT_ID=$PROJECT_ID
+      - --set-secrets=DATABASE_URL=DATABASE_URL:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,JWT_SECRET=JWT_SECRET:latest,STRIPE_API_KEY=STRIPE_API_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,SENDGRID_API_KEY=SENDGRID_API_KEY:latest,SENDGRID_FROM_EMAIL=SENDGRID_FROM_EMAIL:latest,STAFF_NOTIFICATION_EMAIL=STAFF_NOTIFICATION_EMAIL:latest,WHATSAPP_PHONE_NUMBER_ID=WHATSAPP_PHONE_NUMBER_ID:latest,WHATSAPP_VERIFY_TOKEN=WHATSAPP_VERIFY_TOKEN:latest,FERNET_ENCRYPTION_KEY=FERNET_ENCRYPTION_KEY:latest,ADMIN_PASSWORD=ADMIN_PASSWORD:latest,INTERNAL_SCHEDULER_SECRET=INTERNAL_SCHEDULER_SECRET:latest,SUPABASE_URL=SUPABASE_URL:latest,SUPABASE_ANON_KEY=SUPABASE_ANON_KEY:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,BAILEYS_BRIDGE_URL=BAILEYS_BRIDGE_URL:latest
       - --allow-unauthenticated
       - --port=8080
 
@@ -116,7 +116,7 @@ steps:
       - --memory=512Mi
       - --timeout=60
       - --cpu-throttling
-      - --set-env-vars=NEXT_PUBLIC_API_URL=https://nocturn-backend-343745766874.asia-southeast1.run.app
+      - --set-env-vars=NEXT_PUBLIC_API_URL=https://nocturn-backend-owtn645vea-as.a.run.app
       - --allow-unauthenticated
       - --port=3000
 
@@ -139,7 +139,7 @@ steps:
       - --cpu=1
       - --timeout=300
       - --no-cpu-throttling
-      - --set-env-vars=BACKEND_INTERNAL_URL=https://nocturn-backend-343745766874.asia-southeast1.run.app
+      - --set-env-vars=BACKEND_INTERNAL_URL=https://nocturn-backend-owtn645vea-as.a.run.app
       - --set-secrets=INTERNAL_SECRET=INTERNAL_SECRET:latest
       - --allow-unauthenticated
       - --port=3001
