@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nocturn AI — Hybrid Co-Pilot Value Flow</title>
+<style>
+  :root {
+    --bg: #0e0e10;
+    --bg2: #161618;
+    --bg3: #1e1e21;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #e8e6e0;
+    --text2: #9e9c96;
+    --text3: #5a5856;
+    --teal: #1D9E75;
+    --teal-dim: #0F6E56;
+    --teal-bg: rgba(29,158,117,0.1);
+    --purple: #7F77DD;
+    --purple-dim: #534AB7;
+    --purple-bg: rgba(127,119,221,0.1);
+    --amber: #EF9F27;
+    --amber-dim: #BA7517;
+    --amber-bg: rgba(239,159,39,0.1);
+    --green: #97C459;
+    --green-dim: #3B6D11;
+    --green-bg: rgba(99,153,34,0.1);
+    --gray: #888780;
+    --gray-bg: rgba(136,135,128,0.1);
+    --red: #E24B4A;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 32px 24px 60px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .doc-header {
+    margin-bottom: 32px;
+  }
+  .doc-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--teal);
+    background: var(--teal-bg);
+    border: 0.5px solid var(--teal-dim);
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+  }
+  h1 { font-size: 22px; font-weight: 500; color: var(--text); margin-bottom: 6px; }
+  .doc-sub { font-size: 13px; color: var(--text2); }
+
+  /* Legend */
+  .legend {
+    display: flex; gap: 18px; flex-wrap: wrap;
+    padding: 10px 14px;
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 24px;
+  }
+  .li { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--text2); }
+  .ld { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Phase block */
+  .phase { margin-bottom: 6px; }
+  .ph {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg2);
+    border: 0.5px solid var(--border2);
+    border-bottom: none;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+  .phn {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 600; flex-shrink: 0; color: #fff;
+  }
+  .pht { font-size: 13px; font-weight: 500; color: var(--text); }
+  .phb {
+    font-size: 10px; color: var(--text3);
+    background: var(--bg3);
+    padding: 3px 9px; border-radius: 20px;
+    border: 0.5px solid var(--border);
+    margin-left: auto;
+  }
+  .pb {
+    border: 0.5px solid var(--border2);
+    border-radius: 0 0 var(--radius) var(--radius);
+    padding: 12px;
+    background: var(--bg);
+  }
+
+  /* Node rows */
+  .row { display: flex; gap: 8px; align-items: flex-start; flex-wrap: nowrap; }
+  .row + .row { margin-top: 10px; }
+  .sublabel {
+    font-size: 10px; font-weight: 600; color: var(--text3);
+    letter-spacing: 0.05em; text-transform: uppercase;
+    margin: 0 0 7px;
+  }
+
+  /* Nodes */
+  .nd {
+    flex: 1; min-width: 0;
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 9px 11px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .nd:hover { border-color: var(--border2); background: var(--bg3); }
+  .actor { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+  .adot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .alabel { font-size: 10px; font-weight: 500; color: var(--text3); }
+  .nt { font-size: 12px; font-weight: 500; color: var(--text); line-height: 1.3; }
+  .ns { font-size: 11px; color: var(--text2); margin-top: 4px; line-height: 1.4; }
+  .tag {
+    display: inline-block; margin-top: 6px;
+    font-size: 10px; font-weight: 500;
+    padding: 2px 8px; border-radius: 20px;
+  }
+  .tag-sys { background: var(--purple-bg); color: var(--purple); border: 0.5px solid rgba(127,119,221,0.3); }
+  .tag-ok  { background: var(--green-bg);  color: var(--green);  border: 0.5px solid rgba(99,153,34,0.3); }
+  .tag-warn{ background: var(--amber-bg);  color: var(--amber);  border: 0.5px solid rgba(239,159,39,0.3); }
+  .tag-neu { background: var(--gray-bg);   color: var(--gray);   border: 0.5px solid rgba(136,135,128,0.3); }
+
+  .arr {
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; color: var(--text3); font-size: 14px;
+    width: 18px; margin-top: 24px;
+  }
+  .da { display: flex; justify-content: center; height: 22px; align-items: center; color: var(--text3); font-size: 14px; margin: 3px 0; }
+
+  /* Value capture */
+  .vc {
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-top: 16px;
+    background: var(--bg2);
+  }
+  .vc-head { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 12px; }
+  .vc-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 12px; }
+  .vci { text-align: center; padding: 12px 8px; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-sm); }
+  .vca { font-size: 16px; font-weight: 500; color: var(--text); }
+  .vcl { font-size: 10px; color: var(--text2); margin-top: 3px; }
+  .vcs { font-size: 10px; color: var(--text3); margin-top: 2px; }
+
+  /* Net win bar */
+  .nw {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px;
+    padding: 12px 14px;
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .nwi { text-align: center; }
+  .nwv { font-size: 13px; font-weight: 500; }
+  .nwl { font-size: 10px; color: var(--text3); margin-top: 2px; }
+  .arr-text { color: var(--text3); font-size: 14px; }
+
+  /* Component table */
+  .comp {
+    margin-top: 16px;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .comp-head {
+    padding: 10px 14px;
+    border-bottom: 0.5px solid var(--border);
+    font-size: 11px; font-weight: 600; color: var(--text3);
+    text-transform: uppercase; letter-spacing: .05em;
+    background: var(--bg2);
+  }
+  .comp-grid { display: grid; grid-template-columns: repeat(2,1fr); }
+  .ci {
+    padding: 10px 14px;
+    border-bottom: 0.5px solid var(--border);
+    border-right: 0.5px solid var(--border);
+  }
+  .ci:nth-child(even) { border-right: none; }
+  .ci:nth-last-child(-n+2) { border-bottom: none; }
+  .ci-comp { font-size: 11px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
+  .ci-desc { font-size: 11px; color: var(--text2); line-height: 1.4; }
+  .ci-phase { font-size: 10px; margin-top: 4px; }
+
+  /* Status table */
+  .status-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-top: 16px; }
+  .si {
+    padding: 10px 12px;
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .si-title { font-size: 11px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+  .si-items { list-style: none; }
+  .si-items li { font-size: 10px; color: var(--text2); line-height: 1.6; padding-left: 12px; position: relative; }
+  .si-items li::before { content: "·"; position: absolute; left: 0; color: var(--text3); }
+  .si-items li.done { color: var(--green); }
+  .si-items li.done::before { content: "✓"; color: var(--green); }
+  .si-items li.pending::before { content: "○"; color: var(--amber); }
+  .si-items li.pending { color: var(--amber); }
+
+  .section-title {
+    font-size: 11px; font-weight: 600; color: var(--text3);
+    text-transform: uppercase; letter-spacing: .05em;
+    margin: 28px 0 12px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-title::after { content: ""; flex: 1; height: 0.5px; background: var(--border); }
+
+  @media (max-width: 700px) {
+    .row { flex-wrap: wrap; }
+    .nd { min-width: calc(50% - 4px); }
+    .arr { display: none; }
+    .vc-grid { grid-template-columns: 1fr; }
+    .comp-grid { grid-template-columns: 1fr; }
+    .ci { border-right: none; }
+    .status-grid { grid-template-columns: 1fr; }
+    .nw { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div class="doc-header">
+  <div class="doc-badge">Nocturn AI · Internal · v1.0 · Apr 2026</div>
+  <h1>Hybrid Co-Pilot — Value Delivery &amp; Capture Flow</h1>
+  <p class="doc-sub">How every product component contributes to the outcome, and how Sheers Software captures a portion of the value recovered.</p>
+</div>
+
+<div class="legend">
+  <div class="li"><span class="ld" style="background:#1D9E75;"></span> Guest / hotel (external)</div>
+  <div class="li"><span class="ld" style="background:#7F77DD;"></span> Nocturn AI system</div>
+  <div class="li"><span class="ld" style="background:#EF9F27;"></span> Hotel staff (human-in-loop)</div>
+  <div class="li"><span class="ld" style="background:#97C459;"></span> Revenue / value capture</div>
+  <div class="li"><span class="ld" style="background:#888780;"></span> Sheers admin</div>
+</div>
+
+<!-- PHASE 1 -->
+<div class="phase">
+  <div class="ph">
+    <div class="phn" style="background:#1D9E75;">1</div>
+    <span class="pht">Acquisition — hotel discovers the offer</span>
+    <span class="phb">Day 0</span>
+  </div>
+  <div class="pb">
+    <div class="row">
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#1D9E75;"></span><span class="alabel">Hotel GM</span></div>
+        <div class="nt">Lands on sheerssoft.com</div>
+        <div class="ns">"Stop paying 18% to OTAs." Pain framing resonates immediately. Revenue calculator quantifies the leak in RM.</div>
+        <div class="tag tag-ok">GTM entry · /audit calculator</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#7F77DD;"></span><span class="alabel">System · /audit</span></div>
+        <div class="nt">After-hours revenue audit</div>
+        <div class="ns">GM drags booking volume slider → sees exact RM lost monthly to OTAs vs Nocturn cost. Proof before any sales conversation.</div>
+        <div class="tag tag-sys">Lead qualifier · self-serve</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#1D9E75;"></span><span class="alabel">Hotel GM</span></div>
+        <div class="nt">Submits /apply form</div>
+        <div class="ns">Property type, star rating, WhatsApp number, ADR, monthly inquiry volume — ICP data captured at intake.</div>
+        <div class="tag tag-ok">GTM trigger · /apply</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#888780;"></span><span class="alabel">Sheers admin</span></div>
+        <div class="nt">Application qualified</div>
+        <div class="ns">Independent 3–4 star, KL/Klang Valley, WhatsApp-first ops confirmed. Chain hotels filtered out. Pilot provisioned.</div>
+        <div class="tag tag-warn">Manual gate · /admin</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="da">↓</div>
+
+<!-- PHASE 2 -->
+<div class="phase">
+  <div class="ph">
+    <div class="phn" style="background:#888780;">2</div>
+    <span class="pht">Onboarding — 48-hour setup</span>
+    <span class="phb">Days 1–2</span>
+  </div>
+  <div class="pb">
+    <div class="row">
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#888780;"></span><span class="alabel">Sheers admin</span></div>
+        <div class="nt">Shadow pilot provisioned</div>
+        <div class="ns">/admin/shadow-pilots → tenant record, Twilio sandbox, property slug created. Entire setup in under 5 minutes.</div>
+        <div class="tag tag-sys">5-min admin task</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#7F77DD;"></span><span class="alabel">System · WhatsApp transport</span></div>
+        <div class="nt">WhatsApp linked via QR scan</div>
+        <div class="ns">Hotel scans once → Nocturn linked to their existing WA Business number via Baileys / whatsapp-web.js. No Meta approval pipeline. No new number needed.</div>
+        <div class="tag tag-sys">WhatsAppTransportInterface</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#888780;"></span><span class="alabel">Sheers + hotel</span></div>
+        <div class="nt">KB ingestion session</div>
+        <div class="ns">90-min field session: rates, room types, facilities, policies, FAQs, check-in norms ingested via /admin/kb-ingestion. Accuracy foundation for all AI replies.</div>
+        <div class="tag tag-warn">1-day field work · P0</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#EF9F27;"></span><span class="alabel">Hotel staff</span></div>
+        <div class="nt">Tenant wizard completed</div>
+        <div class="ns">/welcome: 5 steps — channels, team roster, notification preferences, billing details. Hotel spends approximately 30 minutes total.</div>
+        <div class="tag tag-ok">30-min hotel effort</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="da">↓</div>
+
+<!-- PHASE 3 -->
+<div class="phase">
+  <div class="ph">
+    <div class="phn" style="background:#EF9F27;">3</div>
+    <span class="pht">Shadow pilot — building the proof autonomously</span>
+    <span class="phb">Days 2–7 · fully automated</span>
+  </div>
+  <div class="pb">
+    <div class="row">
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#1D9E75;"></span><span class="alabel">Guest · after 6 PM</span></div>
+        <div class="nt">Inquiry arrives — unanswered</div>
+        <div class="ns">Rate check, weekend availability, group booking request. Staff is asleep. Guest doesn't wait — defaults to Agoda by morning.</div>
+        <div class="tag tag-warn">The silent revenue leak</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#7F77DD;"></span><span class="alabel">AI engine · read-only</span></div>
+        <div class="nt">AI captures + classifies intent</div>
+        <div class="ns">BM / English / Manglish parsed. Intent scored: booking inquiry, rate request, escalation flag. Lead logged. No auto-reply yet — shadow mode only.</div>
+        <div class="tag tag-sys">audit_only_mode = true</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#7F77DD;"></span><span class="alabel">System · AuditRecord</span></div>
+        <div class="nt">Revenue at risk calculated</div>
+        <div class="ns">Lead nights × ADR (default RM 230) × 20% conversion assumption = estimated recovery per inquiry. Accumulated across 7 days. Stored in Supabase.</div>
+        <div class="tag tag-sys">Revenue formula</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#97C459;"></span><span class="alabel">Cloud Scheduler · Day 7</span></div>
+        <div class="nt">Audit email fires automatically</div>
+        <div class="ns">GM receives: X inquiries dropped this week. RM Y revenue at risk. RM Z in OTA commissions avoidable. Real data from their own property. The proof moment.</div>
+        <div class="tag tag-ok">Conversion trigger · no sales call</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="da">↓</div>
+
+<!-- PHASE 4 -->
+<div class="phase">
+  <div class="ph">
+    <div class="phn" style="background:#534AB7;">4</div>
+    <span class="pht">Hybrid co-pilot — delivering the value (Sprint 2.6)</span>
+    <span class="phb">Days 8–30</span>
+  </div>
+  <div class="pb">
+    <div class="sublabel">Step A · inquiry arrives → AI draft generated (under 30 seconds)</div>
+    <div class="row" style="margin-bottom:12px;">
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#1D9E75;"></span><span class="alabel">Guest · 11:47 PM</span></div>
+        <div class="nt">WhatsApp inquiry arrives</div>
+        <div class="ns">"Do you have rooms for this weekend? Is the family pool open?" Staff are asleep. OTA is one tap away.</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#7F77DD;"></span><span class="alabel">AI engine · KB + inventory</span></div>
+        <div class="nt">Context assembled in real time</div>
+        <div class="ns">Reads property KB for rates, policies, room types + polls hotel's Google Sheet for live room availability (2-minute refresh cycle). Injects into system prompt.</div>
+        <div class="tag tag-sys">Google Sheet inventory reader</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#7F77DD;"></span><span class="alabel">Dashboard sidebar · /conversations</span></div>
+        <div class="nt">BM / EN draft generated</div>
+        <div class="ns">Accurate, warm, hotel-branded reply appears in the conversations sidebar. SST, Tourism Tax, public holiday surcharges applied automatically. One-click copy.</div>
+        <div class="tag tag-sys">Sprint 2.6 hybrid UI</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#EF9F27;"></span><span class="alabel">Hotel staff</span></div>
+        <div class="nt">Staff reviews and sends</div>
+        <div class="ns">Reviews draft (5 seconds) → "Copy to WhatsApp" → pastes into WA Business App → sent. Guest receives a response in under 30 seconds.</div>
+        <div class="tag tag-warn">Human-in-loop · no Meta approval needed</div>
+      </div>
+    </div>
+
+    <div class="sublabel">Step B · booking intent detected → direct booking confirmed</div>
+    <div class="row">
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#7F77DD;"></span><span class="alabel">AI · intent detection</span></div>
+        <div class="nt">Booking intent flagged</div>
+        <div class="ns">AI detects booking signal in conversation → FPX / DuitNow payment link auto-embedded in draft reply. Guest gets a frictionless direct payment path.</div>
+        <div class="tag tag-sys">FPX / DuitNow link · Sprint 2.6</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#1D9E75;"></span><span class="alabel">Guest</span></div>
+        <div class="nt">Direct booking confirmed</div>
+        <div class="ns">Booked direct. No OTA intermediary. No 18% commission paid. Lead marked as converted. Revenue attributed to Nocturn.</div>
+        <div class="tag tag-ok">Direct booking win</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#7F77DD;"></span><span class="alabel">System · follow-up engine</span></div>
+        <div class="nt">Automated follow-up sequences</div>
+        <div class="ns">For unconverted leads: Day 1 / 3 / 7 follow-up messages fire automatically. Zero staff effort on cold leads. Recovers 10–20% of otherwise lost inquiries.</div>
+        <div class="tag tag-sys">Lead recovery engine</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#97C459;"></span><span class="alabel">9 AM daily GM report</span></div>
+        <div class="nt">GM sees "RM X recovered today"</div>
+        <div class="ns">Revenue recovered, OTA fees saved, inquiries handled by channel, guest sentiment summary. Hard data every morning. Creates a daily habit loop that makes cancellation feel irrational.</div>
+        <div class="tag tag-ok">Retention engine</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="da">↓</div>
+
+<!-- PHASE 5 -->
+<div class="phase">
+  <div class="ph">
+    <div class="phn" style="background:#97C459;">5</div>
+    <span class="pht">30-day proof and paid conversion</span>
+    <span class="phb">Day 30</span>
+  </div>
+  <div class="pb">
+    <div class="row">
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#888780;"></span><span class="alabel">Sheers AM + GM</span></div>
+        <div class="nt">30-day review call</div>
+        <div class="ns">Hard data presented: total inquiries handled, direct bookings closed, OTA commissions saved, inquiry-to-conversion rate. Compared against the RM 999 setup cost.</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#7F77DD;"></span><span class="alabel">AI · guest insight report</span></div>
+        <div class="nt">Guest insight report delivered</div>
+        <div class="ns">Top inquiry themes, KB gaps identified, conversion blockers, guest sentiment trends across 30 days. Delivered free at Day 30 as part of the setup.</div>
+        <div class="tag tag-sys">Included in RM 999 setup</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#97C459;"></span><span class="alabel">Revenue math</span></div>
+        <div class="nt">ROI is self-evident</div>
+        <div class="ns">Every RM 1 of Nocturn cost returned approximately RM 6–8 in recovered OTA commissions. 30-day guarantee waives next month if it didn't. The math closes itself.</div>
+        <div class="tag tag-ok">Guarantee removes risk objection</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="nd">
+        <div class="actor"><span class="adot" style="background:#97C459;"></span><span class="alabel">Hotel converts</span></div>
+        <div class="nt">Paid plan activates</div>
+        <div class="ns">No contract. Stripe billing starts. Hotel continues on RM 199/mo + 3% on confirmed facilitated bookings only. No lock-in.</div>
+        <div class="tag tag-ok">Revenue starts · Stripe</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- VALUE CAPTURE -->
+<div class="vc">
+  <div class="vc-head">Value capture — how Sheers Software earns</div>
+  <div class="vc-grid">
+    <div class="vci">
+      <div class="vca">RM 999</div>
+      <div class="vcl">One-time setup</div>
+      <div class="vcs">AI training + 48-hr implementation. Covers field KB session.</div>
+    </div>
+    <div class="vci">
+      <div class="vca">RM 199/mo</div>
+      <div class="vcl">Platform fee</div>
+      <div class="vcs">All channels, dashboard, daily reports, follow-up engine.</div>
+    </div>
+    <div class="vci">
+      <div class="vca">3%</div>
+      <div class="vcl">Performance fee</div>
+      <div class="vcs">Only on confirmed, Nocturn-facilitated bookings. Aligned incentive.</div>
+    </div>
+  </div>
+  <div class="nw">
+    <div class="nwi">
+      <div class="nwv" style="color:#E24B4A;">18% OTA commission</div>
+      <div class="nwl">Hotel pays per booking today (Agoda / Booking.com)</div>
+    </div>
+    <div class="arr-text">→</div>
+    <div class="nwi">
+      <div class="nwv" style="color:#7F77DD;">3% + RM 199/mo</div>
+      <div class="nwl">Nocturn total cost to hotel</div>
+    </div>
+    <div class="arr-text">→</div>
+    <div class="nwi">
+      <div class="nwv" style="color:#97C459;">~12–15% net saved</div>
+      <div class="nwl">Per direct booking vs OTA route</div>
+    </div>
+    <div class="arr-text">→</div>
+    <div class="nwi">
+      <div class="nwv" style="color:#EF9F27;">Both parties win</div>
+      <div class="nwl">Hotel retains margin · Sheers earns performance</div>
+    </div>
+  </div>
+</div>
+
+<!-- COMPONENT MAP -->
+<div class="section-title">Component contribution map</div>
+<div class="comp">
+  <div class="comp-head">What each component does for the outcome</div>
+  <div class="comp-grid">
+    <div class="ci">
+      <div class="ci-comp">sheerssoft.com landing + /audit calculator</div>
+      <div class="ci-desc">Converts pain awareness into application intent without a sales call. The self-qualifying layer — GM proves the ROI to themselves before submitting.</div>
+      <div class="ci-phase"><span class="tag tag-ok">Phase 1 · acquisition</span></div>
+    </div>
+    <div class="ci">
+      <div class="ci-comp">/apply intake form + admin qualification</div>
+      <div class="ci-desc">ICP gate. Captures property data for KB prep. Filters out chains and non-WhatsApp-first operators before any engineering time is spent.</div>
+      <div class="ci-phase"><span class="tag tag-ok">Phase 1 · acquisition</span></div>
+    </div>
+    <div class="ci">
+      <div class="ci-comp">/admin/shadow-pilots provisioning</div>
+      <div class="ci-desc">Removes engineering from the pilot activation loop. Any Sheers AM can provision a shadow pilot in 5 minutes without touching code.</div>
+      <div class="ci-phase"><span class="tag tag-sys">Phase 2 · onboarding</span></div>
+    </div>
+    <div class="ci">
+      <div class="ci-comp">Baileys / whatsapp-web.js transport + WhatsAppTransportInterface</div>
+      <div class="ci-desc">Eliminates the Meta Cloud API home-address verification blocker entirely. One QR scan connects to the hotel's existing number. Transport abstraction enables zero-downtime migration to a BSP post-pilot.</div>
+      <div class="ci-phase"><span class="tag tag-sys">Phase 2 · onboarding</span></div>
+    </div>
+    <div class="ci">
+      <div class="ci-comp">KB ingestion + /admin/kb-ingestion</div>
+      <div class="ci-desc">The accuracy foundation. Every AI reply is grounded in the hotel's actual rates, room types, policies, and FAQs. Accuracy = staff trust = adoption.</div>
+      <div class="ci-phase"><span class="tag tag-warn">Phase 2 · field work · P0</span></div>
+    </div>
+    <div class="ci">
+      <div class="ci-comp">/welcome onboarding wizard</div>
+      <div class="ci-desc">Reduces hotel setup time to 30 minutes. Configures channels, team notifications, and preferences in a guided 5-step flow without requiring Sheers involvement.</div>
+      <div class="ci-phase"><span class="tag tag-sys">Phase 2 · onboarding</span></div>
+    </div>
+    <div class="ci">
+      <div class="ci-comp">AuditRecord model + revenue formula</div>
+      <div class="ci-desc">Translates raw WhatsApp inquiry data into RM figures the GM can feel. Makes the cost of inaction tangible and attributable — the foundation of the Day 7 proof email.</div>
+      <div class="ci-phase"><span class="tag tag-sys">Phase 3 · shadow pilot</span></div>
+    </div>
+    <div class="ci">
+      <div class="ci-comp">Cloud Scheduler + run_weekly_audit_report job</div>
+      <div class="ci-desc">The automated conversion trigger. GM receives real data before any sales conversation starts. The product sells itself — Sheers doesn't need to pitch.</div>
+      <div class="ci-phase"><span class="tag tag-ok">Phase 3 · shadow pilot · Day 7</span></div>
+    </div>
+    <div class="ci">
+      <div class="ci-comp">AI engine — BM / EN + Malaysian hospitality logic</div>
+      <div class="ci-desc">Generates accurate, warm, hotel-branded draft replies in BM and English. SST, Tourism Tax, public holiday surcharges, PDPA compliance built in. Localised, not generic.</div>
+      <div class="ci-phase"><span class="tag tag-sys">Phase 4 · hybrid active</span></div>
+    </div>
+    <div class="ci">
+      <div class="ci-comp">Google Sheet inventory reader (2-min polling)</div>
+      <div class="ci-desc">Injects real-time room availability into the AI context window on every reply draft. Prevents the most damaging failure mode — quoting a sold-out room. No PMS integration required.</div>
+      <div class="ci-phase"><span class="tag tag-warn">Sprint 2.6 · not yet built</span></div>
+    </div>
+    <div class="ci">
+      <div class="ci-comp">Hybrid co-pilot sidebar UI (/dashboard/conversations)</div>
+      <div class="ci-desc">The human-in-loop bridge that delivers 80% of the product value while Meta registration is pending. AI drafts — staff sends. Guest experience is indistinguishable from full automation.</div>
+      <div class="ci-phase"><span class="tag tag-warn">Sprint 2.6 · not yet built</span></div>
+    </div>
+    <div class="ci">
+      <div class="ci-comp">FPX / DuitNow payment link generator</div>
+      <div class="ci-desc">Closes the loop from inquiry to confirmed direct booking without needing a PMS integration or a booking engine. Removes the last friction point in the booking journey.</div>
+      <div class="ci-phase"><span class="tag tag-warn">Sprint 2.6 · not yet built</span></div>
+    </div>
+    <div class="ci">
+      <div class="ci-comp">Automated follow-up engine (Day 1 / 3 / 7)</div>
+      <div class="ci-desc">Recovers 10–20% of leads that didn't convert on first contact. Fires automatically with zero staff involvement. Each recovered lead = OTA commission fully avoided.</div>
+      <div class="ci-phase"><span class="tag tag-sys">Phase 4 · hybrid active</span></div>
+    </div>
+    <div class="ci">
+      <div class="ci-comp">Daily 9 AM GM report (SendGrid + Cloud Scheduler)</div>
+      <div class="ci-desc">The retention engine. Creates a daily habit of seeing RM recovered. Makes the value of the product visible every single morning. Cancellation becomes psychologically costly when the numbers are good.</div>
+      <div class="ci-phase"><span class="tag tag-ok">Phase 4 · retention</span></div>
+    </div>
+    <div class="ci">
+      <div class="ci-comp">30-day revenue recovery guarantee</div>
+      <div class="ci-desc">Removes the risk objection from hotel GMs who have been burned by overpromising tech vendors. Converts skeptics. Enforces Sheers' own accountability — only earns performance fee on real results.</div>
+      <div class="ci-phase"><span class="tag tag-ok">Phase 5 · conversion</span></div>
+    </div>
+    <div class="ci">
+      <div class="ci-comp">Stripe billing + /portal tenant management</div>
+      <div class="ci-desc">Activates on Day 30 conversion. Tenant self-manages KB, team, channels, and billing from /portal. Reduces per-tenant support burden as the cohort grows.</div>
+      <div class="ci-phase"><span class="tag tag-sys">Phase 5 · paid plan</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- BUILD STATUS -->
+<div class="section-title">Sprint 2.6 status — what's needed before first revenue</div>
+<div class="status-grid">
+  <div class="si">
+    <div class="si-title" style="color:#97C459;">Already built (v0.5)</div>
+    <ul class="si-items">
+      <li class="done">sheerssoft.com landing + /audit calculator</li>
+      <li class="done">/apply intake form — primary GTM entry point</li>
+      <li class="done">/admin/shadow-pilots provisioning page</li>
+      <li class="done">AuditRecord model + revenue formula</li>
+      <li class="done">Cloud Scheduler + Day 7 audit email</li>
+      <li class="done">AI engine (BM/EN + Malaysian logic)</li>
+      <li class="done">Automated follow-up engine (Day 1/3/7)</li>
+      <li class="done">Daily 9 AM GM report (SendGrid)</li>
+      <li class="done">/portal + /welcome wizard (tenant management)</li>
+      <li class="done">PDPA compliance + FERNET encryption</li>
+    </ul>
+  </div>
+  <div class="si">
+    <div class="si-title" style="color:#EF9F27;">Still to build — Sprint 2.6 (4.5 days dev)</div>
+    <ul class="si-items">
+      <li class="pending">Hybrid co-pilot reply drafting UI (sidebar) — 1 day</li>
+      <li class="pending">Google Sheet inventory reader (2-min polling) — 0.5 day</li>
+      <li class="pending">FPX/DuitNow payment link generator — 0.5 day</li>
+      <li class="pending">"RM X recovered today" in daily GM report — 0.5 day</li>
+      <li class="pending">BM 50-question end-to-end test (pass ≥80%) — half day field</li>
+      <li class="pending">First pilot KB population session — 1 day field</li>
+      <li class="pending">Cloud Scheduler jobs recreation (deleted 23 Mar cleanup)</li>
+    </ul>
+  </div>
+</div>
+
+<div style="margin-top:28px;padding:14px;border:0.5px solid rgba(29,158,117,0.3);border-radius:var(--radius-sm);background:rgba(29,158,117,0.05);">
+  <div style="font-size:11px;font-weight:600;color:#1D9E75;margin-bottom:6px;">Self-sustaining goal · what "sells itself" looks like</div>
+  <div style="font-size:11px;color:var(--text2);line-height:1.6;">
+    The product is designed to require zero active selling after the shadow pilot is live. The /audit calculator qualifies the lead. The /apply form captures the intent. The Day 7 audit email delivers the proof. The hybrid co-pilot delivers the value. The daily GM report reinforces retention. The 30-day guarantee removes the conversion objection. The only remaining manual steps — admin provisioning and KB field session — are targetted for automation in Sprint 3 and beyond.
+  </div>
+</div>
+
+<div style="margin-top:20px;font-size:10px;color:var(--text3);text-align:center;">
+  Nocturn AI · Sheers Software Sdn Bhd · SSM 202501033756 · Internal document v1.0 · Apr 2026
+</div>
+
+</body>
+</html>

@@ -341,6 +341,12 @@ class Property(Base):
     audit_only_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     shadow_pilot_start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     shadow_pilot_phone: Mapped[str | None] = mapped_column(String(20))
+    shadow_pilot_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    shadow_pilot_session_active: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    shadow_pilot_session_last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    shadow_pilot_dashboard_token: Mapped[str | None] = mapped_column(Text)
+    shadow_pilot_dashboard_token_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    avg_stay_nights: Mapped[float] = mapped_column(Numeric(5, 2), default=1.0, server_default="1.0")
 
     # Relationships
     tenant: Mapped["Tenant | None"] = relationship(back_populates="properties")
@@ -684,4 +690,101 @@ class AuditRecord(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# Shadow Pilot — Conversation Tracking (Stage 2 deep monitoring)
+# ─────────────────────────────────────────────────────────────
+
+
+class ShadowPilotConversation(Base):
+    """
+    Tracks individual guest conversations observed during shadow pilot mode.
+    Guest phone is encrypted at rest; only a SHA-256 hash is used for lookups.
+    Staff message content is NEVER stored — timestamps only.
+    """
+    __tablename__ = "shadow_pilot_conversations"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    property_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("properties.id"), nullable=False)
+    guest_phone_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    guest_phone_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    guest_name: Mapped[str | None] = mapped_column(String(255))
+    first_guest_message_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_guest_message_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    first_staff_reply_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_staff_reply_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    response_time_minutes: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    is_after_hours: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    is_unanswered: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    is_booking_intent: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    is_group_booking: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    is_repeat_guest: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    intent: Mapped[str | None] = mapped_column(String(50))
+    intent_confidence: Mapped[float | None] = mapped_column(Numeric(5, 4))
+    top_topic: Mapped[str | None] = mapped_column(String(100))
+    message_count_guest: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    message_count_staff: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    language_detected: Mapped[str | None] = mapped_column(String(20))
+    estimated_value_rm: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    status: Mapped[str] = mapped_column(String(20), default="open", server_default="open")
+    first_guest_message_preview: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("idx_spc_property_id", "property_id"),
+        Index("idx_spc_first_message", "first_guest_message_at"),
+        Index("idx_spc_property_after_hours", "property_id", "is_after_hours"),
+        Index("idx_spc_property_unanswered", "property_id", "is_unanswered"),
+        Index("idx_spc_phone_hash", "property_id", "guest_phone_hash"),
+    )
+
+
+class ShadowPilotAnalyticsDaily(Base):
+    """
+    Pre-aggregated daily analytics for shadow pilot properties.
+    One row per property per day — computed by the daily aggregation job.
+    """
+    __tablename__ = "shadow_pilot_analytics_daily"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    property_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("properties.id"), nullable=False)
+    report_date: Mapped[date] = mapped_column(Date, nullable=False)
+    total_inquiries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    after_hours_inquiries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    business_hours_inquiries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    booking_intent_inquiries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    group_booking_inquiries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    repeat_guest_contacts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    responded_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    unanswered_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    after_hours_unanswered: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    after_hours_responded_next_day: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    avg_response_time_minutes: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    avg_response_time_business_hours: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    avg_response_time_after_hours: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    response_time_over_1hr: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    response_time_over_4hr: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    response_time_over_8hr: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    response_time_over_24hr: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    revenue_at_risk_total: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0, server_default="0.0")
+    revenue_at_risk_conservative: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0, server_default="0.0")
+    ota_commission_equivalent: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0, server_default="0.0")
+    slow_response_revenue_at_risk: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0, server_default="0.0")
+    daily_revenue_leakage: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0, server_default="0.0")
+    peak_inquiry_hour: Mapped[int | None] = mapped_column(Integer)
+    after_hours_peak_hour: Mapped[int | None] = mapped_column(Integer)
+    inquiries_by_hour: Mapped[dict | None] = mapped_column(JSON)
+    inquiries_by_day_of_week: Mapped[dict | None] = mapped_column(JSON)
+    top_inquiry_topics: Mapped[list | None] = mapped_column(JSON)
+    top_unanswered_topics: Mapped[list | None] = mapped_column(JSON)
+    booking_intent_rate: Mapped[float | None] = mapped_column(Numeric(5, 4))
+    language_breakdown: Mapped[dict | None] = mapped_column(JSON)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("property_id", "report_date", name="uq_spad_property_date"),
+        Index("idx_spad_property_date", "property_id", "report_date"),
     )

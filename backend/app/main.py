@@ -99,6 +99,100 @@ async def lifespan(app: FastAPI):
             """
         ),
         (
+            "properties_shadow_pilot_v2",
+            """
+            ALTER TABLE properties
+                ADD COLUMN IF NOT EXISTS shadow_pilot_mode BOOLEAN NOT NULL DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS shadow_pilot_session_active BOOLEAN NOT NULL DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS shadow_pilot_session_last_seen TIMESTAMPTZ,
+                ADD COLUMN IF NOT EXISTS shadow_pilot_dashboard_token TEXT,
+                ADD COLUMN IF NOT EXISTS shadow_pilot_dashboard_token_expires TIMESTAMPTZ,
+                ADD COLUMN IF NOT EXISTS avg_stay_nights NUMERIC(5,2) NOT NULL DEFAULT 1.0;
+            UPDATE properties SET shadow_pilot_mode = audit_only_mode WHERE audit_only_mode = TRUE AND shadow_pilot_mode = FALSE;
+            """
+        ),
+        (
+            "create_shadow_pilot_conversations",
+            """
+            CREATE TABLE IF NOT EXISTS shadow_pilot_conversations (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+                guest_phone_encrypted TEXT NOT NULL,
+                guest_phone_hash VARCHAR(64) NOT NULL,
+                guest_name VARCHAR(255),
+                first_guest_message_at TIMESTAMPTZ NOT NULL,
+                last_guest_message_at TIMESTAMPTZ NOT NULL,
+                first_staff_reply_at TIMESTAMPTZ,
+                last_staff_reply_at TIMESTAMPTZ,
+                response_time_minutes NUMERIC(10,2),
+                is_after_hours BOOLEAN NOT NULL DEFAULT FALSE,
+                is_unanswered BOOLEAN NOT NULL DEFAULT FALSE,
+                is_booking_intent BOOLEAN NOT NULL DEFAULT FALSE,
+                is_group_booking BOOLEAN NOT NULL DEFAULT FALSE,
+                is_repeat_guest BOOLEAN NOT NULL DEFAULT FALSE,
+                intent VARCHAR(50),
+                intent_confidence NUMERIC(5,4),
+                top_topic VARCHAR(100),
+                message_count_guest INTEGER NOT NULL DEFAULT 1,
+                message_count_staff INTEGER NOT NULL DEFAULT 0,
+                language_detected VARCHAR(20),
+                estimated_value_rm NUMERIC(10,2),
+                status VARCHAR(20) NOT NULL DEFAULT 'open',
+                first_guest_message_preview VARCHAR(500),
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_spc_property_id ON shadow_pilot_conversations(property_id);
+            CREATE INDEX IF NOT EXISTS idx_spc_first_message ON shadow_pilot_conversations(first_guest_message_at);
+            CREATE INDEX IF NOT EXISTS idx_spc_property_after_hours ON shadow_pilot_conversations(property_id, is_after_hours);
+            CREATE INDEX IF NOT EXISTS idx_spc_property_unanswered ON shadow_pilot_conversations(property_id, is_unanswered);
+            CREATE INDEX IF NOT EXISTS idx_spc_phone_hash ON shadow_pilot_conversations(property_id, guest_phone_hash);
+            """
+        ),
+        (
+            "create_shadow_pilot_analytics_daily",
+            """
+            CREATE TABLE IF NOT EXISTS shadow_pilot_analytics_daily (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+                report_date DATE NOT NULL,
+                total_inquiries INTEGER NOT NULL DEFAULT 0,
+                after_hours_inquiries INTEGER NOT NULL DEFAULT 0,
+                business_hours_inquiries INTEGER NOT NULL DEFAULT 0,
+                booking_intent_inquiries INTEGER NOT NULL DEFAULT 0,
+                group_booking_inquiries INTEGER NOT NULL DEFAULT 0,
+                repeat_guest_contacts INTEGER NOT NULL DEFAULT 0,
+                responded_count INTEGER NOT NULL DEFAULT 0,
+                unanswered_count INTEGER NOT NULL DEFAULT 0,
+                after_hours_unanswered INTEGER NOT NULL DEFAULT 0,
+                after_hours_responded_next_day INTEGER NOT NULL DEFAULT 0,
+                avg_response_time_minutes NUMERIC(10,2),
+                avg_response_time_business_hours NUMERIC(10,2),
+                avg_response_time_after_hours NUMERIC(10,2),
+                response_time_over_1hr INTEGER NOT NULL DEFAULT 0,
+                response_time_over_4hr INTEGER NOT NULL DEFAULT 0,
+                response_time_over_8hr INTEGER NOT NULL DEFAULT 0,
+                response_time_over_24hr INTEGER NOT NULL DEFAULT 0,
+                revenue_at_risk_total NUMERIC(12,2) NOT NULL DEFAULT 0,
+                revenue_at_risk_conservative NUMERIC(12,2) NOT NULL DEFAULT 0,
+                ota_commission_equivalent NUMERIC(12,2) NOT NULL DEFAULT 0,
+                slow_response_revenue_at_risk NUMERIC(12,2) NOT NULL DEFAULT 0,
+                daily_revenue_leakage NUMERIC(12,2) NOT NULL DEFAULT 0,
+                peak_inquiry_hour INTEGER,
+                after_hours_peak_hour INTEGER,
+                inquiries_by_hour JSONB,
+                inquiries_by_day_of_week JSONB,
+                top_inquiry_topics JSONB,
+                top_unanswered_topics JSONB,
+                booking_intent_rate NUMERIC(5,4),
+                language_breakdown JSONB,
+                computed_at TIMESTAMPTZ DEFAULT NOW(),
+                UNIQUE(property_id, report_date)
+            );
+            CREATE INDEX IF NOT EXISTS idx_spad_property_date ON shadow_pilot_analytics_daily(property_id, report_date);
+            """
+        ),
+        (
             "create_announcements",
             """
             CREATE TABLE IF NOT EXISTS announcements (

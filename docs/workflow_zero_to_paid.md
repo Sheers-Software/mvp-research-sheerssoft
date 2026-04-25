@@ -16,16 +16,13 @@ This document exists because a brilliant product with no sales process does not 
 ## The Customer Journey Map
 
 ```
-STRANGER ──► AWARE ──► INTERESTED ──► CONSIDERING ──► PILOT AGREED ──► PILOT LIVE ──► PROOF ──► PAYING CUSTOMER
-   │            │           │               │                │               │           │            │
-   │         Sees a       Visits         Has demo         Signs           AI handles    Numbers      Invoice
-   │         LinkedIn     website,       call, gets       pilot           real guests   in hand      paid
-   │         post or      asks for       proposal,        agreement,      every day,   confirm      within
-   │         gets         more info      thinks about     goes live       GM opens     ROI          14 days
-   │         WhatsApp     or books       it              on WhatsApp      dashboard                of verbal
-   │         outreach     demo                                            + widget                  yes
-   │
-   Stage 1   Stage 2      Stage 3        Stage 3b         Stage 4         Stage 5      Stage 6     Stage 7-8
+┌─────────────────────────────────────────────────────┐
+│ Stage 1: Acquisition (/audit & /apply)              │
+│ Stage 2: Onboarding (48h setup via Baileys QR)      │
+│ Stage 3: Shadow Pilot (Days 2-7, Read-Only Audit)   │
+│ Stage 4: Hybrid Co-Pilot (Days 8-30, Sidebar Draft) │
+│ Stage 5: Paid Conversion (RM 999 + RM 199/m + 3%)   │
+└─────────────────────────────────────────────────────┘
 ```
 
 The journey is not linear. A GM can move from Aware to Considering in a single demo call. A pilot can stall at Stage 5 for 90 days if there is no conversion push. The stages below address every transition point and every place deals die.
@@ -445,19 +442,19 @@ For each room type: Name, description (size, bed type, view, features), rack rat
 Before calling a property "live":
 
 **Phase 0–3: Admin-led (manual, SheersSoft does it all)**
-- [ ] Property record created via `/admin/onboarding` form (or admin script)
+- [ ] Property record created via `/admin/shadow-pilots` form
 - [ ] ADR set correctly (verify with GM)
 - [ ] Operating hours configured (affects "after-hours" classification)
 - [ ] Notification email(s) set (GM + reservations manager)
 - [ ] Timezone confirmed: Asia/Kuala_Lumpur
-- [ ] WhatsApp provider set: "twilio" (sandbox first) or "meta" (after approval)
+- [ ] WhatsApp connected via Baileys QR Scan (no Twilio, no Meta Cloud API needed)
 - [ ] KB ingested: minimum 30 KBDocument entries (via admin script until `/portal/kb` is live)
 - [ ] KB tested: 10 representative questions answered correctly, no hallucinations
 - [ ] Widget snippet generated and provided to IT contact
 - [ ] Staff accounts created: GM + reservations manager minimum (via `/admin/tenants/[id]` invite)
 - [ ] Dashboard login tested: GM logs in via magic link, lands on `/dashboard`, sees KPI cards
-- [ ] Test WhatsApp conversation: send 5 messages, verify responses
-- [ ] Test handoff: trigger handoff, verify staff notification, test staff reply from dashboard
+- [ ] Test WhatsApp conversation: send 5 messages, verify responses in Shadow Mode (no sending)
+- [ ] Scheduled `run_weekly_audit_report` for Day 7 email
 - [ ] Daily email: trigger manually, verify arrives in GM's inbox
 - [ ] FERNET key active: verify lead phone number encrypted in DB after capture
 - [ ] Pilot agreement signed and filed
@@ -472,21 +469,17 @@ Before calling a property "live":
 
 ### WhatsApp Setup Steps
 
-**Track A — Twilio Sandbox (Live Immediately, Use for Pilot Start)**
-1. Log in to Twilio console
-2. Create a new Twilio number or use existing sandbox number
-3. Set Property.whatsapp_provider = "twilio" and Property.twilio_phone_number in database
-4. Configure webhook: Twilio → HTTPS POST → `https://nocturn-backend-owtn645vea-as.a.run.app/api/v1/channels/whatsapp/twilio`
-5. Provide the sandbox number to the hotel team with join instructions
-6. Test: send "Hi, got room?" — verify AI responds in < 30 seconds
+**Track A — Baileys / whatsapp-web.js (Immediate Setup)**
+1. Navigate to `/admin/shadow-pilots`
+2. Generate pairing QR code.
+3. Instruct GM/Hotel Staff to go to WhatsApp "Linked Devices" and scan QR.
+4. Set Property.audit_only_mode = True (for Days 2-7).
+5. Verify incoming messages are logging to Dashboard without auto-replying.
 
-**Track B — Meta Cloud API (Apply Immediately, Approve in 1–7 Days)**
-1. Request Meta Business Manager access from hotel's Facebook Page admin
-2. Submit WhatsApp Business number for verification via Meta Business Manager
-3. Once approved: set Property.whatsapp_provider = "meta" and configure WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_TOKEN
-4. Set webhook: Meta → HTTPS POST → `https://nocturn-backend-owtn645vea-as.a.run.app/api/v1/channels/whatsapp/meta`
-5. Verify webhook token with Meta
-6. Cut over from Twilio to Meta once approved and tested
+**Track B — Meta Cloud API (Stage 3, Future Optimization)**
+1. Only proceed if GM wants fully automated responses.
+2. Submit WhatsApp Business number for verification via Meta Business Manager.
+3. Once approved: set Property.whatsapp_provider = "meta".
 
 ---
 

@@ -33,6 +33,13 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
+# 2b. Seed shadow pilot demo data (7-day synthetic observation for GM dashboard demo)
+Write-Host "`n🔍 Seeding Shadow Pilot Demo Data (7-day observation)..." -ForegroundColor Yellow
+python backend/seed_shadow_pilot_demo.py
+if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Shadow pilot seed failed — demo will work but GM dashboard won't have data."
+}
+
 # 3. Instructions
 Write-Host "`n✅ Live Demo Environment Ready!" -ForegroundColor Green
 Write-Host "---------------------------------------------------"

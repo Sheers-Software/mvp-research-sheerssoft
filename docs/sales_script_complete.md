@@ -137,12 +137,9 @@ revenue this is costing [Hotel Name]? I can pull up the numbers for you.
 
 **If they ask "What is this about?" or "What do you do?":**
 ```
-We built an AI that sits on your hotel's WhatsApp number, answers guest
-inquiries overnight in under 20 seconds, captures their booking details,
-and sends your GM a revenue summary every morning at 7am.
+We built an AI that links to your hotel's WhatsApp via a 5-minute QR scan, reads guest inquiries overnight, and drafts perfect replies in a dashboard for your staff to approve the next morning—complete with payment links.
 
-It's live in 48 hours. No setup fee. You don't pay a cent unless the AI
-captures at least one qualified booking lead in the first 30 days.
+It's live in 48 hours. No setup fee for the 7-day Shadow Pilot. You don't pay a cent unless you see the verified revenue proof.
 
 The 20-min call is just to run your numbers — so you can see if the ROI
 makes sense for [Hotel Name] specifically.
@@ -700,13 +697,7 @@ The AI only answers from a knowledge base that you control.
 You populate it — your room types, your rates, your policies, your
 FAQ answers. It doesn't make things up or pull from the internet.
 
-If a guest asks something that's not in your knowledge base,
-the AI doesn't guess. It tells the guest it'll confirm with the team
-and flags the conversation for your staff to follow up.
-
-So the worst case isn't 'AI gives wrong answer.' The worst case is
-'AI says I'll check for you' — which is exactly what a trained
-front desk staff member would say."
+More importantly, it doesn't talk to guests automatically if you don't want it to. With our Hybrid Co-pilot, it drafts the response for your staff to review the next morning. Nothing goes out without an 'Approve & Send'. Safety is the default."
 ```
 
 ---

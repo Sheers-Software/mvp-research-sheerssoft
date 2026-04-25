@@ -1058,3 +1058,166 @@ async def update_shadow_pilot(
         "shadow_pilot_phone": prop.shadow_pilot_phone,
         "shadow_pilot_start_date": prop.shadow_pilot_start_date.isoformat() if prop.shadow_pilot_start_date else None,
     }
+
+
+@router.post("/superadmin/shadow-pilots")
+async def provision_shadow_pilot(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(require_superadmin),
+):
+    """
+    Provision a new shadow pilot: set shadow_pilot_mode=True, generate dashboard token,
+    trigger Baileys bridge to start session.
+    Body: {property_id, hotel_phone, gm_email, adr, avg_stay_nights, operating_hours}
+    """
+    import jwt
+    from datetime import timedelta
+    from app.config import get_settings as _get_settings
+
+    prop = await db.scalar(select(Property).where(Property.id == uuid.UUID(body["property_id"])))
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    # Generate dashboard token (30 days)
+    _settings = _get_settings()
+    exp = datetime.now(timezone.utc) + timedelta(days=30)
+    token_payload = {
+        "property_id": str(prop.id),
+        "type": "shadow_dashboard",
+        "exp": exp,
+    }
+    dashboard_token = jwt.encode(token_payload, _settings.jwt_secret, algorithm="HS256")
+
+    prop.shadow_pilot_mode = True
+    prop.shadow_pilot_session_active = False
+    prop.shadow_pilot_start_date = datetime.now(timezone.utc)
+    prop.shadow_pilot_dashboard_token = dashboard_token
+    prop.shadow_pilot_dashboard_token_expires = exp
+    if body.get("hotel_phone"):
+        prop.shadow_pilot_phone = body["hotel_phone"]
+    if body.get("gm_email"):
+        prop.notification_email = body["gm_email"]
+    if body.get("adr"):
+        prop.adr = body["adr"]
+    if body.get("avg_stay_nights"):
+        prop.avg_stay_nights = body["avg_stay_nights"]
+    if body.get("operating_hours"):
+        prop.operating_hours = body["operating_hours"]
+
+    await db.commit()
+
+    # Trigger Baileys bridge to start session
+    bridge_url = getattr(_settings, 'baileys_bridge_url', None)
+    if bridge_url and prop.slug and prop.shadow_pilot_phone:
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=10) as client:
+                await client.post(
+                    f"{bridge_url}/internal/start-session",
+                    json={"property_slug": prop.slug, "property_phone": prop.shadow_pilot_phone},
+                )
+        except Exception as e:
+            logger.warning("baileys_start_session_failed", error=str(e))
+
+    return {
+        "property_id": str(prop.id),
+        "shadow_pilot_mode": True,
+        "shadow_pilot_start_date": prop.shadow_pilot_start_date.isoformat(),
+        "dashboard_token": dashboard_token,
+        "slug": prop.slug,
+    }
+
+
+@router.get("/superadmin/shadow-pilots/{property_id}/qr")
+async def get_shadow_pilot_qr(
+    property_id: str,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(require_superadmin),
+):
+    """Proxy QR code from Baileys bridge for scanning in the admin UI."""
+    prop = await db.scalar(select(Property).where(Property.id == uuid.UUID(property_id)))
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    from app.config import get_settings as _get_settings
+    _settings = _get_settings()
+    bridge_url = getattr(_settings, 'baileys_bridge_url', None)
+
+    if not bridge_url or not prop.slug:
+        return {"qr_base64": None, "status": "bridge_not_configured"}
+
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(f"{bridge_url}/qr/{prop.slug}")
+            return resp.json()
+    except Exception as e:
+        return {"qr_base64": None, "status": "bridge_unavailable", "error": str(e)}
+
+
+@router.delete("/superadmin/shadow-pilots/{property_id}")
+async def stop_shadow_pilot(
+    property_id: str,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(require_superadmin),
+):
+    """Stop shadow pilot — disconnect Baileys session, set shadow_pilot_mode=False."""
+    prop = await db.scalar(select(Property).where(Property.id == uuid.UUID(property_id)))
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    from app.config import get_settings as _get_settings
+    _settings = _get_settings()
+    bridge_url = getattr(_settings, 'baileys_bridge_url', None)
+
+    if bridge_url and prop.slug:
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=10) as client:
+                await client.post(
+                    f"{bridge_url}/internal/stop-session",
+                    json={"property_slug": prop.slug},
+                )
+        except Exception as e:
+            logger.warning("baileys_stop_session_failed", error=str(e))
+
+    prop.shadow_pilot_mode = False
+    prop.shadow_pilot_session_active = False
+    await db.commit()
+    return {"status": "stopped", "property_id": property_id}
+
+
+@router.get("/superadmin/shadow-pilots/{property_id}/analytics")
+async def get_shadow_pilot_analytics(
+    property_id: str,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(require_superadmin),
+):
+    """Full daily analytics for a shadow pilot property."""
+    from app.models import ShadowPilotAnalyticsDaily
+    rows = list(await db.scalars(
+        select(ShadowPilotAnalyticsDaily).where(
+            ShadowPilotAnalyticsDaily.property_id == uuid.UUID(property_id)
+        ).order_by(ShadowPilotAnalyticsDaily.report_date)
+    ))
+    return {
+        "property_id": property_id,
+        "rows": [
+            {
+                "date": r.report_date.isoformat(),
+                "total_inquiries": r.total_inquiries,
+                "after_hours_inquiries": r.after_hours_inquiries,
+                "unanswered_count": r.unanswered_count,
+                "after_hours_unanswered": r.after_hours_unanswered,
+                "booking_intent_inquiries": r.booking_intent_inquiries,
+                "avg_response_time_minutes": float(r.avg_response_time_minutes or 0),
+                "avg_response_time_after_hours": float(r.avg_response_time_after_hours or 0),
+                "revenue_at_risk_conservative": float(r.revenue_at_risk_conservative or 0),
+                "daily_revenue_leakage": float(r.daily_revenue_leakage or 0),
+                "peak_inquiry_hour": r.peak_inquiry_hour,
+                "top_inquiry_topics": r.top_inquiry_topics,
+            }
+            for r in rows
+        ]
+    }

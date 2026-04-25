@@ -493,8 +493,10 @@ Show the status filters:
 Show the handoff status:
 > *"The moment the AI detects a complaint or a request it can't handle — it stops replying and flags the conversation for your team. Staff open this, they see the full context — every message, the AI's responses, the guest's sentiment. They don't ask the guest to repeat themselves."*
 
-Show the staff reply input:
-> *"And they reply from right here. The guest gets your message instantly on WhatsApp. The whole conversation is in one place."*
+Show the staff reply input and the AI Draft generation:
+> *"Here's where the magic happens. The AI doesn't just hand off and leave you hanging. For Phase 2, the AI will pull your room availability directly from your Google Sheet, read the guest's context, and draft the perfect reply in this box for you — complete with a payment link if they are ready to book. All you do is click 'Approve & Send'. You remain in complete control. No bots talking without your permission."*
+
+> *"The guest gets your message instantly on WhatsApp. The whole conversation is exactly what you would say, just drafted instantly."*
 
 ---
 
@@ -515,9 +517,9 @@ Open a blank calculator or share your pre-calculated estimate:
 
 > *"Based on [X] daily inquiries, [ADR], and a conservative 20% conversion rate on after-hours leads — you have approximately **RM [amount]/month** in revenue at risk from unanswered inquiries. That's not counting what you're paying Booking.com to capture the leads you're dropping."*
 
-> *"We charge RM 199 a month and 3% only on direct bookings we actually close for you. Compare that to what you're paying Booking.com — 15–18% on every booking, including guests who were already trying to reach you directly. Setup is a one-time RM 999. We handle everything — connect your WhatsApp number, drop a script tag on your website, configure your email. Your team spends 30 minutes with me sharing your rates, room types, and FAQs. You're live in 48 hours."*
+> *"We charge RM 199 a month and 3% only on direct bookings we actually close for you. Compare that to what you're paying Booking.com — 15–18% on every booking, including guests who were already trying to reach you directly. Setup is a one-time RM 999. We handle everything — connect your WhatsApp number via a 5-minute QR scan, drop a script tag on your website, configure your email. Your team spends 30 minutes with me sharing your rates. You're live in 48 hours."*
 
-> *"And here's our guarantee: if in 30 days we haven't demonstrated revenue recovery, we waive the following month's platform fee. We only win when you win."*
+> *"And here's our guarantee: if the math doesn't close itself within 30 days — meaning we haven't recovered enough revenue to cover our fees — we waive the following month. The revenue math closes itself."*
 
 **Close question:**
 > *"Does RM 199 a month plus 3% on bookings we recover make sense for [Hotel Name]? I can have you live by [specific date]."*
@@ -529,7 +531,7 @@ Open a blank calculator or share your pre-calculated estimate:
 | Objection | Response |
 |-----------|----------|
 | *"Will it sound robotic?"* | *"Let me show you."* Send a BM message live. *"Does that sound robotic?"* |
-| *"What if it gives wrong rates?"* | *"It only quotes from your verified knowledge base. If it's unsure, it says: 'Let me connect you with our team.' Safety is the default, not the exception."* |
+| *"What if it gives wrong rates?"* | *"It only quotes from your verified knowledge base. More importantly, with our Hybrid Co-Pilot mode, the AI drafts the reply for your staff to approve before it sends. It never sends a response autonomously if you don't want it to. Safety is the default."* |
 | *"We already have a chatbot on our website."* | *"Great — that handles maybe 10% of inquiries. We're covering the 90% coming through WhatsApp and email."* |
 | *"I need to check with IT."* | *"There's no IT project. One script tag, one WhatsApp link. I've never needed to involve IT."* |
 | *"I need to show the owner."* | *"Absolutely. Can I join that call? I can walk them through the ROI numbers directly — it's usually a 10-minute conversation."* |

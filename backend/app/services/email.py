@@ -80,10 +80,14 @@ async def send_email(
         return {"status": "skipped", "reason": "not_configured"}
 
     # Build HTML email
-    html_body = EMAIL_TEMPLATE.format(
-        hotel_name=hotel_name,
-        body=formatted,
-    )
+    # If content is already a full HTML document (starts with < and is_html), use as-is
+    if is_html and formatted.lstrip().startswith('<'):
+        html_body = formatted
+    else:
+        html_body = EMAIL_TEMPLATE.format(
+            hotel_name=hotel_name,
+            body=formatted,
+        )
 
     try:
         sg = SendGridAPIClient(settings.sendgrid_api_key)

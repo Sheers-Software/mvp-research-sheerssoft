@@ -15,7 +15,7 @@
 
 ## 1. The Offer in One Sentence
 
-> **Your hotel's AI revenue partner — captures every after-hours booking inquiry on WhatsApp, email, and your website in under 30 seconds, proves the revenue recovered every morning, and charges you 3% only on confirmed bookings it closes. Live in 48 hours.**
+> **Your hotel's Hybrid AI revenue partner — links to your WhatsApp via a simple QR scan, drafts perfect replies for every after-hours booking inquiry for your staff to approve the next morning, proves the revenue recovered, and charges you RM 199/month plus 3% only on confirmed bookings it closes. Live in 48 hours.**
 
 ---
 
@@ -72,7 +72,7 @@ Everything the hotel receives for RM 199/month + RM 999 setup + 3% on facilitate
 
 | Deliverable | What It Does | Equivalent If Bought Separately |
 |-------------|-------------|--------------------------------|
-| **WhatsApp AI Responder** | Responds to every WhatsApp inquiry in under 30 seconds, 24/7. Bilingual English + BM. Handles rates, room types, availability, facilities, policies, directions. | Part-time night receptionist: RM 1,800–2,500/month for 6 hrs/night, single channel only |
+| **WhatsApp AI Co-Pilot** | Drafts responses to every WhatsApp inquiry for your staff to approve the next morning. Bilingual English + BM. Handles rates, room types, availability, facilities, policies, directions. | Part-time night receptionist: RM 1,800–2,500/month for 6 hrs/night, single channel only |
 | **Web Chat Widget** | One-line `<script>` tag deployed on hotel website. Chat bubble captures every website visitor inquiry. | Live chat software subscription: RM 200–400/month, no AI |
 | **Email Intake Handler** | Forward reservation email to Nocturn AI. AI responds, categorizes intent, CCs reservations team. | Admin time to handle emails: 30 min/day × RM 15/hr = RM 330/month |
 | **Lead CRM** | Every inquiry → lead record with name, phone, intent, channel, timestamp, estimated value. Filterable, exportable. | CRM subscription: RM 150–500/month, no auto-capture |
@@ -93,7 +93,7 @@ Everything the hotel receives for RM 199/month + RM 999 setup + 3% on facilitate
 |-------------|-----------|-------------------|
 | **Discovery & Knowledge Architecture** | 30-minute call. We document: room types, rates, ADR, facilities, check-in/out times, parking, F&B hours, policies, common FAQs. | 30 minutes |
 | **Custom AI Knowledge Base Build** | SheersSoft ingests all property data, structures it into the AI knowledge base, tests it against 20 real question types. | Zero |
-| **WhatsApp Business API Setup** | Initiate Meta Cloud API registration OR configure Twilio sandbox. Link to hotel's WhatsApp Business number. | 30 minutes (provide login access once) |
+| **WhatsApp Connection** | Quick 5-minute QR scan to link your hotel's WhatsApp device via Baileys. No Meta API approval nightmare. | 30 minutes (scan QR once) |
 | **Web Widget Deployment** | Configure widget with hotel branding. Deploy embed code. Test on property website. | One email to webmaster (or we do it directly) |
 | **Quality Assurance Battery** | Run 20-question internal test: rates, BM/EN, edge cases, handoff triggers. Fix before GM sees it. | Zero |
 | **Go-Live Verification Call** | 20-minute call Day 2. GM sends 5 test questions. We fix anything on the spot. | 20 minutes |
@@ -124,7 +124,7 @@ This fee is not a software activation charge. It is a done-for-you professional 
 
 | What we deliver | Market rate if purchased separately |
 |-----------------|-------------------------------------|
-| WhatsApp Business API registration + configuration | RM 500–1,200 (digital agency setup fee) |
+| WhatsApp Baileys connection and Hybrid Sidebar setup | RM 500–1,200 (digital agency setup fee) |
 | Custom AI knowledge architecture (your property, your tone, your rates) | RM 3,000–8,000 (NLP consultant, 2–3 weeks) |
 | 20-question quality assurance battery | RM 800–1,500 (QA testing engagement) |
 | Web widget deployment + testing | RM 200–500 (developer hourly) |
@@ -148,7 +148,7 @@ The real question is why it costs only RM 999 when the alternative is doing it y
 
 | Component | Monthly cost if replaced with alternatives |
 |-----------|------------------------------------------|
-| AI response engine (24/7, 30-second response) | Part-time night receptionist: RM 1,800–2,500/month (6 hrs/night, 1 channel only) |
+| AI Co-Pilot engine (24/7, instant drafting) | Part-time night receptionist: RM 1,800–2,500/month (6 hrs/night, 1 channel only) |
 | Lead CRM with auto-capture | CRM subscription (HubSpot/Salesforce): RM 150–600/month, no auto-capture |
 | Daily GM morning report | VA to compile and send: RM 400–800/month (2 hrs/day) |
 | Web chat widget with AI | Live chat software: RM 200–400/month, no AI, requires staff monitoring |
@@ -302,7 +302,7 @@ SheersSoft works. The GM is not involved.
 | All room types, rates, policies ingested | SheersSoft tech | 1 hour |
 | Facilities and FAQs structured | SheersSoft tech | 1 hour |
 | Tone calibration applied to AI prompt | SheersSoft tech | 30 minutes |
-| WhatsApp Business API application initiated (or Twilio configured) | SheersSoft tech | 1 hour |
+| WhatsApp Baileys connection enabled | SheersSoft tech | 1 hour |
 | Internal 20-question test battery | SheersSoft QA | 1 hour |
 | KB corrections from test results | SheersSoft tech | 30 minutes |
 | Web widget configured (branding, greeting, property name) | SheersSoft tech | 30 minutes |
@@ -623,7 +623,7 @@ For a hotel GM who takes 60 seconds to compare their options:
 | **Generic AI chatbot (e.g., Tidio, Crisp)** | RM 150–400 | Website only | Immediate | Partial | No | No |
 | **Booking.com/Agoda (OTA)** | 15–25% per booking | They capture it for you (and charge for it) | Immediate | Yes — theirs, not yours | No | No |
 | **Custom AI development (agency)** | RM 5,000–15,000 setup + RM 2,000–5,000/mo | Depends on build quality | Depends | Depends | No | No |
-| **Nocturn AI — Revenue Partner Plan** | **RM 199/mo + 3% performance** | **WhatsApp + Web + Email, 24/7** | **<30 seconds** | **Yes, with full CRM** | **Yes, 7am daily** | **Yes, staff-verified** |
+| **Nocturn AI — Revenue Partner Plan** | **RM 199/mo + 3% performance** | **WhatsApp + Web + Email, 24/7** | **Instant Draft & Review** | **Yes, with full CRM** | **Yes, 7am daily** | **Yes, staff-verified** |
 
 **The status quo is not free.** Every month of "do nothing" costs the hotel RM 3,000–20,000+ in after-hours revenue depending on property size. That is the true price of inaction.
 
@@ -704,7 +704,7 @@ The Grand Slam Offer only works long-term if the hotel stays. These are the stru
 > We build your property's AI, connect your WhatsApp, deploy your website widget, test everything, and hand you a working system in 48 hours. You contribute 80 minutes. We do the rest.
 >
 > **Platform: RM 199/month**
-> Your AI concierge runs 24/7 on WhatsApp, your website, and email. Every inquiry answered in under 30 seconds. Every lead captured with contact details, intent, and estimated value. Daily 7am GM report. Real-time dashboard. Monthly guest insights.
+> Your AI concierge drafts replies 24/7 on WhatsApp, your website, and email. Every inquiry drafted. Every lead captured with contact details, intent, and estimated value. Daily 7am GM report. Real-time dashboard. Monthly guest insights.
 >
 > **Performance: 3% on confirmed bookings we facilitate**
 > Not on all bookings. Only on confirmed direct bookings that came through Nocturn AI — leads you or your staff have verified. We earn 3%. You keep 97%. Compare that to the 18% you're sending to Agoda on inquiries that started as direct messages.

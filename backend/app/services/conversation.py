@@ -773,3 +773,44 @@ async def _try_extract_lead(
     conversation.guest_name = guest_name or conversation.guest_name
 
     return lead
+
+
+async def _call_llm_simple(prompt: str) -> str:
+    """
+    Simple single-turn LLM call returning raw text.
+    Used by the shadow pilot classifier for intent detection.
+    Tries Gemini first, then OpenAI, then raises if both fail.
+    """
+    import asyncio as _asyncio
+
+    # Attempt 1: Gemini async client
+    if settings.gemini_api_key and gemini_client:
+        try:
+            from google.genai import types as _types
+            response = await gemini_client.aio.models.generate_content(
+                model=settings.gemini_model,
+                contents=[_types.Content(role="user", parts=[_types.Part.from_text(text=prompt)])],
+                config=_types.GenerateContentConfig(temperature=0.0, max_output_tokens=256),
+            )
+            text = response.text.strip() if response.text else ""
+            if text:
+                return text
+        except Exception as e:
+            logger.debug("_call_llm_simple gemini failed", error=str(e))
+
+    # Attempt 2: OpenAI
+    if settings.openai_api_key and openai_client:
+        try:
+            resp = await openai_client.chat.completions.create(
+                model=settings.openai_model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=256,
+                temperature=0.0,
+            )
+            text = resp.choices[0].message.content.strip()
+            if text:
+                return text
+        except Exception as e:
+            logger.debug("_call_llm_simple openai failed", error=str(e))
+
+    raise RuntimeError("All LLM providers failed in _call_llm_simple")

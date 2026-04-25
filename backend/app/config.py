@@ -92,6 +92,10 @@ class Settings(BaseSettings):
     # called by Cloud Scheduler in production. Generate with: openssl rand -hex 32
     internal_scheduler_secret: str = ""
 
+    # Baileys Bridge — Node.js WhatsApp bridge for shadow pilot / hybrid mode
+    # Set to the URL of the running Baileys bridge service (e.g. http://localhost:3001)
+    baileys_bridge_url: str | None = None
+
     @property
     def is_production(self) -> bool:
         return self.environment == "production"

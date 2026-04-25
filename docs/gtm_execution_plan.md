@@ -196,7 +196,7 @@ In `frontend/src/app/dashboard/leads/page.tsx`, add "Lost" to the status filter 
 ### Task P0.6 — BM/Manglish Test Suite (50 Questions)
 **Priority:** #6 · **Effort:** Half day · **Standard:** PRD F1 Acceptance Criteria — ≥80% pass rate required
 
-Run the 50-question BM/Manglish test suite against the live Vivatel KB via WhatsApp (Twilio sandbox). The suite must cover:
+Run the 50-question BM/Manglish test suite against the live Vivatel KB via WhatsApp using the Baileys/whatsapp-web.js test connection. The suite must cover:
 - Standard room inquiries in BM ("ada bilik available untuk 2 malam?")
 - Rate questions ("berapa harga bilik standard?", "ada package tak?")
 - After-hours messages at unusual hours
@@ -270,20 +270,19 @@ Property:
   operating_hours: { mon-fri: 07:00-23:00, sat-sun: 07:00-23:00 }
   notification_email: [Zul's email + GM's email]
   plan_tier: "starter"
-  whatsapp_provider: "meta"  (or "twilio" based on Zul's setup)
+  whatsapp_provider: "baileys"
   adr: 230  (confirm with Zul)
 ```
 
 ---
 
 ### Task V1.2 — WhatsApp Business Number Linked
-**Effort:** 1–3 days (Meta approval timeline) · **Start immediately**
+**Effort:** 5 minutes · **Start immediately**
 
-Two parallel tracks:
-- **Track A (Meta Cloud API):** Submit Vivatel's WhatsApp Business number for verification via Meta Business Manager. Approval: 1–7 days. Apply on Day 1 of this phase.
-- **Track B (Twilio sandbox, live immediately):** Configure Twilio WhatsApp sandbox for Vivatel's test number. Usable from Day 1 for UAT while Meta approval processes.
-
-Vivatel goes live on Track B first. Cut over to Track A (Meta) once approved.
+Connect Vivatel via the Baileys/whatsapp-web.js connection:
+- Have Zul scan the QR code from the `/admin` portal on their hotel WhatsApp device.
+- Zero downtime, no Meta API approvals needed.
+- `audit_only_mode` = True so it starts listening and logging for the 7-day shadow pilot.
 
 ---
 
@@ -638,7 +637,7 @@ If Zul's GM declines after the pilot:
 Document everything that was learned from Vivatel:
 - KB intake form template (room types, rates, FAQs, operating hours)
 - Standard property configuration script
-- WhatsApp setup walkthrough (Meta Cloud API + Twilio backup)
+- WhatsApp setup walkthrough (Baileys QR Scan)
 - Widget installation guide (1-page PDF for IT teams)
 - First-48-hour monitoring checklist
 - Staff training script (30-minute walkthrough)

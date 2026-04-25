@@ -33,6 +33,17 @@ steps:
           -t ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:latest \
           ./frontend
 
+  # ── 2b. Build Baileys bridge image ──────────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: build-baileys-bridge
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/baileys-bridge:$COMMIT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/baileys-bridge:latest
+      - ./baileys-bridge
+
   # ── 3. Push backend image ────────────────────────────────────────────────────
   - name: gcr.io/cloud-builders/docker
     id: push-backend
@@ -50,6 +61,15 @@ steps:
       - push
       - --all-tags
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend
+
+  # ── 4b. Push Baileys bridge image ───────────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: push-baileys-bridge
+    waitFor: [build-baileys-bridge]
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/baileys-bridge
 
   # ── 5. Deploy backend to Cloud Run ──────────────────────────────────────────
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
@@ -100,9 +120,34 @@ steps:
       - --allow-unauthenticated
       - --port=3000
 
+  # ── 7. Deploy Baileys bridge to Cloud Run ───────────────────────────────────
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy-baileys-bridge
+    waitFor: [push-baileys-bridge, deploy-backend]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - baileys-bridge
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/baileys-bridge:$COMMIT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --service-account=${_SA}
+      - --min-instances=1
+      - --max-instances=3
+      - --memory=512Mi
+      - --cpu=1
+      - --timeout=300
+      - --no-cpu-throttling
+      - --set-env-vars=BACKEND_INTERNAL_URL=https://nocturn-backend-343745766874.asia-southeast1.run.app
+      - --set-secrets=INTERNAL_SECRET=INTERNAL_SECRET:latest
+      - --allow-unauthenticated
+      - --port=3001
+
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$COMMIT_SHA
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/baileys-bridge:$COMMIT_SHA
 
 options:
   logging: CLOUD_LOGGING_ONLY

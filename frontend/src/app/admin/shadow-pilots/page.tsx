@@ -1,19 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { apiGet, apiPatch } from '@/lib/api';
+import { useEffect, useState, useRef } from 'react';
+import { apiGet, apiPost, apiDelete } from '@/lib/api';
 
-interface ShadowProperty {
+interface ShadowPilot {
     id: string;
     name: string;
+    slug: string | null;
     tenant_name: string | null;
-    tenant_id: string | null;
-    audit_only_mode: boolean;
-    shadow_pilot_phone: string | null;
+    shadow_pilot_mode: boolean;
+    shadow_pilot_session_active: boolean;
+    shadow_pilot_session_last_seen: string | null;
     shadow_pilot_start_date: string | null;
+    shadow_pilot_phone: string | null;
     notification_email: string | null;
     is_active: boolean;
-    created_at: string | null;
+}
+
+interface QRState {
+    qr_base64: string | null;
+    status: string;
 }
 
 function daysRunning(startDate: string | null): number | null {
@@ -23,146 +29,168 @@ function daysRunning(startDate: string | null): number | null {
     return Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export default function ShadowPilotsPage() {
-    const [properties, setProperties] = useState<ShadowProperty[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState<string | null>(null);
-    const [editPhone, setEditPhone] = useState<Record<string, string>>({});
-    const [phoneEdit, setPhoneEdit] = useState<string | null>(null);
+function SessionBadge({ active, lastSeen }: { active: boolean; lastSeen: string | null }) {
+    if (active) return <span className="badge badge-success">● Connected</span>;
+    if (lastSeen) {
+        const mins = Math.floor((Date.now() - new Date(lastSeen).getTime()) / 60000);
+        if (mins < 5) return <span className="badge badge-success">● Connected</span>;
+    }
+    return <span className="badge badge-neutral">○ Disconnected</span>;
+}
 
-    useEffect(() => {
-        apiGet<ShadowProperty[]>('/superadmin/shadow-pilots')
+export default function ShadowPilotsPage() {
+    const [properties, setProperties] = useState<ShadowPilot[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [showModal, setShowModal] = useState(false);
+    const [modalStep, setModalStep] = useState<'form' | 'qr'>('form');
+    const [form, setForm] = useState({
+        property_id: '',
+        hotel_phone: '',
+        gm_email: '',
+        adr: '230',
+        avg_stay_nights: '1',
+        operating_hours_open: '09:00',
+        operating_hours_close: '18:00',
+    });
+    const [provisionedId, setProvisionedId] = useState<string | null>(null);
+    const [qrState, setQrState] = useState<QRState>({ qr_base64: null, status: 'waiting' });
+    const [submitting, setSubmitting] = useState(false);
+    const [disconnecting, setDisconnecting] = useState<string | null>(null);
+    const qrPollRef = useRef<NodeJS.Timeout | null>(null);
+
+    const load = () => {
+        apiGet<ShadowPilot[]>('/superadmin/shadow-pilots')
             .then(setProperties)
             .catch(() => { })
             .finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        load();
+        const interval = setInterval(load, 30000);
+        return () => clearInterval(interval);
     }, []);
 
-    const toggleAuditMode = async (prop: ShadowProperty) => {
-        setSaving(prop.id);
+    // Poll QR when modal is in QR step
+    useEffect(() => {
+        if (modalStep === 'qr' && provisionedId) {
+            const poll = async () => {
+                try {
+                    const data = await apiGet<QRState>(`/superadmin/shadow-pilots/${provisionedId}/qr`);
+                    setQrState(data);
+                    if (data.status === 'connected') {
+                        if (qrPollRef.current) clearInterval(qrPollRef.current);
+                        load();
+                    }
+                } catch { }
+            };
+            poll();
+            qrPollRef.current = setInterval(poll, 3000);
+            return () => { if (qrPollRef.current) clearInterval(qrPollRef.current); };
+        }
+    }, [modalStep, provisionedId]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSubmitting(true);
         try {
-            const updated = await apiPatch<ShadowProperty>(
-                `/superadmin/shadow-pilots/${prop.id}`,
-                { audit_only_mode: !prop.audit_only_mode }
-            );
-            setProperties(prev =>
-                prev.map(p => p.id === prop.id ? { ...p, ...updated } : p)
-            );
-        } catch {
-            alert('Failed to update shadow pilot mode');
+            const days: Record<string, { open: string; close: string }> = {};
+            const weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            weekdays.forEach(d => {
+                days[d] = { open: form.operating_hours_open, close: form.operating_hours_close };
+            });
+            const result = await apiPost<{ property_id: string }>('/superadmin/shadow-pilots', {
+                property_id: form.property_id,
+                hotel_phone: form.hotel_phone,
+                gm_email: form.gm_email,
+                adr: parseFloat(form.adr),
+                avg_stay_nights: parseFloat(form.avg_stay_nights),
+                operating_hours: days,
+            });
+            setProvisionedId(result.property_id);
+            setModalStep('qr');
+        } catch (err: any) {
+            alert(err?.message || 'Failed to provision shadow pilot');
         } finally {
-            setSaving(null);
+            setSubmitting(false);
         }
     };
 
-    const savePhone = async (prop: ShadowProperty) => {
-        const phone = editPhone[prop.id] ?? prop.shadow_pilot_phone ?? '';
-        setSaving(prop.id);
+    const handleDisconnect = async (prop: ShadowPilot) => {
+        if (!confirm(`Disconnect shadow pilot for ${prop.name}? The hotel's WhatsApp continues working normally.`)) return;
+        setDisconnecting(prop.id);
         try {
-            const updated = await apiPatch<ShadowProperty>(
-                `/superadmin/shadow-pilots/${prop.id}`,
-                { shadow_pilot_phone: phone || null }
-            );
-            setProperties(prev =>
-                prev.map(p => p.id === prop.id ? { ...p, ...updated } : p)
-            );
-            setPhoneEdit(null);
+            await apiDelete(`/superadmin/shadow-pilots/${prop.id}`);
+            load();
         } catch {
-            alert('Failed to save phone number');
+            alert('Failed to disconnect');
         } finally {
-            setSaving(null);
+            setDisconnecting(null);
         }
     };
 
-    const activePilots = properties.filter(p => p.audit_only_mode);
-    const allProperties = properties.filter(p => !p.audit_only_mode);
+    const closeModal = () => {
+        if (qrPollRef.current) clearInterval(qrPollRef.current);
+        setShowModal(false);
+        setModalStep('form');
+        setProvisionedId(null);
+        setQrState({ qr_base64: null, status: 'waiting' });
+        setForm({ property_id: '', hotel_phone: '', gm_email: '', adr: '230', avg_stay_nights: '1', operating_hours_open: '09:00', operating_hours_close: '18:00' });
+    };
+
+    const activePilots = properties.filter(p => p.shadow_pilot_mode);
+    const availableProperties = properties.filter(p => !p.shadow_pilot_mode);
 
     if (loading) {
-        return (
-            <div className="login-page">
-                <div className="loader" />
-            </div>
-        );
+        return <div className="login-page"><div className="loader" /></div>;
     }
 
     return (
         <div>
-            <div style={{ marginBottom: 32 }}>
-                <h1>Shadow Pilots</h1>
-                <p className="text-muted text-sm" style={{ marginTop: 4 }}>
-                    Stage 2 of the sales funnel. Properties in audit-only mode log inquiries silently — no AI reply is sent. Weekly reports email the GM their missed-revenue estimate.
-                </p>
+            <div style={{ marginBottom: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                    <h1>Shadow Pilots</h1>
+                    <p className="text-muted text-sm" style={{ marginTop: 4 }}>
+                        Baileys linked device — observes hotel's real WhatsApp for 7 days. No disruption. Day 7 report proves ROI.
+                    </p>
+                </div>
+                <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+                    + New Shadow Pilot
+                </button>
             </div>
 
-            {/* Active shadow pilots */}
+            {/* Active pilots */}
             <div className="card" style={{ marginBottom: 32 }}>
-                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                        <h3 style={{ margin: 0 }}>Active Shadow Pilots</h3>
-                        <p className="text-muted text-sm" style={{ margin: '4px 0 0' }}>
-                            {activePilots.length} {activePilots.length === 1 ? 'property' : 'properties'} currently in audit-only mode
-                        </p>
-                    </div>
+                <div className="card-header">
+                    <h3 style={{ margin: 0 }}>Active Shadow Pilots ({activePilots.length})</h3>
                 </div>
-
                 {activePilots.length === 0 ? (
                     <div style={{ padding: '32px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                        No active shadow pilots. Enable audit-only mode on a property below to start a shadow pilot.
+                        No active shadow pilots. Click "+ New Shadow Pilot" to start one.
                     </div>
                 ) : (
                     <table className="table">
                         <thead>
                             <tr>
                                 <th>Property</th>
-                                <th>Tenant</th>
-                                <th>Shadow Number</th>
-                                <th>Days Running</th>
-                                <th>Weekly Email To</th>
+                                <th>Session</th>
+                                <th>Day</th>
+                                <th>Phone</th>
+                                <th>GM Email</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {activePilots.map(prop => {
                                 const days = daysRunning(prop.shadow_pilot_start_date);
-                                const isEditing = phoneEdit === prop.id;
                                 return (
                                     <tr key={prop.id}>
                                         <td>
                                             <span className="font-medium">{prop.name}</span>
-                                        </td>
-                                        <td className="text-sm text-muted">
-                                            {prop.tenant_name ?? '—'}
+                                            <div className="text-xs text-muted">{prop.tenant_name ?? '—'}</div>
                                         </td>
                                         <td>
-                                            {isEditing ? (
-                                                <div style={{ display: 'flex', gap: 4 }}>
-                                                    <input
-                                                        className="input input-sm"
-                                                        style={{ width: 140 }}
-                                                        value={editPhone[prop.id] ?? prop.shadow_pilot_phone ?? ''}
-                                                        onChange={e => setEditPhone(prev => ({ ...prev, [prop.id]: e.target.value }))}
-                                                        onKeyDown={e => e.key === 'Enter' && savePhone(prop)}
-                                                        placeholder="+601X-XXXXXXX"
-                                                        autoFocus
-                                                    />
-                                                    <button
-                                                        className="btn btn-primary btn-sm"
-                                                        onClick={() => savePhone(prop)}
-                                                        disabled={saving === prop.id}
-                                                    >Save</button>
-                                                    <button
-                                                        className="btn btn-ghost btn-sm"
-                                                        onClick={() => setPhoneEdit(null)}
-                                                    >✕</button>
-                                                </div>
-                                            ) : (
-                                                <span
-                                                    className="text-sm"
-                                                    style={{ cursor: 'pointer', borderBottom: '1px dashed var(--border-subtle)' }}
-                                                    onClick={() => { setPhoneEdit(prop.id); setEditPhone(prev => ({ ...prev, [prop.id]: prop.shadow_pilot_phone ?? '' })); }}
-                                                >
-                                                    {prop.shadow_pilot_phone || <span className="text-muted">Click to set number</span>}
-                                                </span>
-                                            )}
+                                            <SessionBadge active={prop.shadow_pilot_session_active} lastSeen={prop.shadow_pilot_session_last_seen} />
                                         </td>
                                         <td>
                                             {days !== null ? (
@@ -171,16 +199,15 @@ export default function ShadowPilotsPage() {
                                                 </span>
                                             ) : '—'}
                                         </td>
-                                        <td className="text-sm text-muted">
-                                            {prop.notification_email ?? 'Not configured'}
-                                        </td>
+                                        <td className="text-sm">{prop.shadow_pilot_phone || '—'}</td>
+                                        <td className="text-sm text-muted">{prop.notification_email || '—'}</td>
                                         <td>
                                             <button
                                                 className="btn btn-danger btn-sm"
-                                                onClick={() => toggleAuditMode(prop)}
-                                                disabled={saving === prop.id}
+                                                onClick={() => handleDisconnect(prop)}
+                                                disabled={disconnecting === prop.id}
                                             >
-                                                {saving === prop.id ? '...' : 'Deactivate'}
+                                                {disconnecting === prop.id ? '...' : 'Disconnect'}
                                             </button>
                                         </td>
                                     </tr>
@@ -191,55 +218,137 @@ export default function ShadowPilotsPage() {
                 )}
             </div>
 
-            {/* All other properties */}
-            <div className="card">
-                <div className="card-header">
-                    <h3 style={{ margin: 0 }}>All Properties</h3>
-                    <p className="text-muted text-sm" style={{ margin: '4px 0 0' }}>
-                        Click "Start Shadow Pilot" to activate audit-only mode on a property
-                    </p>
-                </div>
-                <table className="table">
-                    <thead>
-                        <tr>
-                            <th>Property</th>
-                            <th>Tenant</th>
-                            <th>Status</th>
-                            <th>Shadow Pilot</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {allProperties.length === 0 ? (
-                            <tr>
-                                <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
-                                    All properties are currently in shadow pilot mode.
-                                </td>
-                            </tr>
-                        ) : (
-                            allProperties.map(prop => (
-                                <tr key={prop.id}>
-                                    <td className="font-medium">{prop.name}</td>
-                                    <td className="text-sm text-muted">{prop.tenant_name ?? '—'}</td>
-                                    <td>
-                                        <span className={`badge ${prop.is_active ? 'badge-success' : 'badge-neutral'}`}>
-                                            {prop.is_active ? 'Active' : 'Inactive'}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <button
-                                            className="btn btn-primary btn-sm"
-                                            onClick={() => toggleAuditMode(prop)}
-                                            disabled={saving === prop.id}
+            {/* Provision Modal */}
+            {showModal && (
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+                }}>
+                    <div style={{
+                        background: 'var(--bg)', border: '1px solid var(--border)',
+                        borderRadius: 12, padding: 32, width: 480, maxWidth: '95vw'
+                    }}>
+                        {modalStep === 'form' ? (
+                            <>
+                                <h3 style={{ margin: '0 0 20px' }}>New Shadow Pilot</h3>
+                                <form onSubmit={handleSubmit}>
+                                    <div style={{ marginBottom: 16 }}>
+                                        <label className="form-label">Property</label>
+                                        <select
+                                            className="input"
+                                            value={form.property_id}
+                                            onChange={e => setForm(f => ({ ...f, property_id: e.target.value }))}
+                                            required
                                         >
-                                            {saving === prop.id ? '...' : 'Start Shadow Pilot'}
+                                            <option value="">Select a property...</option>
+                                            {availableProperties.map(p => (
+                                                <option key={p.id} value={p.id}>{p.name} {p.tenant_name ? `(${p.tenant_name})` : ''}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div style={{ marginBottom: 16 }}>
+                                        <label className="form-label">Hotel WhatsApp Number</label>
+                                        <input
+                                            className="input"
+                                            placeholder="+60123456789"
+                                            value={form.hotel_phone}
+                                            onChange={e => setForm(f => ({ ...f, hotel_phone: e.target.value }))}
+                                            required
+                                        />
+                                    </div>
+                                    <div style={{ marginBottom: 16 }}>
+                                        <label className="form-label">GM Email (for weekly report)</label>
+                                        <input
+                                            className="input"
+                                            type="email"
+                                            placeholder="gm@hotel.com"
+                                            value={form.gm_email}
+                                            onChange={e => setForm(f => ({ ...f, gm_email: e.target.value }))}
+                                            required
+                                        />
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                                        <div>
+                                            <label className="form-label">ADR (RM)</label>
+                                            <input
+                                                className="input"
+                                                type="number"
+                                                value={form.adr}
+                                                onChange={e => setForm(f => ({ ...f, adr: e.target.value }))}
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="form-label">Avg Stay Nights</label>
+                                            <input
+                                                className="input"
+                                                type="number"
+                                                step="0.5"
+                                                value={form.avg_stay_nights}
+                                                onChange={e => setForm(f => ({ ...f, avg_stay_nights: e.target.value }))}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+                                        <div>
+                                            <label className="form-label">Operating Hours Open</label>
+                                            <input
+                                                className="input"
+                                                type="time"
+                                                value={form.operating_hours_open}
+                                                onChange={e => setForm(f => ({ ...f, operating_hours_open: e.target.value }))}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="form-label">Operating Hours Close</label>
+                                            <input
+                                                className="input"
+                                                type="time"
+                                                value={form.operating_hours_close}
+                                                onChange={e => setForm(f => ({ ...f, operating_hours_close: e.target.value }))}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                        <button type="button" className="btn btn-ghost" onClick={closeModal}>Cancel</button>
+                                        <button type="submit" className="btn btn-primary" disabled={submitting}>
+                                            {submitting ? 'Provisioning...' : 'Provision + Get QR'}
                                         </button>
-                                    </td>
-                                </tr>
-                            ))
+                                    </div>
+                                </form>
+                            </>
+                        ) : (
+                            <>
+                                <h3 style={{ margin: '0 0 8px' }}>Scan WhatsApp QR Code</h3>
+                                <p className="text-sm text-muted" style={{ marginBottom: 24 }}>
+                                    Have the hotel GM open WhatsApp → Linked Devices → Link a Device, then scan this QR.
+                                </p>
+                                <div style={{ textAlign: 'center', minHeight: 240, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {qrState.status === 'connected' ? (
+                                        <div style={{ color: 'var(--success)', fontSize: 16, fontWeight: 500 }}>
+                                            <div style={{ fontSize: 40, marginBottom: 12 }}>✓</div>
+                                            Connected to hotel's WhatsApp
+                                        </div>
+                                    ) : qrState.qr_base64 ? (
+                                        <img src={qrState.qr_base64} alt="WhatsApp QR Code" style={{ width: 200, height: 200 }} />
+                                    ) : (
+                                        <div style={{ color: 'var(--text-muted)' }}>
+                                            <div className="loader" style={{ marginBottom: 12 }} />
+                                            Generating QR code...
+                                        </div>
+                                    )}
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
+                                    <button className="btn btn-ghost" onClick={closeModal}>
+                                        {qrState.status === 'connected' ? 'Done' : 'Close (pilot still activating)'}
+                                    </button>
+                                </div>
+                            </>
                         )}
-                    </tbody>
-                </table>
-            </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
