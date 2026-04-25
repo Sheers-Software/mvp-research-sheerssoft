@@ -30,10 +30,9 @@ router = APIRouter()
 async def support_chat(
     body: SupportChatRequest,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
 ):
     """
-    Send a message to the Nocturn AI support chatbot.
+    Send a message to the Nocturn AI support chatbot (public — no auth required).
     Uses the dedicated 'Nocturn AI Support' property's RAG engine.
     If conversation doesn't exist, starts a new one.
     """
@@ -51,9 +50,9 @@ async def support_chat(
             "conversation_id": None,
         }
 
-    # Get or create conversation
-    user_email = user.email if not isinstance(user, dict) else "admin@sheerssoft.com"
-    user_name = user.full_name if not isinstance(user, dict) else "Admin"
+    # Public chatbot — use session_id as guest identifier
+    user_email = getattr(body, "session_id", None) or "visitor@nocturn.ai"
+    user_name = "Visitor"
 
     if body.conversation_id:
         conv_stmt = select(Conversation).where(Conversation.id == body.conversation_id)

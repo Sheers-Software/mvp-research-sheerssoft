@@ -30,3 +30,6 @@ scripts/
 # IDE
 .vscode/
 .idea/
+
+# Claude Code worktrees & memory (large, not needed for build)
+.claude/

@@ -399,6 +399,7 @@ class SupportChatRequest(BaseModel):
     """Message to the Nocturn AI support chatbot."""
     message: str = Field(..., min_length=1, max_length=4000)
     conversation_id: uuid.UUID | None = None  # Existing conversation or start new
+    session_id: str | None = None  # Optional anonymous session identifier
 
 
 # ─── Applications ───
