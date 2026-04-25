@@ -2,11 +2,11 @@
 
 An AI-powered hotel inquiry capture system that recovers revenue lost after hours, tracks granular ROI, and is a fully multi-tenant SaaS platform built by SheersSoft.
 
-**v0.6.0** — Shadow Pilot (Baileys Linked Device): Hotels scan one QR code and Nocturn silently observes their real WhatsApp for 7 days. Day-7 email delivers revenue leakage in RM + a token-gated GM dashboard. Zero messages sent to guests. Core sales mechanism proving ROI before live activation.
+**v0.6.1** — Gap Analysis & Production Hardening: Full codebase audit against the Hybrid Co-Pilot value flow. 11 gaps identified (2 P0 · 6 P1 · 2 P2). Shadow pilot DDL migrations applied to production Supabase. All 8 Cloud Scheduler jobs verified live.
 
 ## Architecture
 
-- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.6.0
+- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.6.1
 - **Frontend:** Next.js 14 + TypeScript
 - **Database:** Supabase PostgreSQL 17 + pgvector — user `nocturn_app`, transaction pooler (port 6543, ap-southeast-2)
 - **Auth:** Supabase Auth (magic links) + local JWT fallback
@@ -299,6 +299,7 @@ Application (public intake → converts to Tenant)
 │       ├── welcome/                 # Onboarding wizard (/welcome)
 │       └── dashboard/               # Property staff operations (/dashboard)
 ├── docs/
+│   ├── product_gap.md               # Gap analysis v2.0 — 11 gaps vs hybrid value flow (25 Apr 2026)
 │   ├── shadow_pilot_spec.md         # Canonical implementation reference (1,332 lines)
 │   ├── prd.md                       # PRD v2.5
 │   ├── architecture.md              # Architecture v2.5 (incl. Baileys bridge)
@@ -362,11 +363,25 @@ cd backend && python rebuild_supabase.py
   - `seed_shadow_pilot_demo.py`: 7-day synthetic data for sales demos
   - 26-test suite covering processor, classifier, aggregator, API auth, zero-reply gate
 
-**Next — Sprint 2.6 (Hybrid AI Co-Pilot):**
-- Hybrid reply drafting sidebar in `/dashboard/conversations`
-- Google Sheet inventory reader (2-min polling)
-- FPX/DuitNow payment link generator
-- BM 50-question test suite (≥80% pass gate before first live client)
+- [x] **v0.6.1** — Gap Analysis & Production Hardening:
+  - Full codebase audit against `nocturn_hybrid_value_flow.html` — 11 gaps documented in `docs/product_gap.md`
+  - Shadow pilot DDL migrations applied to production Supabase (properties + 2 new tables)
+  - All 8 Cloud Scheduler jobs enabled and verified (including 2 new shadow pilot jobs)
+  - `BAILEYS_BRIDGE_URL` + `INTERNAL_SECRET` secrets added to GCP Secret Manager
+
+**Next — Sprint 2.6 (P0 gaps + Hybrid AI Co-Pilot):**
+
+P0 (must fix before first live client):
+- GAP-004: Day-7 report property-relative timing fix (0.5 day)
+- GAP-006: Hybrid reply drafting sidebar in `/dashboard/conversations` (1.5 days)
+- GAP-010: Stripe RM 199/month recurring subscription wiring (1 day)
+
+P1 (before second client):
+- GAP-007: Google Sheet inventory reader (2-min polling)
+- GAP-008: FPX/DuitNow payment link generator
+- GAP-001: `/apply` form ADR + monthly inquiry volume fields
+- GAP-005: AuditRecord ↔ shadow pilot comparison in Day-7 email
+- BM 50-question test suite (≥80% pass gate)
 
 ## Database & Supabase Notes
 

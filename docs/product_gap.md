@@ -1,219 +1,289 @@
 # Product Gap Analysis
-## Nocturn AI — What to Build, What to Drop, How to Get Paid
-### Version 1.4 · 20 Apr 2026
-### Cross-referenced with: prd.md v2.4, architecture.md v2.4, build_plan.md v2.4, portal_architecture.md, workflow_zero_to_paid.md, revenue_methodology.md
+## Nocturn AI — Codebase vs Hybrid Value Flow
+### Version 2.0 · 25 Apr 2026
+### Source: Live codebase audit against `nocturn_hybrid_value_flow.html` (Hybrid Co-Pilot Value Delivery & Capture Flow)
 
 ---
 
-## Current Status Snapshot (as of 20 Apr 2026)
+## Summary
 
-| Area | Status |
-|------|--------|
-| AI engine (WhatsApp Meta + Twilio, Web Chat, BM/EN) | ✅ Live (Cloud Run — GCP deploy paused since 23 Mar 2026) |
-| Dashboard home — KPI cards (revenue/leads/inquiries) | ✅ Done (v0.3.1) |
-| Staff reply from dashboard (conversations view) | ✅ Done (v0.3.1) |
-| "Lost" filter in leads | ✅ Done (v0.3.1) |
-| Maintenance mode (backend + admin toggle + tenant banner) | ✅ Done (v0.3.2) |
-| Service health dashboard (`/admin/health`) | ✅ Done (v0.3.2) |
-| Magic link auth (Supabase PKCE) | ✅ Done — superadmin restricted to `a.basyir@sheerssoft.com` |
-| Daily email in production (SendGrid + 4 Cloud Scheduler jobs) | ✅ Done (v0.3.2) — Note: jobs deleted in 2026-03-23 GCP cleanup; recreate on next deploy |
-| FERNET encryption key | ✅ Done — `FERNET_ENCRYPTION_KEY` confirmed in Secret Manager |
-| Infra migration (Supabase-only DB, Secret Manager) | ✅ Done (v0.3.3) |
-| `/portal` tenant management layer | ✅ Done (v0.4) — KB, team, channels, billing, support |
-| `/welcome` onboarding wizard (5 steps) | ✅ Done (v0.4) |
-| Role-based auth callback routing | ✅ Done (v0.4) |
-| `/admin/kb-ingestion` tool | ✅ Done (v0.4) |
-| Application intake form (`/apply`) | ✅ Done (v0.4) — primary GTM entry point |
-| After-Hours Revenue Audit calculator (`/audit`) | ✅ Done (v0.5) |
-| `AuditRecord` model + endpoints | ✅ Done (v0.5) |
-| `/admin/tools/revenue-audit` admin tool | ✅ Done (v0.5) |
-| `audit_only_mode` flag on Property | ✅ Done (v0.5) |
-| Weekly audit email + `run_weekly_audit_report` scheduler job | ✅ Done (v0.5) |
-| `/admin/shadow-pilots` provisioning page | ✅ Done (v0.5) |
-| Announcements model (DB table + migration) | ✅ Model/table exists — backend routes in superadmin.py |
-| **Hybrid AI Co-Pilot reply drafting UI** | ❌ Not built (Sprint 2.6) |
-| **Google Sheet real-time inventory reader** | ❌ Not built (Sprint 2.6) |
-| **FPX/DuitNow payment link generator in AI replies** | ❌ Not built (Sprint 2.6) |
-| BM end-to-end test (50 questions) | ❌ Not run — **P0 blocker** |
-| First pilot property KB not populated | ❌ Not done — **P0 field work** |
+| Phase | Alignment | P0 Gaps | P1 Gaps | P2 Gaps |
+|-------|-----------|---------|---------|---------|
+| Phase 1 — Acquisition | 80% | 0 | 1 | 0 |
+| Phase 2 — Onboarding | 85% | 0 | 1 | 1 |
+| Phase 3 — Shadow Pilot | 75% | 1 | 1 | 0 |
+| Phase 4 — Hybrid Co-Pilot | 40% | 1 | 3 | 0 |
+| Phase 5 — Conversion | 60% | 1 | 1 | 1 |
+
+**Total open gaps: 10** — 2 P0 · 6 P1 · 2 P2
 
 ---
 
-## 1. The Situation (20 Apr 2026)
+## Phase 1 — Acquisition
 
-The codebase is at **v0.5** (v0.5.2 per `main.py`). The shadow pilot infrastructure is complete — a SheersSoft AM can provision a shadow pilot for a prospect in 5 minutes from the admin panel, and the GM gets a real-data audit email on Day 7 automatically.
+### GAP-001 · `/apply` form missing ICP qualification fields · **P1**
 
-**The remaining gap to first paid client:**
-1. Run the 50-question BM/Manglish test suite (half-day) — must pass ≥80%
-2. Populate first pilot property KB (1-day field session)
-3. Build Sprint 2.6 Hybrid Co-Pilot features (3–5 days dev) — converts shadow pilot → revenue-generating co-pilot
+**Flow spec:** The application form captures "property type, star rating, WhatsApp number, ADR, monthly inquiry volume — ICP data captured at intake."
 
-**Key hybrid model insight (20 Apr 2026):** The Meta Cloud API home-address verification blocker means we cannot auto-send via WhatsApp. The Hybrid Co-Pilot sidesteps this: AI drafts the reply in the dashboard, hotel staff sends via their existing WhatsApp Business App (multi-device). Hotels get 80% of the value today while Meta registration is resolved.
+**Current state:** `frontend/src/app/apply/page.tsx` captures hotel name, contact name, email, phone (optional), room count (optional), inquiry channels (multi-select), and a freetext notes field. ADR, star rating, and monthly inquiry volume are absent entirely.
 
----
+**Impact:** The revenue leakage formula requires ADR and monthly inquiry volume to produce a meaningful pre-sales projection. Without them, the admin cannot pre-qualify the economics of a prospect at intake — they must conduct a separate discovery call before provisioning. The self-qualifying loop described in Phase 1 is broken: the GM proves ROI on the `/audit` calculator but that data never flows through to the application record.
 
-## 2. The Bridge — Path to First Revenue
+**Exact fix:**
+- `frontend/src/app/apply/page.tsx` — add three fields: `adr_estimate` (number, RM), `monthly_inquiry_volume` (integer), `star_rating` (1–5 select).
+- `backend/app/models.py` — add `adr_estimate NUMERIC(10,2)`, `monthly_inquiry_volume INTEGER`, `star_rating SMALLINT` to `Application` model.
+- `backend/app/routes/superadmin.py` — include new fields in application create/read schemas.
+- Pre-populate ADR on the shadow pilot provisioning form from the application record at provisioning time.
 
-```
-Step 1: Shadow pilot provisioned → GM gets Day 7 audit email      ✅ INFRASTRUCTURE READY
-Step 2: BM test passes ≥80%                                        ❌ NOT RUN (half-day)
-Step 3: First pilot KB populated                                    ❌ NEEDS FIELD SESSION (1 day)
-Step 4: Sprint 2.6 Hybrid Co-Pilot UI built                        ❌ NOT BUILT (2–3 days dev)
-Step 5: Hotel tries co-pilot → AI drafts → staff sends → guest books ← TARGET
-Step 6: GM sees "RM X recovered today" in morning report → signs up paid
-```
+**Estimated effort:** 0.25 day
 
 ---
 
-## 3. Remaining Obstacles to First Payment
+## Phase 2 — Onboarding
 
-### Obstacle A: BM Test Not Run — ❌ FIELD WORK (P0)
-**Status:** 50-question BM/Manglish test suite exists at `docs/bm_test_suite.md`. Execution plan at `docs/bm_test_execution_plan.md`. Not run end-to-end via real WhatsApp.
+### GAP-002 · Welcome wizard billing step is absent · **P1**
 
-**Fix:** Run via Twilio sandbox. Must pass ≥80% before first client go-live.
+**Flow spec:** 5-step wizard covers "channels, team roster, notification preferences, billing details" — billing details is an explicit step.
 
----
+**Current state:** `frontend/src/app/welcome/page.tsx` has 5 steps: (1) welcome/property name, (2) knowledge base entry, (3) channel status, (4) invite team, (5) go-live summary. No billing details step exists. Stripe checkout is reachable only via `POST /api/v1/billing/checkout` — there is no wizard entry point.
 
-### Obstacle B: Pilot Property KB Empty — ❌ FIELD WORK (P0)
-**Status:** No KB ingested for first pilot property.
+**Impact:** A hotel completing the full welcome wizard exits without entering billing information. The RM 999 setup fee is never collected during onboarding. Billing is a manual follow-up action requiring the admin to re-engage the client separately after the wizard is complete.
 
-**Fix:** 90-minute session with GM/property contact. Ingest via `/admin/kb-ingestion` or:
-```bash
-python backend/scripts/ingest_kb.py --property-slug [slug] --file [property]_kb.md
-```
+**Exact fix:**
+- `frontend/src/app/welcome/page.tsx` — replace Step 5 (go-live summary) with a billing step that calls `POST /api/v1/billing/checkout` for the RM 999 setup fee Stripe session. Move go-live to a post-payment confirmation screen.
+- Alternatively: insert billing as Step 4, shift team invite to Step 5, make go-live the final screen after payment confirmed via webhook.
 
----
-
-### Obstacle C: Hybrid Co-Pilot Not Built — ❌ DEV (Sprint 2.6)
-**Status:** Shadow pilot infrastructure shows GMs the problem. Hybrid co-pilot is how they experience the solution. Without it, the shadow pilot conversion asks GMs to still trust on faith.
-
-**Required deliverables (Sprint 2.6):**
-- Hybrid reply drafting UI in `/dashboard/conversations`: AI-drafted reply appears in sidebar when a guest message comes in. "Copy to WhatsApp" button + optional forward
-- Google Sheet inventory reader: 2-minute polling of hotel's Google Sheet for room availability; injects into AI system prompt
-- FPX/DuitNow link generator: when AI detects booking intent, embed a payment link in the draft
-- Analytics update: "RM X recovered today (same-day vs OTA 30-day)" in daily GM report
+**Estimated effort:** 0.5 day
 
 ---
 
-### ~~Obstacle D: Cloud Scheduler Jobs Missing~~ — ✅ PARTIALLY RESOLVED
-**Status:** Jobs were confirmed live (nocturn-daily-report, nocturn-followups, nocturn-insights, nocturn-keepalive, run-weekly-audit-report) but **deleted in 2026-03-23 GCP cleanup**. Must recreate on next production deploy.
+### GAP-003 · KB self-service not available in `/portal` · **P2**
+
+**Flow spec:** KB ingestion is described as a "90-min field session" at onboarding, implying hotel staff own ongoing KB maintenance thereafter.
+
+**Current state:** Primary KB ingestion tool is `/admin/kb-ingestion/page.tsx` — a superadmin-only page requiring SheersSoft involvement. `/portal/kb/` exists but scope is unclear. The welcome wizard Step 2 has inline KB fields but these are one-time at wizard time. No clear path exists for a hotel owner to update their KB (add room types, change rates, update policies) from `/portal` without SheersSoft.
+
+**Impact:** Every KB update after initial onboarding requires SheersSoft involvement. As client base grows, this creates a linear support burden that becomes a bottleneck. AI accuracy degrades silently as hotel rates and policies change without KB updates.
+
+**Exact fix:**
+- Verify `/portal/kb/` supports full CRUD: add/edit/delete rooms, FAQs, policies, documents. If only edit is supported, add create and delete flows.
+- Add a KB health indicator to the portal home: last updated date, document count, suggested gaps from the monthly insights run.
+- Consider a simple CSV/paste import for bulk rate table updates.
+
+**Files to check/change:** `frontend/src/app/portal/kb/page.tsx`, `backend/app/routes/portal.py`.
+
+**Estimated effort:** 0.5 day
 
 ---
 
-### ~~Obstacle E: WHATSAPP_API_TOKEN missing~~ — ❌ STAGE 3 ONLY
-**Status:** Not in Secret Manager. Not needed for Shadow Pilot (Twilio) or Hybrid Co-Pilot path. Required only for Stage 3 (full Meta Cloud API auto-send) after virtual office address verification is resolved.
+## Phase 3 — Shadow Pilot
+
+### GAP-004 · Day-7 report is calendar-scheduled, not property-relative · **P0**
+
+**Flow spec:** "Cloud Scheduler · Day 7 — GM receives the proof email. The proof moment."
+
+**Current state:** `shadow-pilot-weekly-report` Cloud Scheduler job fires on `0 8 * * 1` (Monday 8 AM UTC) regardless of when each property's shadow pilot was provisioned. `backend/app/services/shadow_pilot_reporter.py` iterates all active shadow pilot properties and sends reports without checking days elapsed since `shadow_pilot_start_date`.
+
+**Impact:** A hotel activating on Thursday gets a "7-day" report after 4 days with sparse data. A hotel activating on Tuesday gets theirs after 6 days. Only a hotel that happens to activate on Monday gets a genuine 7-day dataset. The proof moment — the core conversion mechanism of the entire product — arrives at the wrong time with insufficient data for the majority of hotels. Credibility is undermined.
+
+**Exact fix:**
+- `backend/app/services/shadow_pilot_reporter.py` — before generating a report for any property, check: `days_elapsed = (NOW() - property.shadow_pilot_start_date).days >= 7`. Skip properties not yet at 7 days.
+- `backend/app/models.py` — add `shadow_pilot_report_sent_at TIMESTAMPTZ` to `Property`. Check this field to ensure the Day-7 report is sent exactly once per pilot.
+- `backend/app/main.py` — add DDL migration for `shadow_pilot_report_sent_at` column.
+- The weekly Monday scheduler becomes the retry mechanism — it catches every property that crossed the 7-day mark since the previous Monday.
+
+**Estimated effort:** 0.5 day
 
 ---
 
-## 4. Feature Priority Matrix
+### GAP-005 · AuditRecord and shadow pilot data are disconnected pipelines · **P1**
 
-### 4.1 ✅ DONE — Everything Built Through v0.5
+**Flow spec:** Day-7 email delivers "Real data from their own property" — implying a before/after comparison.
 
-All items from `portal_architecture.md` Phases 1–5 are complete. Shadow pilot infrastructure (Sprint 2.5) is complete.
+**Current state:** `AuditRecord` captures the pre-sales self-assessment from the `/audit` calculator (estimated RM lost/month based on GM's own inputs). `ShadowPilotAnalyticsDaily` captures actual observed data. The Day-7 report shows shadow pilot data only. The two pipelines are never joined.
 
-See `build_plan.md` Section "v0.5 — What Was Built" for the full feature list with ✅ status on every item.
+**Impact:** The most compelling sales narrative — "You estimated RM X at risk on the calculator. Your real 7-day data shows RM Y actually leaking — you underestimated it" — is never rendered. The comparison between the GM's self-reported estimate and the observed evidence is a psychological anchor that makes the value proposition undeniable. Currently, the Day-7 email is a data dump without the "you were right" moment.
 
----
+**Exact fix:**
+- At shadow pilot provisioning time (`POST /api/v1/superadmin/shadow-pilots`), look up the `AuditRecord` for the hotel (match on email or `converted_to_tenant_id`) and store `estimated_monthly_leakage_rm` on the `Property` (new column).
+- In `shadow_pilot_reporter.py` report template, include a comparison row: "Your pre-pilot estimate: RM X/month" vs "Observed 7-day leakage: RM Y (annualised: RM Z)".
 
-### 4.2 ❌ Must Build Now (Sprint 2.6 — Hybrid Co-Pilot)
+**Files to change:** `backend/app/routes/superadmin.py` (shadow pilot provision), `backend/app/models.py` (Property), `backend/app/services/shadow_pilot_reporter.py`.
 
-| Task | Type | Effort | Owner |
-|------|------|--------|-------|
-| Hybrid reply drafting sidebar in conversations view | Dev | 1 day | Ahmad Basyir |
-| Google Sheet inventory reader (2-min polling) | Dev | 0.5 day | Ahmad Basyir |
-| FPX/DuitNow payment link generator | Dev | 0.5 day | Ahmad Basyir |
-| Daily GM report: "RM X recovered today" (hybrid-aware) | Dev | 0.5 day | Ahmad Basyir |
-| BM 50-question end-to-end test | Field test | Half day | Ahmad Basyir |
-| Pilot KB population session | Field work | 1 day | Ahmad Basyir |
-
-**Total: ~4.5 days dev + 1.5 days field work. This is Sprint 2.6.**
+**Estimated effort:** 0.5 day
 
 ---
 
-### 4.3 Build Next — After First Pilot Live (Sprint 3+)
+## Phase 4 — Hybrid Co-Pilot
 
-| Feature | When |
-|---------|------|
-| Day 7 AM notification to SheersSoft AM | Sprint 3 — completes the auto-conversion loop |
-| Announcements system (UI: admin compose + tenant inbox banner) | Sprint 3 — backend model/table already exists |
-| Confirmed revenue ("Mark as Booked") + actual revenue metric | After 30 days of pilot data |
-| Week-over-week comparison in daily email | After 14+ days of data |
-| `/dashboard/insights` — AI performance + KB gaps | After 30+ days of per-property data |
+### GAP-006 · Hybrid reply drafting sidebar does not exist · **P0**
 
----
+**Flow spec:** "Accurate, warm, hotel-branded reply appears in the conversations sidebar. SST, Tourism Tax, public holiday surcharges applied automatically. One-click copy."
 
-### 4.4 Build at Scale (5+ Paying Tenants)
+**Current state:** `frontend/src/app/dashboard/conversations/page.tsx` has a `sendStaffReply()` function and a plain textarea. No AI draft generation, no sidebar panel, no "Copy to WhatsApp" button. Staff receive zero AI assistance when replying to guests from the dashboard. The AI engine in `services/conversation.py` produces high-quality replies but is never surfaced to staff in operational mode.
 
-| Feature | Why Wait |
-|---------|----------|
-| Billing portal (Stripe Customer Portal) | Manual invoicing until ≥10 tenants |
-| Mobile-responsive dashboard | Desktop-first is fine for hotel GMs |
-| `staff_tier` RBAC (manager/revenue/ops) | No tenant has asked for this yet |
-| Meta Cloud API (Stage 3 full automation) | After virtual office address verified + 5 paying pilots |
-| F&B Revenue Intelligence | 5 paying customers first |
+**Impact:** This is the primary value delivery mechanism for Phase 4. Without it, the product delivers value only during the 7-day shadow pilot observation, then reverts to a manual reply tool. The entire "Days 8–30 hybrid co-pilot" phase cannot function. This gap is the single largest blocker to first-client revenue delivery.
+
+**Exact fix:**
+1. `backend/app/routes/staff.py` — add `POST /api/v1/conversations/{id}/draft-reply` endpoint. Calls `process_message()` with a `draft_only=True` flag. Returns generated text without persisting or sending. Include `language` param (en/bm) for toggle.
+2. `backend/app/services/conversation.py` — add `draft_only` mode that returns the AI response string instead of calling the send function. Inject SST (8%), Tourism Tax (RM 10/night), and public holiday surcharge context into the system prompt when draft mode is active.
+3. `frontend/src/app/dashboard/conversations/page.tsx` — add a right-side panel that: calls the draft endpoint when a conversation is selected, displays the draft with syntax highlighting for rates/dates, provides a "Copy" button, and a BM/EN toggle.
+
+**Estimated effort:** 1.5 days
 
 ---
 
-### 4.5 Drop (Do Not Build in v1 — Reconfirmed)
+### GAP-007 · Google Sheet inventory reader is not implemented · **P1**
 
-| Feature | Why to Drop |
-|---------|-------------|
-| Automated PDF report generation for audit | Post-PMF. Text email is sufficient. |
-| Voice / image AI capabilities | No customer has asked. Don't add. |
-| Email channel inbound (SendGrid inbox) | Malaysian hotels use WhatsApp. Unvalidated. |
-| Gamified onboarding progress tracker | Dashboard KPI cards replaced this. No GM asked. |
-| F&B Intelligence, Guest Recognition KYC | Right direction, wrong timing. 5 paying customers first. |
+**Flow spec:** "Polls hotel's Google Sheet for live room availability (2-minute refresh cycle). Injects into system prompt."
 
-> **Items previously listed as "Drop" that are now BUILT and ACTIVE:**
-> - Application intake form (`/apply`) — primary GTM entry point
-> - Shadow Pilot provisioning (`/admin/shadow-pilots`) — live
-> - Tenant portal (`/portal`, `/welcome`) — live
-> - Support chatbot property — architecture exists
+**Current state:** No Google Sheets integration exists anywhere in the backend. Room availability is static — whatever was last ingested into `KBDocument` is the only source of truth. Grep for "sheets", "gsheet", "google.oauth2", "gspread" returns zero matches.
 
----
+**Impact:** Without live inventory, the AI will quote availability for sold-out rooms. For the first live hotel, one incident of a guest being told a room is available when it is not destroys staff trust and kills adoption immediately. This is the most common and most damaging failure mode for AI assistants in hospitality.
 
-## 5. What "Getting Paid" Looks Like
+**Exact fix:**
+1. `backend/app/models.py` — add `google_sheet_inventory_url TEXT` to `Property`.
+2. New `backend/app/services/inventory_reader.py` — uses `gspread` (service account auth). Fetches the sheet, parses room availability rows, stores as structured JSON cache on property (or Redis key with 2-min TTL).
+3. `backend/app/services/conversation.py` — in the system prompt builder, inject current inventory cache: "Available rooms as of {time}: {room_list}. Do NOT quote unavailable rooms."
+4. `backend/app/services/scheduler.py` — add a 2-minute polling job (dev/demo) and a Cloud Scheduler endpoint (production) for inventory refresh.
+5. `frontend/src/app/portal/` — add Google Sheet URL field to property settings.
 
-### Path A — Hybrid Co-Pilot (Primary, 7-day close)
-
-```
-Shadow pilot launched (Day 0) → Day 7 audit email → GM calls
-  → Sprint 2.6 Hybrid Co-Pilot demo → KB + Google Sheet ingested (1 day)
-  → Hotel tries co-pilot for 3 days → first direct booking closed
-  → GM sees "RM X recovered today" in morning report
-  → Invoice: RM 999 setup + RM 199/mo + 3% performance
-```
-
-### Path B — Full Auto (Stage 3, deferred)
-After Hybrid proves ROI → virtual office address verified → Meta Cloud API registration → full auto-send.
+**Estimated effort:** 1 day
 
 ---
 
-## 6. The Revenue Formula (Canonical — Unchanged)
+### GAP-008 · FPX / DuitNow payment link generator is not implemented · **P1**
 
-Per `revenue_methodology.md`:
+**Flow spec:** "AI detects booking signal → FPX / DuitNow payment link auto-embedded in draft reply. Guest gets a frictionless direct payment path."
 
-```
-Estimated Revenue Recovered = Sum of (lead nights × property ADR) × 20%
-  where: lead nights defaults to 1 if not captured
-         ADR defaults to property setting (target ~RM 230)
-         20% = conservative conversion assumption
+**Current state:** Stripe card-only integration exists for SheersSoft's billing relationship with hotels. No FPX or DuitNow integration exists for the hotel-to-guest booking payment flow. Grep for "fpx", "duitnow", "toyyibpay", "billplz", "ipay88" returns zero matches.
 
-Cost Savings = AI-handled inquiries × 0.25 hrs × RM 25/hr
-```
+**Impact:** Stripe card payment has very low penetration among Malaysian hotel guests, who default to FPX (online banking) or DuitNow QR for local transactions. Without a Malaysia-native payment method, the booking journey breaks at payment. The guest reverts to OTA. The 3% performance fee is uncollectable. This is the gap between "inquiry handled" and "direct booking confirmed."
 
-**Hybrid-specific update:** "Actual revenue recovered" will come from leads where staff sent an AI-drafted reply via WhatsApp Business App and the guest subsequently confirmed a booking. This is tracked via the "Mark as Booked" flow (Sprint 3 target).
+**Exact fix:**
+1. Integrate Stripe's FPX support via `PaymentIntents` (lowest friction given existing Stripe setup) — FPX is available in Malaysia via Stripe.
+2. New `backend/app/services/payment_link.py` — generates a Stripe PaymentIntent with `payment_method_types=["fpx"]` for a given amount (ADR × nights) and returns a hosted payment URL.
+3. In the hybrid draft endpoint (GAP-006), when `intent=room_booking` is detected, include a payment link in the draft.
+4. `backend/app/models.py` (Lead) — add `payment_link_url TEXT`, `confirmed_booking_amount_rm NUMERIC(10,2)`, `payment_reference VARCHAR(255)`.
 
----
-
-## 7. Decision Rule for New Feature Requests
-
-1. **Does it unblock the first hybrid co-pilot demo?** → Build immediately (Sprint 2.6).
-2. **Does it protect the quality of the pilot?** → Build during pilot (Sprint 3).
-3. **Does it remove per-tenant engineering time?** → Build before 3rd tenant.
-4. **Does it help retain/upsell 5+ paying properties?** → Build at scale.
-5. **None of the above?** → Drop.
+**Estimated effort:** 1 day
 
 ---
 
-*v1.4 update (20 Apr 2026): All portal, welcome wizard, shadow pilot, audit infrastructure confirmed ✅ complete. Application intake confirmed ✅ active. Three remaining gaps: BM test (P0 field work), pilot KB (P0 field work), Sprint 2.6 Hybrid Co-Pilot (3–5 days dev). Cloud Scheduler jobs must be recreated on next GCP deploy.*
+### GAP-009 · 3% performance fee has no attribution or tracking mechanism · **P1**
+
+**Flow spec:** "Only on confirmed, Nocturn-facilitated bookings. Aligned incentive."
+
+**Current state:** `Lead` model has `converted BOOLEAN` and `converted_at TIMESTAMPTZ` but no flag for whether the conversion was Nocturn-facilitated vs organic, no confirmed booking amount, and no performance fee accumulation. `Tenant` has billing fields but no `performance_fee_balance_rm`.
+
+**Impact:** The 3% performance fee is unmeasurable from the system. It either goes uncollected, requires hotel self-reporting (unenforceable), or requires manual reconciliation per billing cycle. As client count grows this becomes operationally intractable. The aligned incentive — Sheers earns only when the hotel earns — cannot function without attribution data.
+
+**Exact fix:**
+1. `backend/app/models.py` (Lead) — add `facilitated_by_nocturn BOOLEAN DEFAULT FALSE`, `confirmed_booking_amount_rm NUMERIC(10,2)`, `performance_fee_rm NUMERIC(10,2)` (computed as `amount × 0.03`).
+2. `backend/app/models.py` (Tenant) — add `performance_fee_balance_rm NUMERIC(12,2) DEFAULT 0` (running total for current billing period).
+3. When staff sends a reply via the hybrid sidebar and the guest subsequently confirms via payment link, set `facilitated_by_nocturn=True` and `confirmed_booking_amount_rm`.
+4. Monthly billing job: include `performance_fee_balance_rm` as a line item in the Stripe invoice, then reset to 0.
+
+**Files to change:** `backend/app/models.py`, `backend/app/routes/staff.py`, `backend/app/services/stripe_service.py`.
+
+**Estimated effort:** 0.5 day
+
+---
+
+## Phase 5 — Conversion
+
+### GAP-010 · Stripe subscription billing (RM 199/month) is not wired · **P0**
+
+**Flow spec:** "No contract. Stripe billing starts. Hotel continues on RM 199/mo + 3% on confirmed facilitated bookings only."
+
+**Current state:** `backend/app/services/stripe_service.py` creates Stripe sessions with `mode="payment"` (one-time only) for the RM 999 setup fee. No code path creates a Stripe subscription. `Tenant.stripe_subscription_id` will be null for every tenant in production. `backend/app/routes/billing.py` exposes only `POST /billing/checkout` (one-time payment). The webhook handler has branches for subscription events but they are never triggered.
+
+**Impact:** The RM 199/month recurring revenue — the product's primary ongoing revenue stream — cannot be collected. A hotel reaching Day 30 and converting to paid has no billing path without manual Stripe dashboard intervention by SheersSoft. This is the most operationally critical gap in the entire codebase. The business model cannot generate recurring revenue in its current state.
+
+**Exact fix:**
+1. `backend/app/services/stripe_service.py` — add `create_subscription_session(tenant_id, customer_id)` that creates a Stripe subscription for the RM 199/month recurring price.
+2. `backend/app/routes/billing.py` — add `POST /billing/subscribe` endpoint.
+3. Webhook: `checkout.session.completed` with `mode=subscription` → set `tenant.stripe_subscription_id`, `tenant.subscription_status='active'`, `tenant.subscription_tier='boutique'`.
+4. Webhook: `invoice.payment_failed` → set `subscription_status='past_due'`, send notification to tenant owner email.
+5. `frontend/src/app/portal/billing/page.tsx` — add "Activate Monthly Plan" button that calls `/billing/subscribe`.
+
+**Estimated effort:** 1 day
+
+---
+
+### GAP-011 · 30-day revenue recovery guarantee has no enforcement code · **P2**
+
+**Flow spec:** "30-day guarantee waives next month if it didn't. The math closes itself."
+
+**Current state:** The guarantee is stated in business model documentation only. No corresponding field, threshold check, or waiver logic exists in the codebase. `Tenant` has `pilot_start_date` and `pilot_end_date` but no `guarantee_threshold_rm`, no `pilot_revenue_recovered_rm`, and no `guarantee_invoked` flag.
+
+**Impact:** When the first hotel invokes the guarantee, SheersSoft must manually waive the next Stripe invoice. Manageable at 1–2 clients. Operationally untenable at 20+. More importantly, there is no automated signal to the account manager that a pilot is underperforming and approaching guarantee territory before Day 30.
+
+**Exact fix:**
+1. `backend/app/models.py` (Tenant) — add `guarantee_threshold_rm NUMERIC(10,2)` (default: cost of Nocturn for the month = RM 199), `pilot_revenue_recovered_rm NUMERIC(10,2) DEFAULT 0`, `guarantee_invoked BOOLEAN DEFAULT FALSE`.
+2. Daily report job (`scheduler.py`) — accumulate `analytics.revenue_recovered` since `pilot_start_date` into `pilot_revenue_recovered_rm`.
+3. At Day 28, if `pilot_revenue_recovered_rm < guarantee_threshold_rm`, send an internal alert to the AM: "Hotel X pilot underperforming — may invoke guarantee."
+4. At Day 30, if threshold not met and hotel requests waiver, auto-apply a 100% Stripe discount coupon to next invoice and set `guarantee_invoked=True`.
+
+**Estimated effort:** 0.5 day
+
+---
+
+## Sprint Prioritisation
+
+### P0 — Before first live client (blocks core value delivery)
+
+| ID | Gap | Effort |
+|----|-----|--------|
+| GAP-004 | Day-7 report not property-relative | 0.5 day |
+| GAP-006 | Hybrid reply drafting sidebar missing | 1.5 days |
+| GAP-010 | Stripe subscriptions not wired | 1 day |
+
+**Total P0: 3 days dev**
+
+---
+
+### P1 — Before second client (blocks revenue model and adoption)
+
+| ID | Gap | Effort |
+|----|-----|--------|
+| GAP-001 | `/apply` missing ADR + monthly inquiry volume | 0.25 day |
+| GAP-002 | Welcome wizard missing billing step | 0.5 day |
+| GAP-005 | AuditRecord ↔ shadow pilot data disconnected | 0.5 day |
+| GAP-007 | Google Sheet inventory reader missing | 1 day |
+| GAP-008 | FPX/DuitNow payment link missing | 1 day |
+| GAP-009 | 3% performance fee has no attribution | 0.5 day |
+
+**Total P1: 3.75 days dev**
+
+---
+
+### P2 — Before scale (operational overhead at > 5 clients)
+
+| ID | Gap | Effort |
+|----|-----|--------|
+| GAP-003 | KB self-service not available in `/portal` | 0.5 day |
+| GAP-011 | 30-day guarantee has no enforcement code | 0.5 day |
+
+**Total P2: 1 day dev**
+
+---
+
+## What is well-aligned
+
+The following components from the value flow are fully implemented and production-verified (as of 25 Apr 2026):
+
+- Shadow pilot core — processor, classifier, aggregator, reporter, Baileys bridge (v0.6.0)
+- AI engine — `conversation.py`, RAG, bilingual EN/BM, 3 behavioral modes
+- After-hours intent detection + revenue leakage formula
+- Follow-up engine — Day 1/3/7 automated sequences
+- Daily 9 AM GM report — revenue recovered, OTA fees saved, guest sentiment
+- Monthly insights — Gemini 30-day transcript analysis
+- PDPA encryption — Fernet + SHA-256 phone hashing
+- `/audit` calculator (public, self-serve)
+- `/apply` intake form (functional, needs ADR fields)
+- `/admin/shadow-pilots` provisioning with QR flow
+- `/welcome` onboarding wizard (5 steps, functional)
+- `/portal` tenant self-management (KB, team, channels, billing pages)
+- All 8 Cloud Scheduler jobs enabled in production
+- 3 Cloud Run services live (`nocturn-backend`, `nocturn-frontend`, `baileys-bridge`)
