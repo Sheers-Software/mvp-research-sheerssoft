@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import AnalyticsDaily
+from app.models import AnalyticsDaily, Property, Tenant
 from app.schemas import AnalyticsSummaryResponse
 from app.auth import verify_jwt, check_property_access
 
@@ -94,11 +94,29 @@ async def get_analytics(
         for r in daily_records
     ]
 
+    # Fetch performance fee balance from tenant
+    performance_fee_balance_rm = 0.0
+    try:
+        prop_result = await db.execute(
+            select(Property).where(Property.id == pid)
+        )
+        prop = prop_result.scalar_one_or_none()
+        if prop and prop.tenant_id:
+            tenant_result = await db.execute(
+                select(Tenant).where(Tenant.id == prop.tenant_id)
+            )
+            tenant = tenant_result.scalar_one_or_none()
+            if tenant and tenant.performance_fee_balance_rm:
+                performance_fee_balance_rm = float(tenant.performance_fee_balance_rm)
+    except Exception:
+        pass
+
     return {
         "property_id": property_id,
         "period": {"from": from_date.isoformat(), "to": to_date.isoformat()},
         "totals": totals,
         "daily": daily,
+        "performance_fee_balance_rm": performance_fee_balance_rm,
     }
 
 

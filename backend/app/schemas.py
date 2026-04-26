@@ -412,6 +412,9 @@ class ApplicationCreateRequest(BaseModel):
     phone: str | None = None
     property_name: str | None = None
     room_count: int | None = None
+    adr_estimate: float | None = None
+    monthly_inquiry_volume: int | None = None
+    star_rating: int | None = None
     current_channels: list[str] | None = None
     message: str | None = None
 

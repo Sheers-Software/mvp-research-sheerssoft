@@ -765,6 +765,39 @@ async def run_weekly_audit_report():
             logger.error("weekly_audit_report job failed", error=str(e))
 
 
+async def run_monthly_performance_fee_billing():
+    """
+    1st of each month: bill accumulated 3% performance fees to active tenants.
+    """
+    from app.models import Tenant
+    from app.services.stripe_service import add_performance_fee_to_invoice
+
+    logger.info("Running monthly performance fee billing job")
+    async with async_session() as db:
+        result = await db.execute(
+            select(Tenant).where(
+                Tenant.subscription_status == "active",
+                Tenant.performance_fee_balance_rm > 0,
+            )
+        )
+        tenants = result.scalars().all()
+        for tenant in tenants:
+            try:
+                success = await add_performance_fee_to_invoice(
+                    tenant, tenant.performance_fee_balance_rm
+                )
+                if success:
+                    logger.info(
+                        "Performance fee invoice item added",
+                        tenant_id=str(tenant.id),
+                        amount_rm=float(tenant.performance_fee_balance_rm),
+                    )
+                    tenant.performance_fee_balance_rm = Decimal("0")
+                    await db.commit()
+            except Exception as e:
+                logger.error("Failed to bill performance fee", tenant_id=str(tenant.id), error=str(e))
+
+
 async def start_scheduler():
     """Initialize and start the scheduler."""
     # Schedule daily GM report at configured time (default 9:00 AM MYT)
@@ -810,6 +843,14 @@ async def start_scheduler():
         run_weekly_audit_report,
         trigger=CronTrigger(day_of_week="mon", hour=8, minute=0, timezone=settings.timezone),
         id="weekly_audit_report",
+        replace_existing=True
+    )
+
+    # Schedule monthly performance fee billing (1st of month at 08:00 MYT = 00:00 UTC)
+    scheduler.add_job(
+        run_monthly_performance_fee_billing,
+        trigger=CronTrigger(day=1, hour=0, minute=0, timezone="UTC"),
+        id="monthly_performance_fee_billing",
         replace_existing=True
     )
 

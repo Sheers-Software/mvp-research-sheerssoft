@@ -37,6 +37,7 @@ interface ConversationDetail {
     started_at: string;
     messages: Message[];
     lead: {
+        id: string;
         guest_name: string | null;
         guest_email: string | null;
         guest_phone: string | null;
@@ -87,6 +88,11 @@ export default function ConversationsPage() {
     const [draftLang, setDraftLang] = useState<'en' | 'bm'>('en');
     const [draftLoading, setDraftLoading] = useState(false);
     const [draftCopied, setDraftCopied] = useState(false);
+    const [paymentLinkAmount, setPaymentLinkAmount] = useState('');
+    const [paymentLinkDesc, setPaymentLinkDesc] = useState('');
+    const [generatingLink, setGeneratingLink] = useState(false);
+    const [paymentLinkUrl, setPaymentLinkUrl] = useState('');
+    const [error, setError] = useState('');
 
     // Resolve property ID from dashboard stats
     useEffect(() => {
@@ -110,6 +116,25 @@ export default function ConversationsPage() {
             .catch(() => { })
             .finally(() => setLoading(false));
     }, [propertyId, filter]);
+
+    const handleGeneratePaymentLink = async () => {
+        if (!detail?.lead?.id || !paymentLinkAmount) return;
+        setGeneratingLink(true);
+        try {
+            const result = await apiPost<{ payment_link_url: string }>(
+                `/leads/${detail.lead.id}/payment-link`,
+                {
+                    amount_rm: parseFloat(paymentLinkAmount),
+                    description: paymentLinkDesc || 'Direct booking',
+                }
+            );
+            setPaymentLinkUrl(result.payment_link_url);
+        } catch (e: unknown) {
+            setError((e instanceof Error ? e.message : String(e)) || 'Failed to generate payment link');
+        } finally {
+            setGeneratingLink(false);
+        }
+    };
 
     const generateDraft = async (id: string) => {
         setDraftLoading(true);
@@ -140,6 +165,9 @@ export default function ConversationsPage() {
         setDetailLoading(true);
         setDraftEn('');
         setDraftBm('');
+        setPaymentLinkUrl('');
+        setPaymentLinkAmount('');
+        setPaymentLinkDesc('');
         try {
             const data = await apiGet<ConversationDetail>(`/conversations/${id}`);
             setDetail(data);
@@ -392,6 +420,63 @@ export default function ConversationsPage() {
                                                 {draftLoading ? '⟳ Generating draft…' : '✦ Generate AI Draft'}
                                             </button>
                                         )}
+                                    </div>
+                                )}
+
+                                {/* Payment link section */}
+                                {detail.status !== 'resolved' && detail.lead?.intent === 'room_booking' && (
+                                    <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border-subtle)' }}>
+                                        <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 14, marginTop: 2 }}>
+                                            <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: 'var(--text-muted)' }}>
+                                                DIRECT BOOKING PAYMENT
+                                            </p>
+                                            {paymentLinkUrl ? (
+                                                <div>
+                                                    <p style={{ fontSize: 12, color: 'var(--success)', marginBottom: 6 }}>✓ Payment link ready</p>
+                                                    <div style={{ display: 'flex', gap: 6 }}>
+                                                        <input
+                                                            readOnly
+                                                            value={paymentLinkUrl}
+                                                            style={{ flex: 1, fontSize: 11, padding: '6px 8px', borderRadius: 4, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                                                        />
+                                                        <button
+                                                            className="btn btn-ghost btn-sm"
+                                                            onClick={() => navigator.clipboard.writeText(paymentLinkUrl)}
+                                                            style={{ fontSize: 11 }}
+                                                        >
+                                                            Copy
+                                                        </button>
+                                                    </div>
+                                                    <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                                                        Paste this into your reply. Guest pays via FPX or card.
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <div style={{ display: 'grid', gap: 6 }}>
+                                                    <input
+                                                        type="number"
+                                                        value={paymentLinkAmount}
+                                                        onChange={(e) => setPaymentLinkAmount(e.target.value)}
+                                                        placeholder="Amount in RM (e.g. 560)"
+                                                        style={{ padding: '7px 10px', borderRadius: 4, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13 }}
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={paymentLinkDesc}
+                                                        onChange={(e) => setPaymentLinkDesc(e.target.value)}
+                                                        placeholder="e.g. Deluxe King × 2 nights, 3–5 May"
+                                                        style={{ padding: '7px 10px', borderRadius: 4, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13 }}
+                                                    />
+                                                    <button
+                                                        className="btn btn-primary btn-sm"
+                                                        onClick={handleGeneratePaymentLink}
+                                                        disabled={generatingLink || !paymentLinkAmount}
+                                                    >
+                                                        {generatingLink ? 'Generating…' : 'Generate FPX Payment Link'}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
 

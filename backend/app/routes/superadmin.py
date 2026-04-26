@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 import structlog
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -19,7 +19,7 @@ from app.auth import require_superadmin, get_current_user
 from app.models import (
     Tenant, Property, User, TenantMembership,
     Conversation, Lead, SupportTicket, Application,
-    OnboardingProgress, Announcement,
+    OnboardingProgress, Announcement, AuditRecord,
 )
 from app.schemas import (
     TenantResponse, TenantUpdateRequest,
@@ -703,6 +703,9 @@ async def submit_application(
         phone=body.phone,
         property_name=body.property_name,
         room_count=body.room_count,
+        adr_estimate=body.adr_estimate,
+        monthly_inquiry_volume=body.monthly_inquiry_volume,
+        star_rating=body.star_rating,
         current_channels=body.current_channels,
         message=body.message,
     )
@@ -1104,6 +1107,29 @@ async def provision_shadow_pilot(
         prop.avg_stay_nights = body["avg_stay_nights"]
     if body.get("operating_hours"):
         prop.operating_hours = body["operating_hours"]
+
+    # Link audit record to property for Day-7 email comparison
+    property_email = prop.notification_email or body.get("gm_email") or ""
+    property_name = prop.name or ""
+    audit_result = await db.execute(
+        select(AuditRecord)
+        .where(
+            or_(
+                AuditRecord.email == property_email,
+                AuditRecord.hotel_name.ilike(f"%{property_name}%")
+            )
+        )
+        .order_by(AuditRecord.created_at.desc())
+        .limit(1)
+    )
+    audit_record = audit_result.scalar_one_or_none()
+    if audit_record:
+        prop.audit_estimated_monthly_leakage_rm = audit_record.total_monthly_leakage
+        logger.info(
+            "Linked audit record to shadow pilot",
+            property_id=str(prop.id),
+            estimated_leakage_rm=float(audit_record.total_monthly_leakage)
+        )
 
     await db.commit()
 

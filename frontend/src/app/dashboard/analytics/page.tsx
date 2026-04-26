@@ -32,6 +32,7 @@ interface AnalyticsData {
         cost_savings: number;
     };
     daily: DailyData[];
+    performance_fee_balance_rm?: number;
 }
 
 const ranges = [
@@ -114,6 +115,8 @@ export default function AnalyticsPage() {
         { label: 'Avg Response', value: t ? `${t.avg_response_time_sec.toFixed(1)}s` : '—', icon: '⚡', color: 'var(--info)' },
     ];
 
+    const performanceFeeBalance = analytics?.performance_fee_balance_rm ?? 0;
+
     return (
         <div>
             <div className="flex items-center justify-between" style={{ marginBottom: 32 }}>
@@ -161,6 +164,13 @@ export default function AnalyticsPage() {
                                 <div className="stat-value" style={{ color: card.color }}>{card.value}</div>
                             </div>
                         ))}
+                    </div>
+
+                    {/* Performance fee card */}
+                    <div className="metric-card animate-in" style={{ marginBottom: 24 }}>
+                        <p className="metric-label">Performance fee accrued</p>
+                        <p className="metric-value">RM {performanceFeeBalance.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</p>
+                        <p className="metric-sub">3% of confirmed direct bookings this month</p>
                     </div>
 
                     {/* Charts */}

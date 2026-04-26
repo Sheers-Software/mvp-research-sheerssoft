@@ -18,6 +18,9 @@ export default function ApplyPage() {
     email: '',
     phone: '',
     room_count: '',
+    adr_estimate: '',
+    monthly_inquiry_volume: '',
+    star_rating: '',
     current_channels: [] as string[],
     message: '',
   });
@@ -48,6 +51,9 @@ export default function ApplyPage() {
           email: form.email,
           phone: form.phone || undefined,
           room_count: form.room_count ? parseInt(form.room_count) : undefined,
+          adr_estimate: form.adr_estimate ? parseFloat(form.adr_estimate) : undefined,
+          monthly_inquiry_volume: form.monthly_inquiry_volume ? parseInt(form.monthly_inquiry_volume) : undefined,
+          star_rating: form.star_rating ? parseInt(form.star_rating) : undefined,
           current_channels: form.current_channels.length ? form.current_channels : undefined,
           message: form.message || undefined,
         }),
@@ -220,6 +226,52 @@ export default function ApplyPage() {
                           onChange={e => setForm(f => ({ ...f, room_count: e.target.value }))}
                         />
                       </div>
+                    </div>
+
+                    <div className="apply-row apply-row-2">
+                      <div className="input-group">
+                        <label htmlFor="adr_estimate">Average Daily Rate (RM)</label>
+                        <input
+                          id="adr_estimate"
+                          type="number"
+                          className="input"
+                          placeholder="e.g. 280"
+                          min="0"
+                          value={form.adr_estimate}
+                          onChange={e => setForm(f => ({ ...f, adr_estimate: e.target.value }))}
+                        />
+                        <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Your average room rate per night</p>
+                      </div>
+                      <div className="input-group">
+                        <label htmlFor="monthly_inquiry_volume">Monthly Inquiry Volume</label>
+                        <input
+                          id="monthly_inquiry_volume"
+                          type="number"
+                          className="input"
+                          placeholder="e.g. 150"
+                          min="0"
+                          value={form.monthly_inquiry_volume}
+                          onChange={e => setForm(f => ({ ...f, monthly_inquiry_volume: e.target.value }))}
+                        />
+                        <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Approx. WhatsApp + email inquiries per month</p>
+                      </div>
+                    </div>
+
+                    <div className="input-group">
+                      <label htmlFor="star_rating">Star Rating</label>
+                      <select
+                        id="star_rating"
+                        className="input"
+                        value={form.star_rating}
+                        onChange={e => setForm(f => ({ ...f, star_rating: e.target.value }))}
+                      >
+                        <option value="">Select…</option>
+                        <option value="1">1 Star</option>
+                        <option value="2">2 Stars</option>
+                        <option value="3">3 Stars</option>
+                        <option value="4">4 Stars</option>
+                        <option value="5">5 Stars</option>
+                      </select>
                     </div>
 
                     <div className="input-group">

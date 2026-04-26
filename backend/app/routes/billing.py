@@ -5,6 +5,8 @@ Billing and subscription endpoints.
 import asyncio
 import logging
 import uuid
+from datetime import datetime, timezone
+from decimal import Decimal
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -15,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user
 from app.config import get_settings
 from app.database import get_db
-from app.models import Tenant
+from app.models import Tenant, Lead, Property
 from app.services.stripe_service import create_checkout_session, create_subscription_session
 
 logger = logging.getLogger(__name__)
@@ -273,6 +275,45 @@ async def stripe_webhook(
         trial_end = data_obj.get("trial_end")
         logger.info(f"Trial ending soon for customer {customer_id} at {trial_end}")
         # TODO: send notification email to tenant owner
+
+    # ── payment_link.completed ────────────────────────────────────────────────
+    elif event_type == "payment_link.completed":
+        payment_link_id = data_obj.get("id")
+        amount_total = data_obj.get("amount_total")
+        amount_rm = Decimal(str(amount_total / 100))
+
+        lead_result = await db.execute(
+            select(Lead).where(Lead.payment_link_stripe_id == payment_link_id)
+        )
+        lead = lead_result.scalar_one_or_none()
+        if lead:
+            try:
+                lead.confirmed_booking_amount_rm = amount_rm
+                lead.payment_confirmed_at = datetime.now(timezone.utc)
+                lead.status = "converted"
+                lead.performance_fee_rm = (amount_rm * Decimal("0.03")).quantize(Decimal("0.01"))
+
+                tenant_result = await db.execute(
+                    select(Tenant).where(Tenant.id == (
+                        select(Property.tenant_id).where(Property.id == lead.property_id).scalar_subquery()
+                    ))
+                )
+                tenant = tenant_result.scalar_one_or_none()
+                if tenant:
+                    tenant.performance_fee_balance_rm = (
+                        (tenant.performance_fee_balance_rm or Decimal("0")) + lead.performance_fee_rm
+                    )
+
+                await db.commit()
+                logger.info(
+                    "Direct booking confirmed via Nocturn payment link",
+                    lead_id=str(lead.id),
+                    amount_rm=float(amount_rm),
+                    performance_fee_rm=float(lead.performance_fee_rm),
+                )
+            except Exception as e:
+                logger.error(f"Failed to process payment_link.completed: {e}")
+                await db.rollback()
 
     else:
         logger.debug(f"Unhandled Stripe event type: {event_type}")

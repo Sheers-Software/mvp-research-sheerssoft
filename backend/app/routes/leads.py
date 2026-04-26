@@ -10,13 +10,18 @@ from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 import structlog
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.database import get_db
 from app.models import Lead
 from app.schemas import LeadResponse, LeadUpdateRequest, LeadConvertRequest
 from app.auth import verify_jwt, check_property_access
+from app.services.stripe_service import create_fpx_payment_link
+
+settings = get_settings()
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -236,3 +241,50 @@ async def export_leads_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+
+class PaymentLinkRequest(BaseModel):
+    amount_rm: float
+    description: str
+    nights: int | None = None
+
+
+@router.post("/leads/{lead_id}/payment-link")
+async def generate_payment_link(
+    lead_id: str,
+    body: PaymentLinkRequest,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(verify_jwt),
+):
+    """Generate a Stripe FPX payment link for a lead (direct booking)."""
+    lead_result = await db.execute(
+        select(Lead).where(Lead.id == uuid.UUID(lead_id))
+    )
+    lead = lead_result.scalar_one_or_none()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    try:
+        result = await create_fpx_payment_link(
+            amount_rm=body.amount_rm,
+            description=body.description,
+            lead_id=lead_id,
+            property_id=str(lead.property_id),
+            success_url=f"{settings.frontend_url}/portal?booking_confirmed=true",
+            cancel_url=f"{settings.frontend_url}/portal",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    lead.payment_link_url = result["url"]
+    lead.payment_link_stripe_id = result["payment_link_id"]
+    lead.payment_link_expires_at = result["expires_at"]
+    lead.facilitated_by_nocturn = True
+    await db.commit()
+
+    return {
+        "payment_link_url": result["url"],
+        "expires_at": result["expires_at"].isoformat(),
+        "amount_rm": body.amount_rm,
+        "description": body.description,
+    }

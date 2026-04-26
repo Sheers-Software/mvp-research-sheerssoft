@@ -169,6 +169,30 @@ async def send_weekly_report_email(prop: Property, rollup: ShadowPilotWeeklyRoll
 
     subject = f"{prop.name}: You left RM {rollup.weekly_revenue_leakage:,.0f} on the table this week. Here's the proof."
 
+    # Audit vs observed comparison line
+    estimated_rm = float(prop.audit_estimated_monthly_leakage_rm or 0)
+    observed_7d_rm = float(rollup.weekly_revenue_leakage)
+    observed_monthly_projection = observed_7d_rm * (30 / 7)
+
+    if estimated_rm > 0:
+        variance_pct = ((observed_monthly_projection - estimated_rm) / estimated_rm) * 100
+        if abs(variance_pct) < 5:
+            comparison_line = f"Your pre-pilot estimate was RM {estimated_rm:,.0f}/month — your real data confirms this."
+        elif observed_monthly_projection > estimated_rm:
+            comparison_line = (
+                f"You estimated RM {estimated_rm:,.0f}/month at risk on the calculator. "
+                f"Your 7-day data projects RM {observed_monthly_projection:,.0f}/month — "
+                f"you were underestimating by {variance_pct:.0f}%."
+            )
+        else:
+            comparison_line = (
+                f"You estimated RM {estimated_rm:,.0f}/month at risk. "
+                f"Your 7-day data projects RM {observed_monthly_projection:,.0f}/month — "
+                f"this is your confirmed minimum recoverable amount."
+            )
+    else:
+        comparison_line = None
+
     # Build 24-hour bar chart HTML
     max_count = max(rollup.inquiries_by_hour_aggregate.values()) or 1
     bars_html = ""
@@ -225,6 +249,8 @@ async def send_weekly_report_email(prop: Property, rollup: ShadowPilotWeeklyRoll
       <div style="font-size:28px;font-weight:600;color:#E24B4A;">RM {rollup.weekly_revenue_leakage:,.0f}</div>
       <div style="font-size:11px;color:#888;margin-top:2px;">Conservative estimate — 40% discount applied</div>
     </div>
+
+    {f'<div style="background:#F0F4FF;border:1px solid #C7D3F7;border-radius:6px;padding:14px 18px;margin:16px 0;font-size:13px;color:#1e2d6b;line-height:1.6;">{comparison_line}</div>' if comparison_line else ''}
 
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin:20px 0;">
       <tr style="background:#f8f8f8;">

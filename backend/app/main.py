@@ -252,6 +252,42 @@ async def lifespan(app: FastAPI):
                 ADD COLUMN IF NOT EXISTS shadow_pilot_report_sent_at TIMESTAMPTZ;
             """
         ),
+        (
+            "applications_icp_fields",
+            """
+            ALTER TABLE applications
+                ADD COLUMN IF NOT EXISTS adr_estimate NUMERIC(10,2),
+                ADD COLUMN IF NOT EXISTS monthly_inquiry_volume INTEGER,
+                ADD COLUMN IF NOT EXISTS star_rating SMALLINT;
+            """
+        ),
+        (
+            "properties_audit_leakage",
+            """
+            ALTER TABLE properties
+                ADD COLUMN IF NOT EXISTS audit_estimated_monthly_leakage_rm NUMERIC(12,2);
+            """
+        ),
+        (
+            "leads_payment_link_fields",
+            """
+            ALTER TABLE leads
+                ADD COLUMN IF NOT EXISTS payment_link_url VARCHAR(500),
+                ADD COLUMN IF NOT EXISTS payment_link_stripe_id VARCHAR(255),
+                ADD COLUMN IF NOT EXISTS payment_link_expires_at TIMESTAMPTZ,
+                ADD COLUMN IF NOT EXISTS payment_confirmed_at TIMESTAMPTZ,
+                ADD COLUMN IF NOT EXISTS confirmed_booking_amount_rm NUMERIC(10,2),
+                ADD COLUMN IF NOT EXISTS facilitated_by_nocturn BOOLEAN DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS performance_fee_rm NUMERIC(10,2);
+            """
+        ),
+        (
+            "tenants_performance_fee_balance",
+            """
+            ALTER TABLE tenants
+                ADD COLUMN IF NOT EXISTS performance_fee_balance_rm NUMERIC(12,2) DEFAULT 0;
+            """
+        ),
     ]
 
     for name, sql in migrations:
