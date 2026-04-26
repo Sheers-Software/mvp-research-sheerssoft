@@ -71,43 +71,106 @@ async def login_for_access_token(
 @router.post("/auth/magic-link")
 async def request_magic_link(body: MagicLinkRequest):
     """
-    Request a magic link login email via Supabase Auth.
-    The email contains a one-click login URL.
+    Request a magic link login email.
+    Uses Supabase Admin API to generate the link (bypasses Supabase SMTP quota),
+    then delivers the email via SendGrid.
     """
     settings = get_settings()
 
-    if not settings.supabase_url or not settings.supabase_anon_key:
+    if not settings.supabase_url or not settings.supabase_service_role_key:
         raise HTTPException(
             status_code=503,
             detail="Supabase Auth not configured. Contact support."
         )
 
+    redirect_to = f"{settings.frontend_url.rstrip('/')}/auth/callback"
+
+    # Step 1: generate the magic link URL via Supabase Admin API (no SMTP involved)
     try:
-        redirect_to = f"{settings.frontend_url.rstrip('/')}/auth/callback"
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{settings.supabase_url}/auth/v1/magiclink",
+                f"{settings.supabase_url}/auth/v1/admin/generate_link",
                 headers={
-                    "apikey": settings.supabase_anon_key,
+                    "apikey": settings.supabase_service_role_key,
+                    "Authorization": f"Bearer {settings.supabase_service_role_key}",
                     "Content-Type": "application/json",
                 },
-                params={"redirect_to": redirect_to},
-                json={"email": body.email},
+                json={
+                    "type": "magiclink",
+                    "email": body.email,
+                    "options": {"redirect_to": redirect_to},
+                },
                 timeout=10.0,
             )
-            logger.info("Magic link sent", email=body.email, redirect_to=redirect_to)
-            if response.status_code >= 400:
-                logger.warning("Magic link request failed", status=response.status_code, body=response.text)
-                raise HTTPException(
-                    status_code=400,
-                    detail="Could not send magic link. Please check your email address."
-                )
-
-        return {"message": "Magic link sent. Check your email inbox.", "email": body.email}
-
     except httpx.RequestError as e:
-        logger.error("Supabase Auth request failed", error=str(e))
+        logger.error("Supabase generate_link request failed", error=str(e))
         raise HTTPException(status_code=503, detail="Authentication service unavailable")
+
+    if response.status_code >= 400:
+        err = {}
+        try:
+            err = response.json()
+        except Exception:
+            pass
+        logger.warning("Supabase generate_link failed", status=response.status_code, body=response.text, email=body.email)
+        detail = err.get("msg") or err.get("message") or "Could not generate login link."
+        raise HTTPException(status_code=400, detail=detail)
+
+    action_link = response.json().get("action_link")
+    if not action_link:
+        logger.error("Supabase generate_link returned no action_link", email=body.email)
+        raise HTTPException(status_code=500, detail="Failed to generate login link")
+
+    # Step 2: deliver via SendGrid (uses our own quota, not Supabase's)
+    from app.services.email import send_email
+    email_result = await send_email(
+        to_email=body.email,
+        subject="Your Nocturn AI sign-in link",
+        content=_magic_link_email_html(action_link),
+        is_html=True,
+        hotel_name="Nocturn AI",
+    )
+
+    if email_result.get("status") == "error":
+        logger.error("Magic link email delivery failed", email=body.email, error=email_result.get("detail"))
+        raise HTTPException(status_code=503, detail="Could not deliver sign-in email. Please try again.")
+
+    logger.info("Magic link delivered via SendGrid", email=body.email, redirect_to=redirect_to)
+    return {"message": "Magic link sent. Check your email inbox.", "email": body.email}
+
+
+def _magic_link_email_html(action_link: str) -> str:
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1e293b;margin:0;padding:20px;background:#f8fafc;}}
+    .wrap{{max-width:480px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);}}
+    .hdr{{background:#0f172a;padding:24px 32px;}}
+    .hdr h1{{color:#fff;margin:0;font-size:20px;font-weight:700;letter-spacing:-.3px;}}
+    .hdr p{{color:#94a3b8;margin:4px 0 0;font-size:13px;}}
+    .bdy{{padding:32px;}}
+    .bdy p{{color:#475569;margin:0 0 16px;font-size:15px;line-height:1.6;}}
+    .btn{{display:block;background:#0f172a;color:#fff!important;text-decoration:none;padding:14px 24px;border-radius:8px;text-align:center;font-weight:600;font-size:15px;margin:24px 0;}}
+    .note{{font-size:12px;color:#94a3b8;margin-top:8px;}}
+    .ftr{{background:#f8fafc;padding:16px 32px;font-size:12px;color:#94a3b8;border-top:1px solid #e2e8f0;}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr"><h1>Nocturn AI</h1><p>Hotel Concierge Intelligence · SheersSoft</p></div>
+    <div class="bdy">
+      <p>Click the button below to sign in to your Nocturn AI account. No password needed.</p>
+      <a href="{action_link}" class="btn">Sign in to Nocturn AI →</a>
+      <p class="note">This link expires in 24 hours and can only be used once.</p>
+      <p style="font-size:13px;color:#94a3b8;">Didn't request this? You can safely ignore this email.</p>
+    </div>
+    <div class="ftr">SheersSoft Sdn Bhd · <a href="https://ai.sheerssoft.com" style="color:#94a3b8">ai.sheerssoft.com</a></div>
+  </div>
+</body>
+</html>"""
 
 
 @router.post("/auth/supabase-callback")
