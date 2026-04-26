@@ -12,6 +12,7 @@ from sqlalchemy import (
     Text,
     Boolean,
     Integer,
+    SmallInteger,
     Numeric,
     Date,
     DateTime,
@@ -62,6 +63,9 @@ class Tenant(Base):
     pilot_end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255))
     stripe_subscription_id: Mapped[str | None] = mapped_column(String(255))
+    performance_fee_balance_rm: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=Decimal('0'), server_default="0"
+    )
     assigned_account_manager: Mapped[str | None] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(
@@ -256,6 +260,9 @@ class Application(Base):
     phone: Mapped[str | None] = mapped_column(String(30))
     property_name: Mapped[str | None] = mapped_column(String(255))
     room_count: Mapped[int | None] = mapped_column(Integer)
+    adr_estimate: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    monthly_inquiry_volume: Mapped[int | None] = mapped_column(Integer)
+    star_rating: Mapped[int | None] = mapped_column(SmallInteger)
     current_channels: Mapped[list | None] = mapped_column(JSON)
     # E.g. ["whatsapp", "email", "phone"]
     message: Mapped[str | None] = mapped_column(Text)
@@ -348,6 +355,7 @@ class Property(Base):
     shadow_pilot_dashboard_token_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     avg_stay_nights: Mapped[float] = mapped_column(Numeric(5, 2), default=1.0, server_default="1.0")
     shadow_pilot_report_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    audit_estimated_monthly_leakage_rm: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
 
     # Relationships
     tenant: Mapped["Tenant | None"] = relationship(back_populates="properties")
@@ -490,6 +498,13 @@ class Lead(Base):
     )  # "new" | "contacted" | "converted" | "lost"
     estimated_value: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     actual_revenue: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    payment_link_url: Mapped[str | None] = mapped_column(String(500))
+    payment_link_stripe_id: Mapped[str | None] = mapped_column(String(255))
+    payment_link_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    payment_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    confirmed_booking_amount_rm: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    facilitated_by_nocturn: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    performance_fee_rm: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     notes: Mapped[str | None] = mapped_column(Text)
     priority: Mapped[str] = mapped_column(
         String(20), default="standard", server_default="standard"

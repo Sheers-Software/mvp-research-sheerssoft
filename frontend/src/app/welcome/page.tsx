@@ -24,7 +24,7 @@ interface WizardData {
     policies: { checkin: string; checkout: string; cancellation: string };
 }
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 
 function StepIndicator({ current }: { current: number }) {
     return (
@@ -105,6 +105,9 @@ export default function WelcomePage() {
     const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', role: 'staff' });
     const [inviting, setInviting] = useState(false);
     const [inviteSuccess, setInviteSuccess] = useState('');
+    const [checkoutLoading, setCheckoutLoading] = useState(false);
+    const [checkoutError, setCheckoutError] = useState('');
+    const [paymentSkipped, setPaymentSkipped] = useState(false);
 
     // Redirect to login if not authenticated
     useEffect(() => {
@@ -116,6 +119,15 @@ export default function WelcomePage() {
     // On mount: check if user already has a tenant/property
     useEffect(() => {
         if (authLoading || !user) return;
+
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('paid') === 'true') {
+            setCurrentStep(6);
+        }
+        if (params.get('step')) {
+            const s = parseInt(params.get('step')!);
+            if (s >= 1 && s <= 6) setCurrentStep(s);
+        }
 
         apiGet<{
             tenant?: { id: string };
@@ -240,7 +252,29 @@ export default function WelcomePage() {
         }
     };
 
-    // Step 5: activate and go to portal
+    // Step 5: proceed to payment
+    const handleProceedToPayment = async () => {
+        if (!tenantId) {
+            setCheckoutError('Account not fully set up. Please go back to Step 1.');
+            return;
+        }
+        setCheckoutLoading(true);
+        setCheckoutError('');
+        try {
+            const result = await apiPost<{ checkout_url: string }>('/billing/checkout', {
+                hotel_id: tenantId,
+                success_url: `${window.location.origin}/welcome?step=6&paid=true`,
+                cancel_url: `${window.location.origin}/welcome?step=5`,
+            });
+            window.location.href = result.checkout_url;
+        } catch (e: unknown) {
+            setCheckoutError((e instanceof Error ? e.message : String(e)) || 'Failed to start checkout. Please try again.');
+        } finally {
+            setCheckoutLoading(false);
+        }
+    };
+
+    // Step 6: activate and go to portal
     const handleActivate = async () => {
         if (!propertyId) {
             router.replace('/portal');
@@ -658,8 +692,65 @@ export default function WelcomePage() {
                     </div>
                 )}
 
-                {/* ─── STEP 5: Go Live ─── */}
+                {/* ─── STEP 5: Setup Fee Payment ─── */}
                 {currentStep === 5 && (
+                    <div className="card animate-in" style={{ padding: 32 }}>
+                        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+                            <div style={{ fontSize: 48, marginBottom: 12 }}>💳</div>
+                            <h2 style={{ marginBottom: 8 }}>One-time Setup Fee</h2>
+                            <p className="text-sm text-muted">
+                                Your AI concierge is ready. Complete the RM 999 setup to activate your account.
+                            </p>
+                        </div>
+                        <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-default)', borderRadius: 10, padding: '20px 24px', marginBottom: 24 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                <span style={{ fontSize: 14, fontWeight: 600 }}>Nocturn AI Setup Fee</span>
+                                <span style={{ fontSize: 18, fontWeight: 700 }}>RM 999</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
+                                <span>Monthly subscription (after setup)</span>
+                                <span>RM 199 / month</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-muted)' }}>
+                                <span>Performance fee (confirmed direct bookings)</span>
+                                <span>3% only</span>
+                            </div>
+                            <div style={{ borderTop: '1px solid var(--border-subtle)', marginTop: 14, paddingTop: 12 }}>
+                                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+                                    30-day money-back guarantee. If Nocturn AI doesn&apos;t recover more than RM 199 in the first month, your next month is free.
+                                </p>
+                            </div>
+                        </div>
+                        {checkoutError && (
+                            <div style={{ color: 'var(--danger)', marginBottom: 16, fontSize: 13, background: 'rgba(239,68,68,0.08)', padding: '10px 14px', borderRadius: 6 }}>
+                                {checkoutError}
+                            </div>
+                        )}
+                        <button
+                            className="btn btn-primary w-full"
+                            onClick={handleProceedToPayment}
+                            disabled={checkoutLoading}
+                            style={{ marginBottom: 12 }}
+                        >
+                            {checkoutLoading
+                                ? <span className="flex items-center gap-sm" style={{ justifyContent: 'center' }}><span className="loader" style={{ width: 14, height: 14 }} /> Redirecting to payment…</span>
+                                : 'Pay RM 999 and Activate →'}
+                        </button>
+                        <div className="flex items-center gap-sm" style={{ justifyContent: 'center' }}>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setCurrentStep(4)}>← Back</button>
+                            <button
+                                className="btn btn-ghost btn-sm"
+                                style={{ color: 'var(--text-muted)', fontSize: 12 }}
+                                onClick={() => { setPaymentSkipped(true); setCurrentStep(6); }}
+                            >
+                                Skip for now (pay later)
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* ─── STEP 6: Go Live ─── */}
+                {currentStep === 6 && (
                     <div className="card animate-in" style={{ padding: 32 }}>
                         <div style={{ textAlign: 'center', marginBottom: 28 }}>
                             <div style={{ fontSize: 56, marginBottom: 12 }}>🚀</div>
@@ -668,6 +759,12 @@ export default function WelcomePage() {
                                 Your AI concierge is configured. Click below to go to your portal.
                             </p>
                         </div>
+
+                        {paymentSkipped && (
+                            <div style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.4)', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: 'var(--text-primary)' }}>
+                                Payment pending — your account will be activated once the RM 999 setup fee is received. You can complete this from the portal billing page.
+                            </div>
+                        )}
 
                         <div style={{ display: 'grid', gap: 10, marginBottom: 28 }}>
                             <div className="flex items-center gap-sm" style={{ padding: '12px 16px', background: 'var(--bg-primary)', borderRadius: 8 }}>
@@ -700,7 +797,7 @@ export default function WelcomePage() {
                         </div>
 
                         <div style={{ textAlign: 'center', marginTop: 16 }}>
-                            <button className="btn btn-ghost btn-sm" onClick={() => setCurrentStep(4)}>← Back</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setCurrentStep(5)}>← Back</button>
                         </div>
                     </div>
                 )}
