@@ -111,7 +111,7 @@ services:
       dockerfile: Dockerfile
     restart: always
     ports:
-      - "3001:3001"
+      - "3010:3001"
     environment:
       BACKEND_INTERNAL_URL: http://backend:8080
       INTERNAL_SECRET: local_dev_internal_secret
