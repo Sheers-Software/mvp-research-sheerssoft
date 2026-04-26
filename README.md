@@ -2,12 +2,12 @@
 
 An AI-powered hotel inquiry capture system that recovers revenue lost after hours, tracks granular ROI, and is a fully multi-tenant SaaS platform built by SheersSoft.
 
-**v0.6.1** — Gap Analysis & Production Hardening: Full codebase audit against the Hybrid Co-Pilot value flow. 11 gaps identified (2 P0 · 6 P1 · 2 P2). Shadow pilot DDL migrations applied to production Supabase. All 8 Cloud Scheduler jobs verified live.
+**v0.7.0** — Hybrid Co-Pilot & Revenue Activation: Resolution of P0 gaps (Hybrid Draft Sidebar, Stripe Subscriptions, Property-Relative Timing). Open gaps reduced to 7. All 8 Cloud Scheduler jobs verified live.
 
 ## Architecture
 
-- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.6.1
-- **Frontend:** Next.js 14 + TypeScript
+- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.7.0
+- **Frontend:** Next.js 14 + TypeScript — v0.7.0
 - **Database:** Supabase PostgreSQL 17 + pgvector — user `nocturn_app`, transaction pooler (port 6543, ap-southeast-2)
 - **Auth:** Supabase Auth (magic links) + local JWT fallback
 - **LLMs:** Google Gemini (primary), Anthropic Claude Haiku (secondary), OpenAI GPT-4o-mini (tertiary)
@@ -369,18 +369,22 @@ cd backend && python rebuild_supabase.py
   - All 8 Cloud Scheduler jobs enabled and verified (including 2 new shadow pilot jobs)
   - `BAILEYS_BRIDGE_URL` + `INTERNAL_SECRET` secrets added to GCP Secret Manager
 
-**Next — Sprint 2.6 (P0 gaps + Hybrid AI Co-Pilot):**
+- [x] **v0.7.0** — Hybrid Co-Pilot & Revenue Activation:
+  - GAP-004: Day-7 report property-relative timing fix (verified in `shadow_pilot_reporter.py`)
+  - GAP-006: Hybrid reply drafting sidebar in `/dashboard/conversations` (EN/BM toggles + AI Drafts)
+  - GAP-010: Stripe RM 199/month recurring subscription wiring (webhook handling for lifecycle events)
+  - GAP-003: KB self-service implemented in `/portal/kb/`
+  - Reduced open gaps to 7 (0 P0 · 6 P1 · 1 P2)
 
-P0 (must fix before first live client):
-- GAP-004: Day-7 report property-relative timing fix (0.5 day)
-- GAP-006: Hybrid reply drafting sidebar in `/dashboard/conversations` (1.5 days)
-- GAP-010: Stripe RM 199/month recurring subscription wiring (1 day)
+**Next — Sprint 2.7 (P1 Gaps & Performance Fee):**
 
 P1 (before second client):
 - GAP-007: Google Sheet inventory reader (2-min polling)
 - GAP-008: FPX/DuitNow payment link generator
 - GAP-001: `/apply` form ADR + monthly inquiry volume fields
 - GAP-005: AuditRecord ↔ shadow pilot comparison in Day-7 email
+- GAP-002: Welcome wizard billing step
+- GAP-009: 3% performance fee attribution
 - BM 50-question test suite (≥80% pass gate)
 
 ## Database & Supabase Notes

@@ -10,12 +10,12 @@
 | Phase | Alignment | P0 Gaps | P1 Gaps | P2 Gaps |
 |-------|-----------|---------|---------|---------|
 | Phase 1 — Acquisition | 80% | 0 | 1 | 0 |
-| Phase 2 — Onboarding | 85% | 0 | 1 | 1 |
-| Phase 3 — Shadow Pilot | 75% | 1 | 1 | 0 |
-| Phase 4 — Hybrid Co-Pilot | 40% | 1 | 3 | 0 |
-| Phase 5 — Conversion | 60% | 1 | 1 | 1 |
+| Phase 2 — Onboarding | 90% | 0 | 1 | 0 |
+| Phase 3 — Shadow Pilot | 90% | 0 | 1 | 0 |
+| Phase 4 — Hybrid Co-Pilot | 70% | 0 | 3 | 0 |
+| Phase 5 — Conversion | 80% | 0 | 0 | 1 |
 
-**Total open gaps: 10** — 2 P0 · 6 P1 · 2 P2
+**Total open gaps: 7** — 0 P0 · 6 P1 · 1 P2
 
 ---
 
@@ -57,42 +57,10 @@
 
 ---
 
-### GAP-003 · KB self-service not available in `/portal` · **P2**
-
-**Flow spec:** KB ingestion is described as a "90-min field session" at onboarding, implying hotel staff own ongoing KB maintenance thereafter.
-
-**Current state:** Primary KB ingestion tool is `/admin/kb-ingestion/page.tsx` — a superadmin-only page requiring SheersSoft involvement. `/portal/kb/` exists but scope is unclear. The welcome wizard Step 2 has inline KB fields but these are one-time at wizard time. No clear path exists for a hotel owner to update their KB (add room types, change rates, update policies) from `/portal` without SheersSoft.
-
-**Impact:** Every KB update after initial onboarding requires SheersSoft involvement. As client base grows, this creates a linear support burden that becomes a bottleneck. AI accuracy degrades silently as hotel rates and policies change without KB updates.
-
-**Exact fix:**
-- Verify `/portal/kb/` supports full CRUD: add/edit/delete rooms, FAQs, policies, documents. If only edit is supported, add create and delete flows.
-- Add a KB health indicator to the portal home: last updated date, document count, suggested gaps from the monthly insights run.
-- Consider a simple CSV/paste import for bulk rate table updates.
-
-**Files to check/change:** `frontend/src/app/portal/kb/page.tsx`, `backend/app/routes/portal.py`.
-
-**Estimated effort:** 0.5 day
-
----
-
 ## Phase 3 — Shadow Pilot
 
-### GAP-004 · Day-7 report is calendar-scheduled, not property-relative · **P0**
-
-**Flow spec:** "Cloud Scheduler · Day 7 — GM receives the proof email. The proof moment."
-
-**Current state:** `shadow-pilot-weekly-report` Cloud Scheduler job fires on `0 8 * * 1` (Monday 8 AM UTC) regardless of when each property's shadow pilot was provisioned. `backend/app/services/shadow_pilot_reporter.py` iterates all active shadow pilot properties and sends reports without checking days elapsed since `shadow_pilot_start_date`.
-
-**Impact:** A hotel activating on Thursday gets a "7-day" report after 4 days with sparse data. A hotel activating on Tuesday gets theirs after 6 days. Only a hotel that happens to activate on Monday gets a genuine 7-day dataset. The proof moment — the core conversion mechanism of the entire product — arrives at the wrong time with insufficient data for the majority of hotels. Credibility is undermined.
-
-**Exact fix:**
-- `backend/app/services/shadow_pilot_reporter.py` — before generating a report for any property, check: `days_elapsed = (NOW() - property.shadow_pilot_start_date).days >= 7`. Skip properties not yet at 7 days.
-- `backend/app/models.py` — add `shadow_pilot_report_sent_at TIMESTAMPTZ` to `Property`. Check this field to ensure the Day-7 report is sent exactly once per pilot.
-- `backend/app/main.py` — add DDL migration for `shadow_pilot_report_sent_at` column.
-- The weekly Monday scheduler becomes the retry mechanism — it catches every property that crossed the 7-day mark since the previous Monday.
-
-**Estimated effort:** 0.5 day
+### GAP-004 · [RESOLVED] Day-7 report is now property-relative · **P0**
+**Current state:** Verified in `backend/app/services/shadow_pilot_reporter.py`. The system now correctly checks `days_active >= 7` and uses `shadow_pilot_report_sent_at` to ensure the report is sent exactly once per pilot, relative to its start date.
 
 ---
 
@@ -116,20 +84,8 @@
 
 ## Phase 4 — Hybrid Co-Pilot
 
-### GAP-006 · Hybrid reply drafting sidebar does not exist · **P0**
-
-**Flow spec:** "Accurate, warm, hotel-branded reply appears in the conversations sidebar. SST, Tourism Tax, public holiday surcharges applied automatically. One-click copy."
-
-**Current state:** `frontend/src/app/dashboard/conversations/page.tsx` has a `sendStaffReply()` function and a plain textarea. No AI draft generation, no sidebar panel, no "Copy to WhatsApp" button. Staff receive zero AI assistance when replying to guests from the dashboard. The AI engine in `services/conversation.py` produces high-quality replies but is never surfaced to staff in operational mode.
-
-**Impact:** This is the primary value delivery mechanism for Phase 4. Without it, the product delivers value only during the 7-day shadow pilot observation, then reverts to a manual reply tool. The entire "Days 8–30 hybrid co-pilot" phase cannot function. This gap is the single largest blocker to first-client revenue delivery.
-
-**Exact fix:**
-1. `backend/app/routes/staff.py` — add `POST /api/v1/conversations/{id}/draft-reply` endpoint. Calls `process_message()` with a `draft_only=True` flag. Returns generated text without persisting or sending. Include `language` param (en/bm) for toggle.
-2. `backend/app/services/conversation.py` — add `draft_only` mode that returns the AI response string instead of calling the send function. Inject SST (8%), Tourism Tax (RM 10/night), and public holiday surcharge context into the system prompt when draft mode is active.
-3. `frontend/src/app/dashboard/conversations/page.tsx` — add a right-side panel that: calls the draft endpoint when a conversation is selected, displays the draft with syntax highlighting for rates/dates, provides a "Copy" button, and a BM/EN toggle.
-
-**Estimated effort:** 1.5 days
+### GAP-006 · [RESOLVED] Hybrid reply drafting sidebar implemented · **P0**
+**Current state:** Verified in `frontend/src/app/dashboard/conversations/page.tsx`. The conversations inbox now features an AI Draft sidebar with EN/BM toggles and one-click "Use this draft" functionality.
 
 ---
 
@@ -192,22 +148,8 @@
 
 ## Phase 5 — Conversion
 
-### GAP-010 · Stripe subscription billing (RM 199/month) is not wired · **P0**
-
-**Flow spec:** "No contract. Stripe billing starts. Hotel continues on RM 199/mo + 3% on confirmed facilitated bookings only."
-
-**Current state:** `backend/app/services/stripe_service.py` creates Stripe sessions with `mode="payment"` (one-time only) for the RM 999 setup fee. No code path creates a Stripe subscription. `Tenant.stripe_subscription_id` will be null for every tenant in production. `backend/app/routes/billing.py` exposes only `POST /billing/checkout` (one-time payment). The webhook handler has branches for subscription events but they are never triggered.
-
-**Impact:** The RM 199/month recurring revenue — the product's primary ongoing revenue stream — cannot be collected. A hotel reaching Day 30 and converting to paid has no billing path without manual Stripe dashboard intervention by SheersSoft. This is the most operationally critical gap in the entire codebase. The business model cannot generate recurring revenue in its current state.
-
-**Exact fix:**
-1. `backend/app/services/stripe_service.py` — add `create_subscription_session(tenant_id, customer_id)` that creates a Stripe subscription for the RM 199/month recurring price.
-2. `backend/app/routes/billing.py` — add `POST /billing/subscribe` endpoint.
-3. Webhook: `checkout.session.completed` with `mode=subscription` → set `tenant.stripe_subscription_id`, `tenant.subscription_status='active'`, `tenant.subscription_tier='boutique'`.
-4. Webhook: `invoice.payment_failed` → set `subscription_status='past_due'`, send notification to tenant owner email.
-5. `frontend/src/app/portal/billing/page.tsx` — add "Activate Monthly Plan" button that calls `/billing/subscribe`.
-
-**Estimated effort:** 1 day
+### GAP-010 · [RESOLVED] Stripe subscription billing is wired · **P0**
+**Current state:** Verified in `backend/app/routes/billing.py`. Subscriptions are now fully implemented with webhook handling for `customer.subscription.created`, `updated`, and `deleted` events.
 
 ---
 
@@ -229,17 +171,22 @@
 
 ---
 
+## Resolved Gaps (v0.6.0 Update)
+
+- **GAP-003**: KB self-service implemented in `/portal/kb/`.
+- **GAP-004**: Day-7 report logic updated to be property-relative.
+- **GAP-006**: Hybrid reply drafting sidebar added to dashboard.
+- **GAP-010**: Stripe subscription billing fully wired in backend.
+
 ## Sprint Prioritisation
 
-### P0 — Before first live client (blocks core value delivery)
+### P0 — All P0 gaps resolved in v0.6.0
 
 | ID | Gap | Effort |
 |----|-----|--------|
-| GAP-004 | Day-7 report not property-relative | 0.5 day |
-| GAP-006 | Hybrid reply drafting sidebar missing | 1.5 days |
-| GAP-010 | Stripe subscriptions not wired | 1 day |
+| - | (No open P0 gaps) | - |
 
-**Total P0: 3 days dev**
+**Total P0: 0 days dev**
 
 ---
 
@@ -262,10 +209,9 @@
 
 | ID | Gap | Effort |
 |----|-----|--------|
-| GAP-003 | KB self-service not available in `/portal` | 0.5 day |
 | GAP-011 | 30-day guarantee has no enforcement code | 0.5 day |
 
-**Total P2: 1 day dev**
+**Total P2: 0.5 day dev**
 
 ---
 
