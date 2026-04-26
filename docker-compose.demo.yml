@@ -25,6 +25,7 @@ services:
       # DATABASE_URL and all API secrets are fetched from GCP Secret Manager at startup.
       # No secrets are sourced from .env.demo — only non-secret config lives there.
       GOOGLE_APPLICATION_CREDENTIALS: /gcp/credentials.json
+      BAILEYS_BRIDGE_URL: http://demo-baileys-bridge:3001
     ports:
       - "8001:8080"
     depends_on:
@@ -50,3 +51,23 @@ services:
       - "3001:3000"
     depends_on:
       - demo-backend
+
+  demo-baileys-bridge:
+    build:
+      context: ./baileys-bridge
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3002:3001"
+    environment:
+      BACKEND_INTERNAL_URL: http://demo-backend:8080
+      INTERNAL_SECRET: ${DEMO_INTERNAL_SECRET:-}
+      PORT: "3001"
+    volumes:
+      - demo_baileys_sessions:/sessions
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-C:/Users/abasy/AppData/Roaming/gcloud/application_default_credentials.json}:/gcp/credentials.json:ro
+    depends_on:
+      - demo-backend
+
+volumes:
+  demo_baileys_sessions:

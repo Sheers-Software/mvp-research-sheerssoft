@@ -14,6 +14,15 @@ if (-not $env:TWILIO_ACCOUNT_SID -and (Test-Path ".env.demo")) {
     }
 }
 
+# Fetch INTERNAL_SECRET from GCP Secret Manager for the Baileys bridge
+Write-Host "`n🔐 Fetching Baileys bridge INTERNAL_SECRET from Secret Manager..." -ForegroundColor Yellow
+$env:DEMO_INTERNAL_SECRET = (gcloud secrets versions access latest --secret=INTERNAL_SECRET --project=nocturn-ai-487207 2>&1).Trim()
+if ([string]::IsNullOrWhiteSpace($env:DEMO_INTERNAL_SECRET)) {
+    Write-Warning "⚠️  Could not fetch INTERNAL_SECRET — Baileys bridge auth will be empty. Ensure gcloud is authenticated."
+} else {
+    Write-Host "   ✓ INTERNAL_SECRET loaded" -ForegroundColor Green
+}
+
 # 1. Bring up the stack
 Write-Host "`n🐳 Bringing up the Demo Stack on port 8001..." -ForegroundColor Yellow
 docker-compose -f docker-compose.demo.yml up -d --build

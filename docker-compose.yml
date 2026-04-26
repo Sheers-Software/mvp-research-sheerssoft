@@ -73,6 +73,8 @@ services:
       # ── CORS ─────────────────────────────────────────────
       ALLOWED_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
       FRONTEND_URL: "http://localhost:3000"
+      BAILEYS_BRIDGE_URL: http://baileys-bridge:3001
+      INTERNAL_SCHEDULER_SECRET: local_dev_internal_secret
     volumes:
       # Mount GCP Application Default Credentials.
       # Windows default: C:\Users\<user>\AppData\Roaming\gcloud\application_default_credentials.json
@@ -103,5 +105,23 @@ services:
       backend:
         condition: service_started
 
+  baileys-bridge:
+    build:
+      context: ./baileys-bridge
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      BACKEND_INTERNAL_URL: http://backend:8080
+      INTERNAL_SECRET: local_dev_internal_secret
+      PORT: "3001"
+    volumes:
+      - baileys_sessions:/sessions
+    depends_on:
+      backend:
+        condition: service_started
+
 volumes:
   postgres_data:
+  baileys_sessions:
