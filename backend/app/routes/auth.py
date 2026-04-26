@@ -132,6 +132,21 @@ async def request_magic_link(body: MagicLinkRequest):
     )
 
     if email_result.get("status") == "error":
+        settings2 = get_settings()
+        if not settings2.is_production:
+            # Non-production fallback: log the link so dev/staging can still test auth flow.
+            # SendGrid free credits are limited; this prevents a hard block during development.
+            logger.warning(
+                "SendGrid delivery failed (non-production) — magic link logged for manual use",
+                email=body.email,
+                action_link=action_link,
+                sendgrid_error=email_result.get("detail"),
+            )
+            return {
+                "message": "Email delivery unavailable (SendGrid quota). Sign-in link logged to backend console.",
+                "email": body.email,
+                "dev_action_link": action_link,
+            }
         logger.error("Magic link email delivery failed", email=body.email, error=email_result.get("detail"))
         raise HTTPException(status_code=503, detail="Could not deliver sign-in email. Please try again.")
 
