@@ -1,6 +1,6 @@
 # Product Gap Analysis
 ## Nocturn AI — Codebase vs Hybrid Value Flow
-### Version 2.0 · 25 Apr 2026
+### Version 3.0 · 26 Apr 2026
 ### Source: Live codebase audit against `nocturn_hybrid_value_flow.html` (Hybrid Co-Pilot Value Delivery & Capture Flow)
 
 ---
@@ -9,51 +9,29 @@
 
 | Phase | Alignment | P0 Gaps | P1 Gaps | P2 Gaps |
 |-------|-----------|---------|---------|---------|
-| Phase 1 — Acquisition | 80% | 0 | 1 | 0 |
-| Phase 2 — Onboarding | 90% | 0 | 1 | 0 |
-| Phase 3 — Shadow Pilot | 90% | 0 | 1 | 0 |
-| Phase 4 — Hybrid Co-Pilot | 70% | 0 | 3 | 0 |
+| Phase 1 — Acquisition | 100% | 0 | 0 | 0 |
+| Phase 2 — Onboarding | 100% | 0 | 0 | 0 |
+| Phase 3 — Shadow Pilot | 100% | 0 | 0 | 0 |
+| Phase 4 — Hybrid Co-Pilot | 85% | 0 | 1 | 0 |
 | Phase 5 — Conversion | 80% | 0 | 0 | 1 |
 
-**Total open gaps: 7** — 0 P0 · 6 P1 · 1 P2
+**Total open gaps: 2** — 0 P0 · 1 P1 · 1 P2
 
 ---
 
 ## Phase 1 — Acquisition
 
-### GAP-001 · `/apply` form missing ICP qualification fields · **P1**
+### GAP-001 · [RESOLVED v0.8.0] `/apply` form ICP qualification fields · **P1**
 
-**Flow spec:** The application form captures "property type, star rating, WhatsApp number, ADR, monthly inquiry volume — ICP data captured at intake."
-
-**Current state:** `frontend/src/app/apply/page.tsx` captures hotel name, contact name, email, phone (optional), room count (optional), inquiry channels (multi-select), and a freetext notes field. ADR, star rating, and monthly inquiry volume are absent entirely.
-
-**Impact:** The revenue leakage formula requires ADR and monthly inquiry volume to produce a meaningful pre-sales projection. Without them, the admin cannot pre-qualify the economics of a prospect at intake — they must conduct a separate discovery call before provisioning. The self-qualifying loop described in Phase 1 is broken: the GM proves ROI on the `/audit` calculator but that data never flows through to the application record.
-
-**Exact fix:**
-- `frontend/src/app/apply/page.tsx` — add three fields: `adr_estimate` (number, RM), `monthly_inquiry_volume` (integer), `star_rating` (1–5 select).
-- `backend/app/models.py` — add `adr_estimate NUMERIC(10,2)`, `monthly_inquiry_volume INTEGER`, `star_rating SMALLINT` to `Application` model.
-- `backend/app/routes/superadmin.py` — include new fields in application create/read schemas.
-- Pre-populate ADR on the shadow pilot provisioning form from the application record at provisioning time.
-
-**Estimated effort:** 0.25 day
+**Status:** Implemented. `frontend/src/app/apply/page.tsx` now captures `adr_estimate` (RM, number), `monthly_inquiry_volume` (integer), and `star_rating` (1–5 select). `backend/app/models.py` Application model updated. Schema passthrough added. DDL startup migration added.
 
 ---
 
 ## Phase 2 — Onboarding
 
-### GAP-002 · Welcome wizard billing step is absent · **P1**
+### GAP-002 · [RESOLVED v0.8.0] Welcome wizard billing step · **P1**
 
-**Flow spec:** 5-step wizard covers "channels, team roster, notification preferences, billing details" — billing details is an explicit step.
-
-**Current state:** `frontend/src/app/welcome/page.tsx` has 5 steps: (1) welcome/property name, (2) knowledge base entry, (3) channel status, (4) invite team, (5) go-live summary. No billing details step exists. Stripe checkout is reachable only via `POST /api/v1/billing/checkout` — there is no wizard entry point.
-
-**Impact:** A hotel completing the full welcome wizard exits without entering billing information. The RM 999 setup fee is never collected during onboarding. Billing is a manual follow-up action requiring the admin to re-engage the client separately after the wizard is complete.
-
-**Exact fix:**
-- `frontend/src/app/welcome/page.tsx` — replace Step 5 (go-live summary) with a billing step that calls `POST /api/v1/billing/checkout` for the RM 999 setup fee Stripe session. Move go-live to a post-payment confirmation screen.
-- Alternatively: insert billing as Step 4, shift team invite to Step 5, make go-live the final screen after payment confirmed via webhook.
-
-**Estimated effort:** 0.5 day
+**Status:** Implemented. `frontend/src/app/welcome/page.tsx` is now 6 steps (was 5). Step 5 is the RM 999 setup fee Stripe checkout (`apiPost /billing/checkout`). URL param handling for `?paid=true` and `?step=N` (Stripe redirect return). "Skip for now" advances to Step 6 with a pending-payment yellow banner. Go Live moved to Step 6.
 
 ---
 
@@ -64,21 +42,9 @@
 
 ---
 
-### GAP-005 · AuditRecord and shadow pilot data are disconnected pipelines · **P1**
+### GAP-005 · [RESOLVED v0.8.0] AuditRecord ↔ shadow pilot data connected · **P1**
 
-**Flow spec:** Day-7 email delivers "Real data from their own property" — implying a before/after comparison.
-
-**Current state:** `AuditRecord` captures the pre-sales self-assessment from the `/audit` calculator (estimated RM lost/month based on GM's own inputs). `ShadowPilotAnalyticsDaily` captures actual observed data. The Day-7 report shows shadow pilot data only. The two pipelines are never joined.
-
-**Impact:** The most compelling sales narrative — "You estimated RM X at risk on the calculator. Your real 7-day data shows RM Y actually leaking — you underestimated it" — is never rendered. The comparison between the GM's self-reported estimate and the observed evidence is a psychological anchor that makes the value proposition undeniable. Currently, the Day-7 email is a data dump without the "you were right" moment.
-
-**Exact fix:**
-- At shadow pilot provisioning time (`POST /api/v1/superadmin/shadow-pilots`), look up the `AuditRecord` for the hotel (match on email or `converted_to_tenant_id`) and store `estimated_monthly_leakage_rm` on the `Property` (new column).
-- In `shadow_pilot_reporter.py` report template, include a comparison row: "Your pre-pilot estimate: RM X/month" vs "Observed 7-day leakage: RM Y (annualised: RM Z)".
-
-**Files to change:** `backend/app/routes/superadmin.py` (shadow pilot provision), `backend/app/models.py` (Property), `backend/app/services/shadow_pilot_reporter.py`.
-
-**Estimated effort:** 0.5 day
+**Status:** Implemented. `Property.audit_estimated_monthly_leakage_rm` (Numeric 12,2) added with DDL migration. Shadow pilot provisioning in `superadmin.py` now looks up the matching `AuditRecord` (by email or hotel name) and stores the estimated leakage on the property. `shadow_pilot_reporter.py` now computes an estimated vs observed comparison and renders it as a prominent callout box in the Day-7 email, immediately above the data table.
 
 ---
 
@@ -108,41 +74,15 @@
 
 ---
 
-### GAP-008 · FPX / DuitNow payment link generator is not implemented · **P1**
+### GAP-008 · [RESOLVED v0.8.0] FPX / DuitNow payment link · **P1**
 
-**Flow spec:** "AI detects booking signal → FPX / DuitNow payment link auto-embedded in draft reply. Guest gets a frictionless direct payment path."
-
-**Current state:** Stripe card-only integration exists for SheersSoft's billing relationship with hotels. No FPX or DuitNow integration exists for the hotel-to-guest booking payment flow. Grep for "fpx", "duitnow", "toyyibpay", "billplz", "ipay88" returns zero matches.
-
-**Impact:** Stripe card payment has very low penetration among Malaysian hotel guests, who default to FPX (online banking) or DuitNow QR for local transactions. Without a Malaysia-native payment method, the booking journey breaks at payment. The guest reverts to OTA. The 3% performance fee is uncollectable. This is the gap between "inquiry handled" and "direct booking confirmed."
-
-**Exact fix:**
-1. Integrate Stripe's FPX support via `PaymentIntents` (lowest friction given existing Stripe setup) — FPX is available in Malaysia via Stripe.
-2. New `backend/app/services/payment_link.py` — generates a Stripe PaymentIntent with `payment_method_types=["fpx"]` for a given amount (ADR × nights) and returns a hosted payment URL.
-3. In the hybrid draft endpoint (GAP-006), when `intent=room_booking` is detected, include a payment link in the draft.
-4. `backend/app/models.py` (Lead) — add `payment_link_url TEXT`, `confirmed_booking_amount_rm NUMERIC(10,2)`, `payment_reference VARCHAR(255)`.
-
-**Estimated effort:** 1 day
+**Status:** Implemented using Stripe PaymentLink with FPX + card support (Malaysia-native via Stripe). `Lead` model now has 7 payment tracking fields (`payment_link_url`, `payment_link_stripe_id`, `payment_link_expires_at`, `payment_confirmed_at`, `confirmed_booking_amount_rm`, `facilitated_by_nocturn`, `performance_fee_rm`). `Tenant.performance_fee_balance_rm` added. New endpoint `POST /api/v1/leads/{id}/payment-link` generates a Stripe PaymentLink and persists it to the lead. `payment_link.completed` webhook handler confirms booking, computes 3% fee, and accumulates on tenant. Conversations UI shows "DIRECT BOOKING PAYMENT" section in the AI draft sidebar when `lead.intent === 'room_booking'`.
 
 ---
 
-### GAP-009 · 3% performance fee has no attribution or tracking mechanism · **P1**
+### GAP-009 · [RESOLVED v0.8.0] 3% performance fee attribution and tracking · **P1**
 
-**Flow spec:** "Only on confirmed, Nocturn-facilitated bookings. Aligned incentive."
-
-**Current state:** `Lead` model has `converted BOOLEAN` and `converted_at TIMESTAMPTZ` but no flag for whether the conversion was Nocturn-facilitated vs organic, no confirmed booking amount, and no performance fee accumulation. `Tenant` has billing fields but no `performance_fee_balance_rm`.
-
-**Impact:** The 3% performance fee is unmeasurable from the system. It either goes uncollected, requires hotel self-reporting (unenforceable), or requires manual reconciliation per billing cycle. As client count grows this becomes operationally intractable. The aligned incentive — Sheers earns only when the hotel earns — cannot function without attribution data.
-
-**Exact fix:**
-1. `backend/app/models.py` (Lead) — add `facilitated_by_nocturn BOOLEAN DEFAULT FALSE`, `confirmed_booking_amount_rm NUMERIC(10,2)`, `performance_fee_rm NUMERIC(10,2)` (computed as `amount × 0.03`).
-2. `backend/app/models.py` (Tenant) — add `performance_fee_balance_rm NUMERIC(12,2) DEFAULT 0` (running total for current billing period).
-3. When staff sends a reply via the hybrid sidebar and the guest subsequently confirms via payment link, set `facilitated_by_nocturn=True` and `confirmed_booking_amount_rm`.
-4. Monthly billing job: include `performance_fee_balance_rm` as a line item in the Stripe invoice, then reset to 0.
-
-**Files to change:** `backend/app/models.py`, `backend/app/routes/staff.py`, `backend/app/services/stripe_service.py`.
-
-**Estimated effort:** 0.5 day
+**Status:** Implemented. Attribution flows from `payment_link.completed` webhook → `Lead.facilitated_by_nocturn` + `Lead.performance_fee_rm` → `Tenant.performance_fee_balance_rm`. Monthly APScheduler job (`run_monthly_performance_fee_billing`) runs on the 1st of each month (UTC midnight = 08:00 MYT) and posts accumulated fees as Stripe InvoiceItem, then resets the balance. Analytics endpoint and dashboard now surface "Performance fee accrued" metric card (RM value, `minimumFractionDigits: 2`).
 
 ---
 
@@ -178,6 +118,14 @@
 - **GAP-006**: Hybrid reply drafting sidebar added to dashboard.
 - **GAP-010**: Stripe subscription billing fully wired in backend.
 
+## Resolved Gaps (v0.8.0 Update — 26 Apr 2026)
+
+- **GAP-001**: `/apply` form now captures ADR, monthly inquiry volume, star rating.
+- **GAP-002**: Welcome wizard Step 5 is RM 999 Stripe checkout (6-step wizard).
+- **GAP-005**: AuditRecord linked to shadow pilot; Day-7 email shows pre/post comparison.
+- **GAP-008**: FPX/card Stripe PaymentLink flow — generate, send, confirm via webhook.
+- **GAP-009**: 3% performance fee attribution, monthly billing job, analytics card.
+
 ## Sprint Prioritisation
 
 ### P0 — All P0 gaps resolved in v0.6.0
@@ -194,14 +142,9 @@
 
 | ID | Gap | Effort |
 |----|-----|--------|
-| GAP-001 | `/apply` missing ADR + monthly inquiry volume | 0.25 day |
-| GAP-002 | Welcome wizard missing billing step | 0.5 day |
-| GAP-005 | AuditRecord ↔ shadow pilot data disconnected | 0.5 day |
 | GAP-007 | Google Sheet inventory reader missing | 1 day |
-| GAP-008 | FPX/DuitNow payment link missing | 1 day |
-| GAP-009 | 3% performance fee has no attribution | 0.5 day |
 
-**Total P1: 3.75 days dev**
+**Total P1: 1 day dev**
 
 ---
 
@@ -217,7 +160,7 @@
 
 ## What is well-aligned
 
-The following components from the value flow are fully implemented and production-verified (as of 25 Apr 2026):
+The following components from the value flow are fully implemented and production-verified (as of 26 Apr 2026):
 
 - Shadow pilot core — processor, classifier, aggregator, reporter, Baileys bridge (v0.6.0)
 - AI engine — `conversation.py`, RAG, bilingual EN/BM, 3 behavioral modes
@@ -233,3 +176,8 @@ The following components from the value flow are fully implemented and productio
 - `/portal` tenant self-management (KB, team, channels, billing pages)
 - All 8 Cloud Scheduler jobs enabled in production
 - 3 Cloud Run services live (`nocturn-backend`, `nocturn-frontend`, `baileys-bridge`)
+- `/apply` ICP qualification (ADR, monthly inquiry volume, star rating) — v0.8.0
+- Welcome wizard 6-step billing flow (RM 999 Stripe checkout) — v0.8.0
+- AuditRecord ↔ shadow pilot leakage comparison in Day-7 email — v0.8.0
+- FPX/card direct booking payment link (Stripe PaymentLink) — v0.8.0
+- 3% performance fee attribution, monthly Stripe billing job — v0.8.0

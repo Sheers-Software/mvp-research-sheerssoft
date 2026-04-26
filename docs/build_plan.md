@@ -22,6 +22,24 @@
 
 ---
 
+## Sprint 2.7 — P1 Gap Closure (COMPLETED v0.8.0 · 26 Apr 2026)
+
+**Goal:** Close all remaining P1 revenue-blocking gaps. Enable self-sustaining setup fee collection and direct booking payment without manual SheersSoft intervention.
+
+| Gap | Feature | Status |
+|-----|---------|--------|
+| GAP-001 | `/apply` ICP fields (ADR, volume, star rating) | ✅ Done |
+| GAP-002 | Welcome wizard billing step (RM 999 Stripe checkout) | ✅ Done |
+| GAP-005 | AuditRecord ↔ shadow pilot Day-7 comparison | ✅ Done |
+| GAP-008 | FPX/card payment link via Stripe PaymentLink | ✅ Done |
+| GAP-009 | 3% performance fee attribution + monthly billing job | ✅ Done |
+
+**Files changed:** `backend/app/models.py`, `backend/app/main.py`, `backend/app/routes/billing.py`, `backend/app/routes/leads.py`, `backend/app/routes/superadmin.py`, `backend/app/routes/analytics.py`, `backend/app/schemas.py`, `backend/app/services/stripe_service.py`, `backend/app/services/scheduler.py`, `backend/app/services/shadow_pilot_reporter.py`, `frontend/src/app/apply/page.tsx`, `frontend/src/app/welcome/page.tsx`, `frontend/src/app/dashboard/conversations/page.tsx`, `frontend/src/app/dashboard/analytics/page.tsx`
+
+**Remaining open gaps:** GAP-007 (Google Sheet inventory, P1) · GAP-011 (30-day guarantee enforcement, P2)
+
+---
+
 ## Sprint 2.5 — Shadow Pilot Deep Implementation (CURRENT SPRINT)
 
 **Goal:** Hotel GM scans one QR code. Nocturn observes their real WhatsApp for 7 days. GM receives an email on Day 7 with their exact revenue leakage in RM, a link to a live dashboard, and sample conversations from their own hotel. No new number promoted. No disruption to hotel operations.

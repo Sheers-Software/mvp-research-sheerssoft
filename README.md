@@ -2,12 +2,12 @@
 
 An AI-powered hotel inquiry capture system that recovers revenue lost after hours, tracks granular ROI, and is a fully multi-tenant SaaS platform built by SheersSoft.
 
-**v0.7.0** — Hybrid Co-Pilot & Revenue Activation: Resolution of P0 gaps (Hybrid Draft Sidebar, Stripe Subscriptions, Property-Relative Timing). Open gaps reduced to 7. All 8 Cloud Scheduler jobs verified live.
+**v0.8.0** — ICP Qualification, Billing Wizard Step, Audit Comparison, FPX Payment Link, 3% Performance Fee Attribution. Open gaps reduced to 2 (1 P1 · 1 P2).
 
 ## Architecture
 
-- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.7.0
-- **Frontend:** Next.js 14 + TypeScript — v0.7.0
+- **Backend:** Python 3.12 + FastAPI (async SQLAlchemy, asyncpg) — v0.8.0
+- **Frontend:** Next.js 14 + TypeScript — v0.8.0
 - **Database:** Supabase PostgreSQL 17 + pgvector — user `nocturn_app`, transaction pooler (port 6543, ap-southeast-2)
 - **Auth:** Supabase Auth (magic links) + local JWT fallback
 - **LLMs:** Google Gemini (primary), Anthropic Claude Haiku (secondary), OpenAI GPT-4o-mini (tertiary)
@@ -23,7 +23,7 @@ An AI-powered hotel inquiry capture system that recovers revenue lost after hour
 1. **Shadow Pilot (Baileys Linked Device):** Hotel GM scans a QR code in the admin panel. Nocturn adds itself as a second linked device on their real WhatsApp Business number — observe-only, zero messages sent to guests. 7 days of data: response times, after-hours unanswered intents, revenue leakage in RM. Day-7 automated email report + token-gated GM dashboard at `/shadow/[slug]?token=...`. Core sales mechanism for proving ROI before contract.
 2. **AI Conversation Engine (RAG):** Answers guest inquiries using a per-property knowledge base, captures leads, and escalates to human staff when needed. Three behavioral modes: Concierge → Lead Capture → Handoff.
 3. **Multi-Tenant SaaS Architecture:** Hotel groups (Tenants) own multiple Properties. Staff access is scoped per-property via TenantMembership roles (`owner` / `admin` / `staff`).
-4. **Self-Service Onboarding Wizard (`/welcome`):** Five-step guided setup for new clients — confirm property details, enter knowledge base (rooms, rates, FAQs, policies), verify channels, invite team, activate AI. No SheersSoft engineer required after provisioning.
+4. **Self-Service Onboarding Wizard (`/welcome`):** Six-step guided setup — confirm property details, enter knowledge base, verify channels, invite team, complete RM 999 setup payment, activate AI. No SheersSoft engineer required after provisioning.
 5. **Tenant Management Portal (`/portal`):** Owner/admin layer for configuring the business — manage KB documents, team members (invite/remove), channel status, billing, and support tickets. Separate from the day-to-day operations dashboard.
 6. **Gamified Onboarding Flow:** SuperAdmin provisions a new tenant in one API call — creates Tenant, Property, User (via Supabase Auth), TenantMembership, and OnboardingProgress. Magic link sent automatically. Channel setup runs asynchronously. Progress score 0–100.
 7. **Stripe Billing:** One-time RM 999 setup fee + RM 199/month + 3% performance fee on confirmed bookings.
@@ -229,6 +229,7 @@ Application (public intake → converts to Tenant)
 | `POST /api/v1/onboarding/provision-tenant` | One-click tenant provisioning |
 | `GET /api/v1/onboarding/progress/{tenant_id}` | Onboarding score |
 | `POST /api/v1/billing/checkout` | Stripe checkout session |
+| `POST /api/v1/leads/{id}/payment-link` | Generate Stripe FPX payment link for a room booking lead |
 | `GET /api/v1/superadmin/metrics` | Platform-wide KPIs |
 | `GET /api/v1/superadmin/service-health` | 9-service health check |
 | `GET /api/v1/portal/home` | Multi-property summary |
@@ -299,7 +300,7 @@ Application (public intake → converts to Tenant)
 │       ├── welcome/                 # Onboarding wizard (/welcome)
 │       └── dashboard/               # Property staff operations (/dashboard)
 ├── docs/
-│   ├── product_gap.md               # Gap analysis v2.0 — 11 gaps vs hybrid value flow (25 Apr 2026)
+│   ├── product_gap.md               # Gap analysis v3.0 — 2 open gaps (26 Apr 2026)
 │   ├── shadow_pilot_spec.md         # Canonical implementation reference (1,332 lines)
 │   ├── prd.md                       # PRD v2.5
 │   ├── architecture.md              # Architecture v2.5 (incl. Baileys bridge)
@@ -376,16 +377,18 @@ cd backend && python rebuild_supabase.py
   - GAP-003: KB self-service implemented in `/portal/kb/`
   - Reduced open gaps to 7 (0 P0 · 6 P1 · 1 P2)
 
-**Next — Sprint 2.7 (P1 Gaps & Performance Fee):**
+- [x] **v0.8.0** — ICP Qualification & Revenue Activation:
+  - GAP-001: `/apply` form captures ADR, monthly inquiry volume, star rating (Application model + DDL)
+  - GAP-002: Welcome wizard expanded to 6 steps — Step 5 is RM 999 Stripe checkout with skip-for-now flow
+  - GAP-005: AuditRecord linked to shadow pilot at provisioning; Day-7 email shows estimated vs observed leakage comparison
+  - GAP-008: FPX/card direct booking payment link via Stripe PaymentLink — staff generates from conversations sidebar; `payment_link.completed` webhook confirms booking
+  - GAP-009: 3% performance fee attribution — Lead + Tenant tracking, monthly APScheduler billing job, analytics dashboard card
+  - Open gaps reduced to 2: GAP-007 (Google Sheet inventory) P1 · GAP-011 (30-day guarantee enforcement) P2
 
-P1 (before second client):
-- GAP-007: Google Sheet inventory reader (2-min polling)
-- GAP-008: FPX/DuitNow payment link generator
-- GAP-001: `/apply` form ADR + monthly inquiry volume fields
-- GAP-005: AuditRecord ↔ shadow pilot comparison in Day-7 email
-- GAP-002: Welcome wizard billing step
-- GAP-009: 3% performance fee attribution
-- BM 50-question test suite (≥80% pass gate)
+**Next — Sprint 2.8 (GAP-007 + Production Readiness):**
+- GAP-007: Google Sheet inventory reader (2-min polling, gspread, inject into AI system prompt)
+- Stripe `payment_method_types` configuration (verify FPX via Dashboard for current API version)
+- BM 50-question accuracy test gate (≥80% required before first live client)
 
 ## Database & Supabase Notes
 
