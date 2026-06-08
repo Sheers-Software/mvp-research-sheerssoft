@@ -176,10 +176,10 @@ export default function AnalyticsPage() {
                     {/* Charts */}
                     {analytics.daily.length > 0 && (
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                            <BarChart data={analytics.daily} dataKey="total_inquiries" color="hsl(245, 60%, 60%)" label="Daily Inquiries" />
-                            <BarChart data={analytics.daily} dataKey="leads_captured" color="hsl(40, 90%, 50%)" label="Leads Captured" />
-                            <BarChart data={analytics.daily} dataKey="estimated_revenue_recovered" color="hsl(145, 60%, 45%)" label="Revenue Recovered (RM)" />
-                            <BarChart data={analytics.daily} dataKey="cost_savings" color="hsl(200, 70%, 50%)" label="Cost Savings (RM)" />
+                            <BarChart data={analytics.daily} dataKey="total_inquiries" color="#6B7FCC" label="Daily Inquiries" />
+                            <BarChart data={analytics.daily} dataKey="leads_captured" color="#F59E0B" label="Leads Captured" />
+                            <BarChart data={analytics.daily} dataKey="estimated_revenue_recovered" color="#1D9E75" label="Revenue Recovered (RM)" />
+                            <BarChart data={analytics.daily} dataKey="cost_savings" color="#29ABD4" label="Cost Savings (RM)" />
                         </div>
                     )}
 
