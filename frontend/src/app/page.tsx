@@ -7,6 +7,7 @@ import { DEMO_MODE } from '@/lib/api';
 import { setPersona, type DemoPersona } from '@/lib/demo/data';
 import PublicNav from '@/components/PublicNav';
 import DemoChat from '@/components/DemoChat';
+import Logo from '@/components/Logo';
 
 /**
  * Root page.
@@ -60,6 +61,8 @@ const STEPS = [
 ];
 
 function Landing() {
+  useEffect(() => { window.scrollTo(0, 0); }, []);
+
   return (
     <>
       <PublicNav />
@@ -68,9 +71,9 @@ function Landing() {
       <section style={{ maxWidth: 1140, margin: '0 auto', padding: '116px 24px 40px' }}>
         <div style={{ display: 'flex', gap: 48, flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ flex: '1 1 420px', minWidth: 300 }}>
-            <span className="badge badge-success" style={{ marginBottom: 16, display: 'inline-block' }}>
-              AI-powered hotel inquiry &amp; conversion engine
-            </span>
+            <div style={{ marginBottom: 20 }}>
+              <Logo size={36} variant="green" showText />
+            </div>
             <h1 style={{ fontSize: 44, lineHeight: 1.1, letterSpacing: '-0.02em', marginBottom: 18 }}>
               Stop losing bookings<br />after the front desk closes.
             </h1>
@@ -89,7 +92,8 @@ function Landing() {
             </p>
           </div>
 
-          <div id="demo" style={{ flex: '1 1 380px', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ flex: '1 1 380px', display: 'flex', justifyContent: 'center' }}>
+            <span id="demo" style={{ position: 'absolute', marginTop: -80 }} />
             <DemoChat />
           </div>
         </div>

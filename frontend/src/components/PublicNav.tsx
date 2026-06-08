@@ -13,7 +13,7 @@ export default function PublicNav() {
       <div className="public-nav-inner">
         {/* Logo — left */}
         <Link href="/" className="public-nav-logo">
-          <Logo size={28} variant="navy" showText />
+          <Logo size={28} variant="green" showText />
           <span className="public-nav-byline">by SheersSoft</span>
         </Link>
 
