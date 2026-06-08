@@ -1,7 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { apiGet, apiPost } from '@/lib/api';
+import { apiGet, apiPost, DEMO_MODE } from '@/lib/api';
+import { demoUser, getPersona } from '@/lib/demo/data';
 
 interface Membership {
     id: string;
@@ -53,6 +54,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     useEffect(() => {
+        if (DEMO_MODE) {
+            // Self-contained demo: auto-load the seeded user for the active persona.
+            setUser(demoUser(getPersona()) as User);
+            setLoading(false);
+            return;
+        }
         const token = localStorage.getItem('nocturn_token');
         if (token) {
             fetchUser();
@@ -84,6 +91,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const logout = () => {
         localStorage.removeItem('nocturn_token');
         setUser(null);
+        if (DEMO_MODE && typeof window !== 'undefined') {
+            window.location.href = '/';
+        }
     };
 
     return (

@@ -11,10 +11,22 @@
  */
 export const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+/** When true, all API calls are served from the self-contained seeded demo
+ *  layer (lib/demo) — no backend, no network. Set NEXT_PUBLIC_DEMO_MODE=true
+ *  on Vercel to run the investor/buyer demo with zero infrastructure. */
+export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+
 export async function api<T = any>(
     path: string,
     options: RequestInit = {},
 ): Promise<T> {
+    if (DEMO_MODE) {
+        const { resolveDemo } = await import('@/lib/demo/router');
+        const method = (options.method || 'GET').toUpperCase() as any;
+        const body = options.body ? JSON.parse(options.body as string) : undefined;
+        return resolveDemo<T>(method, path, body);
+    }
+
     const token = typeof window !== 'undefined' ? localStorage.getItem('nocturn_token') : null;
 
     const headers: Record<string, string> = {
