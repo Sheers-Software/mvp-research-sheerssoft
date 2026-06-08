@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from '@/lib/auth';
 import DemoPersonaBar from '@/components/DemoPersonaBar';
 import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const instrumentSerif = Instrument_Serif({
   weight: ["400"],
@@ -31,6 +32,7 @@ export default function RootLayout({
           {children}
         </AuthProvider>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
