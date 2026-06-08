@@ -1210,3 +1210,23 @@ tbody tr:last-child td {
     font-size: 12px;
   }
 }
+
+/* ─── Demo persona bar offset ─────────────────────────────────────────────────
+   When the demo bar is visible (position: fixed; height: 36px) every other
+   fixed/sticky element that sits at top: 0 must be pushed down by 36px so
+   nothing is obscured. Applied via <body class="demo-bar-active">. */
+body.demo-bar-active .sidebar,
+body.demo-bar-active .mobile-header,
+body.demo-bar-active .public-nav {
+  top: 36px;
+}
+
+body.demo-bar-active .main-content {
+  padding-top: calc(36px + 28px); /* bar + original top padding */
+}
+
+@media (max-width: 768px) {
+  body.demo-bar-active .main-content {
+    padding-top: calc(36px + 68px);
+  }
+}

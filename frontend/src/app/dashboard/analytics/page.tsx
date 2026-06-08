@@ -45,24 +45,24 @@ function BarChart({ data, dataKey, color, label }: { data: DailyData[]; dataKey:
     const values = data.map((d) => Number(d[dataKey]) || 0);
     const max = Math.max(...values, 1);
 
+    const CHART_H = 120;
     return (
         <div className="card" style={{ padding: '16px 20px' }}>
             <h4 style={{ fontSize: 13, marginBottom: 12, color: 'var(--text-muted)' }}>{label}</h4>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 120 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: CHART_H, overflow: 'hidden' }}>
                 {data.map((d, i) => {
                     const val = Number(d[dataKey]) || 0;
-                    const height = max > 0 ? (val / max) * 100 : 0;
+                    const barH = max > 0 ? Math.max((val / max) * CHART_H, 2) : 2;
                     return (
                         <div
                             key={i}
                             title={`${d.date}: ${val}`}
                             style={{
                                 flex: 1,
-                                height: `${Math.max(height, 2)}%`,
+                                height: `${barH}px`,
                                 background: `linear-gradient(to top, ${color}, ${color}88)`,
                                 borderRadius: '4px 4px 0 0',
-                                minWidth: 4,
-                                transition: 'height 0.5s ease',
+                                minWidth: 3,
                                 cursor: 'pointer',
                             }}
                         />

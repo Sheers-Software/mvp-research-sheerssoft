@@ -21,6 +21,8 @@ export default function DemoPersonaBar() {
 
     useEffect(() => {
         setP(getPersona());
+        document.body.classList.add('demo-bar-active');
+        return () => { document.body.classList.remove('demo-bar-active'); };
     }, []);
 
     if (!DEMO_MODE) return null;
@@ -32,11 +34,13 @@ export default function DemoPersonaBar() {
 
     return (
         <div
+            id="demo-persona-bar"
             style={{
-                position: 'sticky', top: 0, zIndex: 200,
+                position: 'fixed', top: 0, left: 0, right: 0, zIndex: 300,
                 background: '#0F172A', color: '#fff',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 gap: 12, padding: '7px 14px', fontSize: 12.5, flexWrap: 'wrap',
+                height: 36,
             }}
         >
             <span style={{ fontWeight: 600, letterSpacing: '0.04em', opacity: 0.85 }}>
