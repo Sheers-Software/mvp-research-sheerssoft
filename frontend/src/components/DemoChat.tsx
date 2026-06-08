@@ -55,22 +55,22 @@ export default function DemoChat() {
                 </div>
             </div>
 
-            <div style={{ padding: 16, height: 340, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--bg-subtle, #f7f8fa)' }}>
+            <div style={{ padding: 16, height: 340, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, background: '#eef0f3' }}>
                 {messages.map((m, i) => (
                     <div
                         key={i}
                         style={{
                             alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
                             maxWidth: '82%',
-                            background: m.role === 'user' ? 'var(--teal, #1d9e75)' : '#fff',
-                            color: m.role === 'user' ? '#fff' : 'var(--text, #1a1a1a)',
+                            background: m.role === 'user' ? '#1d9e75' : '#ffffff',
+                            color: m.role === 'user' ? '#fff' : '#1a1a1a',
                             padding: '9px 13px',
                             borderRadius: 14,
                             borderBottomRightRadius: m.role === 'user' ? 4 : 14,
                             borderBottomLeftRadius: m.role === 'user' ? 14 : 4,
                             fontSize: 13.5,
                             lineHeight: 1.45,
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.10)',
                         }}
                     >
                         {m.content}

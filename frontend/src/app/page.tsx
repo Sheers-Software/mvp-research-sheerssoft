@@ -64,8 +64,8 @@ function Landing() {
     <>
       <PublicNav />
 
-      {/* Hero */}
-      <section style={{ maxWidth: 1140, margin: '0 auto', padding: '56px 24px 40px' }}>
+      {/* Hero — padding-top clears demo bar (36px) + public nav (58px) + breathing room */}
+      <section style={{ maxWidth: 1140, margin: '0 auto', padding: '116px 24px 40px' }}>
         <div style={{ display: 'flex', gap: 48, flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ flex: '1 1 420px', minWidth: 300 }}>
             <span className="badge badge-success" style={{ marginBottom: 16, display: 'inline-block' }}>
