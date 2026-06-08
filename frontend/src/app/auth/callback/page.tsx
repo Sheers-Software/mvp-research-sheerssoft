@@ -10,6 +10,12 @@ export default function AuthCallbackPage() {
 
     useEffect(() => {
         async function handleCallback() {
+            // Demo mode: no Supabase auth, just go home.
+            if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
+                router.replace('/');
+                return;
+            }
+
             let supabaseAccessToken: string | null = null;
 
             // PKCE flow: Supabase sends ?code= as a query param
@@ -24,6 +30,7 @@ export default function AuthCallbackPage() {
 
             if (code) {
                 // Exchange PKCE code for a Supabase session
+                if (!supabase) { setError('Supabase is not configured.'); return; }
                 const { data, error: exchError } = await supabase.auth.exchangeCodeForSession(code);
                 if (exchError || !data.session) {
                     setError(exchError?.message || 'Failed to exchange auth code. Please request a new magic link.');
