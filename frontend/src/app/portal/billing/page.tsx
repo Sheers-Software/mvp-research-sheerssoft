@@ -22,7 +22,7 @@ const PLANS: Plan[] = [
         tier: 'pilot',
         name: 'Pilot',
         features: [
-            { label: '1 property', included: true },
+            { label: '1 business', included: true },
             { label: '500 conversations/month', included: true },
             { label: 'WhatsApp + Web Chat', included: true },
             { label: 'Email channel', included: false },
@@ -35,7 +35,7 @@ const PLANS: Plan[] = [
         name: 'Boutique',
         highlight: true,
         features: [
-            { label: '2 properties', included: true },
+            { label: '2 businesses', included: true },
             { label: '2,000 conversations/month', included: true },
             { label: 'All channels (WhatsApp, Email, Web)', included: true },
             { label: 'Monthly AI insights', included: true },
@@ -47,7 +47,7 @@ const PLANS: Plan[] = [
         tier: 'independent',
         name: 'Independent',
         features: [
-            { label: '5 properties', included: true },
+            { label: '5 businesses', included: true },
             { label: '10,000 conversations/month', included: true },
             { label: 'All channels', included: true },
             { label: 'Monthly AI insights', included: true },
@@ -59,7 +59,7 @@ const PLANS: Plan[] = [
         tier: 'premium',
         name: 'Premium',
         features: [
-            { label: 'Unlimited properties', included: true },
+            { label: 'Unlimited businesses', included: true },
             { label: 'Unlimited conversations', included: true },
             { label: 'All channels', included: true },
             { label: 'Monthly AI insights', included: true },

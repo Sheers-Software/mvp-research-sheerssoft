@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.auth import get_current_user
 from app.models import (
-    Tenant, Property, TenantMembership, OnboardingProgress,
+    Tenant, Business, TenantMembership, OnboardingProgress,
     KBDocument, AnalyticsDaily, User,
 )
 from app.services import generate_embedding
@@ -66,7 +66,7 @@ class KBWizardContact(BaseModel):
 
 
 class KBIngestWizardRequest(BaseModel):
-    property_name: str
+    business_name: str
     rooms: list[KBWizardRoom] = []
     facilities: list[str] = []
     faqs: list[KBWizardFaq] = []
@@ -93,27 +93,27 @@ async def _get_user_tenant_id(user: Any) -> uuid.UUID:
 
 async def _verify_property_access(
     db: AsyncSession,
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     user: Any,
-) -> Property:
+) -> Business:
     """
-    Verify the property exists and belongs to the user's tenant.
-    Returns the Property ORM object on success, raises 403/404 otherwise.
+    Verify the business exists and belongs to the user's tenant.
+    Returns the Business ORM object on success, raises 403/404 otherwise.
     """
     tenant_id = await _get_user_tenant_id(user)
 
     result = await db.execute(
-        select(Property).where(
-            Property.id == property_id,
-            Property.tenant_id == tenant_id,
-            Property.deleted_at.is_(None),
+        select(Business).where(
+            Business.id == business_id,
+            Business.tenant_id == tenant_id,
+            Business.deleted_at.is_(None),
         )
     )
     prop = result.scalar_one_or_none()
     if not prop:
         raise HTTPException(
             status_code=404,
-            detail="Property not found or you do not have access to it.",
+            detail="Business not found or you do not have access to it.",
         )
     return prop
 
@@ -150,7 +150,7 @@ async def portal_home(
     user=Depends(get_current_user),
 ):
     """
-    Tenant portal home — summary card for all properties with weekly metrics.
+    Tenant portal home — summary card for all businesses with weekly metrics.
     """
     tenant_id = await _get_user_tenant_id(user)
 
@@ -162,24 +162,24 @@ async def portal_home(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found.")
 
-    # Load all active properties for this tenant
+    # Load all active businesses for this tenant
     props_result = await db.execute(
-        select(Property).where(
-            Property.tenant_id == tenant_id,
-            Property.deleted_at.is_(None),
-        ).order_by(Property.created_at)
+        select(Business).where(
+            Business.tenant_id == tenant_id,
+            Business.deleted_at.is_(None),
+        ).order_by(Business.created_at)
     )
-    properties = props_result.scalars().all()
+    businesses = props_result.scalars().all()
 
-    # For each property compute 7-day analytics
+    # For each business compute 7-day analytics
     seven_days_ago = (datetime.now(timezone.utc) - timedelta(days=7)).date()
 
     property_summaries = []
-    for prop in properties:
+    for prop in businesses:
         # Load last 7 days of AnalyticsDaily
         analytics_result = await db.execute(
             select(AnalyticsDaily).where(
-                AnalyticsDaily.property_id == prop.id,
+                AnalyticsDaily.business_id == prop.id,
                 AnalyticsDaily.report_date >= seven_days_ago,
             )
         )
@@ -194,7 +194,7 @@ async def portal_home(
         # Load OnboardingProgress
         progress_result = await db.execute(
             select(OnboardingProgress).where(
-                OnboardingProgress.property_id == prop.id
+                OnboardingProgress.business_id == prop.id
             )
         )
         progress = progress_result.scalar_one_or_none()
@@ -226,7 +226,7 @@ async def portal_home(
             "subscription_status": tenant.subscription_status,
             "pilot_end_date": tenant.pilot_end_date.isoformat() if tenant.pilot_end_date else None,
         },
-        "properties": property_summaries,
+        "businesses": property_summaries,
     }
 
 
@@ -340,36 +340,36 @@ async def portal_channels(
     user=Depends(get_current_user),
 ):
     """
-    Channel setup status for all properties in the user's tenant.
-    Includes the embeddable widget code for each property.
+    Channel setup status for all businesses in the user's tenant.
+    Includes the embeddable widget code for each business.
     """
     tenant_id = await _get_user_tenant_id(user)
 
     props_result = await db.execute(
-        select(Property).where(
-            Property.tenant_id == tenant_id,
-            Property.deleted_at.is_(None),
-        ).order_by(Property.created_at)
+        select(Business).where(
+            Business.tenant_id == tenant_id,
+            Business.deleted_at.is_(None),
+        ).order_by(Business.created_at)
     )
-    properties = props_result.scalars().all()
+    businesses = props_result.scalars().all()
 
     summaries = []
-    for prop in properties:
+    for prop in businesses:
         progress_result = await db.execute(
             select(OnboardingProgress).where(
-                OnboardingProgress.property_id == prop.id
+                OnboardingProgress.business_id == prop.id
             )
         )
         progress = progress_result.scalar_one_or_none()
 
         widget_embed_code = (
             f'<script src="https://ai.sheerssoft.com/widget.js" '
-            f'data-property="{prop.slug}"></script>'
+            f'data-business="{prop.slug}"></script>'
         )
 
         summaries.append({
-            "property_id": str(prop.id),
-            "property_name": prop.name,
+            "business_id": str(prop.id),
+            "business_name": prop.name,
             "whatsapp_status": progress.whatsapp_status if progress else "pending",
             "email_status": progress.email_status if progress else "pending",
             "website_status": progress.website_status if progress else "pending",
@@ -384,20 +384,20 @@ async def portal_channels(
 # Knowledge Base
 # ─────────────────────────────────────────────────────────────
 
-@router.get("/properties/{property_id}/kb")
+@router.get("/businesses/{business_id}/kb")
 async def list_kb_documents(
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     """
-    List all KB documents for a property, ordered by doc_type then title.
+    List all KB documents for a business, ordered by doc_type then title.
     """
-    await _verify_property_access(db, property_id, user)
+    await _verify_property_access(db, business_id, user)
 
     result = await db.execute(
         select(KBDocument)
-        .where(KBDocument.property_id == property_id)
+        .where(KBDocument.business_id == business_id)
         .order_by(KBDocument.doc_type, KBDocument.title)
     )
     docs = result.scalars().all()
@@ -415,24 +415,24 @@ async def list_kb_documents(
     ]
 
 
-@router.post("/properties/{property_id}/kb", status_code=201)
+@router.post("/businesses/{business_id}/kb", status_code=201)
 async def create_kb_document(
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     body: KBCreateRequest,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     """
-    Create a new KB document for a property and generate its embedding.
+    Create a new KB document for a business and generate its embedding.
     Sets OnboardingProgress.kb_populated = True on first document.
     """
-    await _verify_property_access(db, property_id, user)
+    await _verify_property_access(db, business_id, user)
 
     # Generate embedding
     embedding = await generate_embedding(body.content)
 
     doc = KBDocument(
-        property_id=property_id,
+        business_id=business_id,
         doc_type=body.doc_type,
         title=body.title,
         content=body.content,
@@ -444,18 +444,18 @@ async def create_kb_document(
     # Set kb_populated flag on first document
     progress_result = await db.execute(
         select(OnboardingProgress).where(
-            OnboardingProgress.property_id == property_id
+            OnboardingProgress.business_id == business_id
         )
     )
     progress = progress_result.scalar_one_or_none()
     if progress and not progress.kb_populated:
         progress.kb_populated = True
-        logger.info("KB populated milestone set", property_id=str(property_id))
+        logger.info("KB populated milestone set", business_id=str(business_id))
 
     await db.commit()
     await db.refresh(doc)
 
-    logger.info("KB document created", doc_id=str(doc.id), property_id=str(property_id))
+    logger.info("KB document created", doc_id=str(doc.id), business_id=str(business_id))
 
     return {
         "id": str(doc.id),
@@ -466,9 +466,9 @@ async def create_kb_document(
     }
 
 
-@router.put("/properties/{property_id}/kb/{doc_id}")
+@router.put("/businesses/{business_id}/kb/{doc_id}")
 async def update_kb_document(
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     doc_id: uuid.UUID,
     body: KBUpdateRequest,
     db: AsyncSession = Depends(get_db),
@@ -477,12 +477,12 @@ async def update_kb_document(
     """
     Update a KB document. Regenerates the embedding if content changed.
     """
-    await _verify_property_access(db, property_id, user)
+    await _verify_property_access(db, business_id, user)
 
     result = await db.execute(
         select(KBDocument).where(
             KBDocument.id == doc_id,
-            KBDocument.property_id == property_id,
+            KBDocument.business_id == business_id,
         )
     )
     doc = result.scalar_one_or_none()
@@ -509,9 +509,9 @@ async def update_kb_document(
     }
 
 
-@router.delete("/properties/{property_id}/kb/{doc_id}")
+@router.delete("/businesses/{business_id}/kb/{doc_id}")
 async def delete_kb_document(
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     doc_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
@@ -519,12 +519,12 @@ async def delete_kb_document(
     """
     Hard-delete a KB document.
     """
-    await _verify_property_access(db, property_id, user)
+    await _verify_property_access(db, business_id, user)
 
     result = await db.execute(
         select(KBDocument).where(
             KBDocument.id == doc_id,
-            KBDocument.property_id == property_id,
+            KBDocument.business_id == business_id,
         )
     )
     doc = result.scalar_one_or_none()
@@ -534,24 +534,24 @@ async def delete_kb_document(
     await db.delete(doc)
     await db.commit()
 
-    logger.info("KB document deleted", doc_id=str(doc_id), property_id=str(property_id))
+    logger.info("KB document deleted", doc_id=str(doc_id), business_id=str(business_id))
     return {"message": "Document deleted"}
 
 
-@router.post("/properties/{property_id}/kb/ingest-wizard", status_code=201)
+@router.post("/businesses/{business_id}/kb/ingest-wizard", status_code=201)
 async def ingest_kb_wizard(
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     body: KBIngestWizardRequest,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     """
-    Bulk-ingest structured property info as KB documents.
+    Bulk-ingest structured business info as KB documents.
     Creates separate documents for rooms, facilities, FAQs, policies, and contact.
     Embeddings are generated in parallel (batched to max 10 at a time).
     Sets OnboardingProgress.kb_populated = True.
     """
-    await _verify_property_access(db, property_id, user)
+    await _verify_property_access(db, business_id, user)
 
     # Build (doc_type, title, content) tuples from wizard data
     docs_to_create: list[tuple[str, str, str]] = []
@@ -566,7 +566,7 @@ async def ingest_kb_wizard(
     # Facilities
     if body.facilities:
         content = "\n".join(f"- {f}" for f in body.facilities)
-        docs_to_create.append(("facilities", f"{body.property_name} Facilities", content))
+        docs_to_create.append(("facilities", f"{body.business_name} Facilities", content))
 
     # FAQs
     for faq in body.faqs:
@@ -613,7 +613,7 @@ async def ingest_kb_wizard(
     # Persist all documents
     for (doc_type, title, content), embedding in zip(docs_to_create, embeddings):
         doc = KBDocument(
-            property_id=property_id,
+            business_id=business_id,
             doc_type=doc_type,
             title=title,
             content=content,
@@ -624,7 +624,7 @@ async def ingest_kb_wizard(
     # Set kb_populated flag
     progress_result = await db.execute(
         select(OnboardingProgress).where(
-            OnboardingProgress.property_id == property_id
+            OnboardingProgress.business_id == business_id
         )
     )
     progress = progress_result.scalar_one_or_none()
@@ -635,7 +635,7 @@ async def ingest_kb_wizard(
 
     logger.info(
         "KB wizard ingest complete",
-        property_id=str(property_id),
+        business_id=str(business_id),
         docs_created=len(docs_to_create),
     )
     return {
@@ -648,24 +648,24 @@ async def ingest_kb_wizard(
 # Onboarding Completion
 # ─────────────────────────────────────────────────────────────
 
-@router.post("/onboarding/complete/{property_id}")
+@router.post("/onboarding/complete/{business_id}")
 async def complete_onboarding(
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     """
-    Mark a property as active (onboarding complete).
+    Mark a business as active (onboarding complete).
     Verifies tenant ownership before activating.
     """
-    prop = await _verify_property_access(db, property_id, user)
+    prop = await _verify_property_access(db, business_id, user)
 
     prop.is_active = True
     await db.commit()
 
-    logger.info("Property activated via onboarding complete", property_id=str(property_id))
+    logger.info("Business activated via onboarding complete", business_id=str(business_id))
     return {
-        "property_id": str(property_id),
+        "business_id": str(business_id),
         "activated": True,
-        "message": "Property is now live!",
+        "message": "Business is now live!",
     }

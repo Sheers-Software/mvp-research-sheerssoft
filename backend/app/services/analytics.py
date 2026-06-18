@@ -12,7 +12,7 @@ from sqlalchemy import select, func, case, and_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
-    Property,
+    Business,
     Conversation,
     Message,
     Lead,
@@ -22,11 +22,11 @@ from app.models import (
 
 async def compute_daily_analytics(
     db: AsyncSession,
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     report_date: date,
 ) -> AnalyticsDaily:
     """
-    Compute analytics for a single property for a single day.
+    Compute analytics for a single business for a single day.
     Uses raw conversation and lead data to build aggregates.
 
     This is called by the daily cron job and can also be called
@@ -43,7 +43,7 @@ async def compute_daily_analytics(
     # 1. Total inquiries (conversations started on this day)
     total_result = await db.execute(
         select(func.count(Conversation.id)).where(
-            Conversation.property_id == property_id,
+            Conversation.business_id == business_id,
             Conversation.started_at >= day_start,
             Conversation.started_at < day_end,
         )
@@ -53,7 +53,7 @@ async def compute_daily_analytics(
     # 2. After-hours inquiries
     after_hours_result = await db.execute(
         select(func.count(Conversation.id)).where(
-            Conversation.property_id == property_id,
+            Conversation.business_id == business_id,
             Conversation.started_at >= day_start,
             Conversation.started_at < day_end,
             Conversation.is_after_hours == True,
@@ -64,7 +64,7 @@ async def compute_daily_analytics(
     # 3. After-hours responded (conversations that have at least one AI message)
     after_hours_responded_result = await db.execute(
         select(func.count(Conversation.id.distinct())).where(
-            Conversation.property_id == property_id,
+            Conversation.business_id == business_id,
             Conversation.started_at >= day_start,
             Conversation.started_at < day_end,
             Conversation.is_after_hours == True,
@@ -78,7 +78,7 @@ async def compute_daily_analytics(
     # 4. Leads captured
     leads_result = await db.execute(
         select(func.count(Lead.id)).where(
-            Lead.property_id == property_id,
+            Lead.business_id == business_id,
             Lead.captured_at >= day_start,
             Lead.captured_at < day_end,
         )
@@ -88,7 +88,7 @@ async def compute_daily_analytics(
     # 5. Handoffs
     handoffs_result = await db.execute(
         select(func.count(Conversation.id)).where(
-            Conversation.property_id == property_id,
+            Conversation.business_id == business_id,
             Conversation.started_at >= day_start,
             Conversation.started_at < day_end,
             Conversation.status == "handed_off",
@@ -102,7 +102,7 @@ async def compute_daily_analytics(
         select(Message.metadata_["response_time_ms"]).where(
             Message.conversation_id.in_(
                 select(Conversation.id).where(
-                    Conversation.property_id == property_id,
+                    Conversation.business_id == business_id,
                     Conversation.started_at >= day_start,
                     Conversation.started_at < day_end,
                 )
@@ -129,7 +129,7 @@ async def compute_daily_analytics(
             func.count(Conversation.id),
         )
         .where(
-            Conversation.property_id == property_id,
+            Conversation.business_id == business_id,
             Conversation.started_at >= day_start,
             Conversation.started_at < day_end,
         )
@@ -146,16 +146,16 @@ async def compute_daily_analytics(
     }
 
     # 8. Estimated revenue recovered
-    # Logic: Sum of (Lead.estimated_value OR Property.ADR) for all after-hours leads
+    # Logic: Sum of (Lead.estimated_value OR Business.ADR) for all after-hours leads
     prop_result = await db.execute(
-        select(Property.adr).where(Property.id == property_id)
+        select(Business.id).where(Business.id == business_id)
     )
-    adr = prop_result.scalar() or Decimal("230")
+    adr = Decimal("0")
 
     # Fetch after-hours leads with their values
     leads_revenue_result = await db.execute(
         select(Lead.estimated_value).where(
-            Lead.property_id == property_id,
+            Lead.business_id == business_id,
             Lead.captured_at >= day_start,
             Lead.captured_at < day_end,
             Lead.conversation_id.in_(
@@ -172,14 +172,14 @@ async def compute_daily_analytics(
         if val is not None:
             total_revenue += val
         else:
-            total_revenue += adr
+            pass
 
     estimated_revenue = total_revenue * Decimal("0.20") # Apply default conversion rate 20%
 
     # Actual revenue recovered (only from converted leads)
     leads_actual_result = await db.execute(
         select(func.sum(Lead.actual_revenue)).where(
-            Lead.property_id == property_id,
+            Lead.business_id == business_id,
             Lead.captured_at >= day_start,
             Lead.captured_at < day_end,
             Lead.status == "converted"
@@ -191,9 +191,9 @@ async def compute_daily_analytics(
     inquiries_handled_manually = handoffs
     inquiries_handled_by_ai = total_inquiries - inquiries_handled_manually
 
-    # Calculate cost savings -> (0.25 hours saved per AI inquiry) * property.hourly_rate
+    # Calculate cost savings -> (0.25 hours saved per AI inquiry) * business.hourly_rate
     prop_result2 = await db.execute(
-        select(Property.hourly_rate).where(Property.id == property_id)
+        select(Business.hourly_rate).where(Business.id == business_id)
     )
     hourly_rate = prop_result2.scalar() or Decimal("25.00")
     hours_saved = Decimal(str(inquiries_handled_by_ai)) * Decimal("0.25")
@@ -202,7 +202,7 @@ async def compute_daily_analytics(
     # 9. Upsert analytics record
     existing = await db.execute(
         select(AnalyticsDaily).where(
-            AnalyticsDaily.property_id == property_id,
+            AnalyticsDaily.business_id == business_id,
             AnalyticsDaily.report_date == report_date,
         )
     )
@@ -223,7 +223,7 @@ async def compute_daily_analytics(
         record.channel_breakdown = channel_breakdown
     else:
         record = AnalyticsDaily(
-            property_id=property_id,
+            business_id=business_id,
             report_date=report_date,
             total_inquiries=total_inquiries,
             after_hours_inquiries=after_hours_inquiries,
@@ -249,13 +249,13 @@ async def compute_all_properties_daily(
     report_date: date | None = None,
 ):
     """
-    Compute daily analytics for all properties.
+    Compute daily analytics for all businesses.
     Called by the daily cron job.
     """
     if report_date is None:
         report_date = date.today() - timedelta(days=1)  # Yesterday
 
-    result = await db.execute(select(Property.id))
+    result = await db.execute(select(Business.id))
     property_ids = [row[0] for row in result.fetchall()]
 
     records = []
@@ -267,22 +267,22 @@ async def compute_all_properties_daily(
 
 async def get_realtime_stats(
     db: AsyncSession,
-    property_id: uuid.UUID
+    business_id: uuid.UUID
 ) -> dict:
     """
     Get real-time statistics for the current day (since midnight).
     Used for the live dashboard view.
     """
     now = datetime.now(timezone.utc)
-    # Get start of day in property's timezone (using UTC for MVP simplicity, ideally property-aware)
-    # TODO: Use property timezone
+    # Get start of day in business's timezone (using UTC for MVP simplicity, ideally business-aware)
+    # TODO: Use business timezone
     today_start = datetime.combine(datetime.now(timezone.utc).date(), datetime.min.time()).replace(tzinfo=timezone.utc)
     
     # Reuse logic from compute_daily_analytics but don't save to DB
     # 1. Total inquiries
     total_result = await db.execute(
         select(func.count(Conversation.id)).where(
-            Conversation.property_id == property_id,
+            Conversation.business_id == business_id,
             Conversation.started_at >= today_start,
         )
     )
@@ -291,7 +291,7 @@ async def get_realtime_stats(
     # 2. After-hours inquiries
     after_hours_result = await db.execute(
         select(func.count(Conversation.id)).where(
-            Conversation.property_id == property_id,
+            Conversation.business_id == business_id,
             Conversation.started_at >= today_start,
             Conversation.is_after_hours == True,
         )
@@ -301,7 +301,7 @@ async def get_realtime_stats(
     # 3. After-hours responded
     after_hours_responded_result = await db.execute(
         select(func.count(Conversation.id.distinct())).where(
-            Conversation.property_id == property_id,
+            Conversation.business_id == business_id,
             Conversation.started_at >= today_start,
             Conversation.is_after_hours == True,
             Conversation.id.in_(
@@ -314,23 +314,23 @@ async def get_realtime_stats(
     # 4. Leads captured
     leads_result = await db.execute(
         select(func.count(Lead.id)).where(
-            Lead.property_id == property_id,
+            Lead.business_id == business_id,
             Lead.captured_at >= today_start,
         )
     )
     leads_captured = leads_result.scalar() or 0
     
     # 5. Estimated Revenue
-    # Get property ADR
+    # Get business ADR
     prop_result = await db.execute(
-        select(Property.adr).where(Property.id == property_id)
+        select(Business.id).where(Business.id == business_id)
     )
-    adr = prop_result.scalar() or Decimal("230")
+    adr = Decimal("0")
     
     # Sum after-hours leads value
     leads_revenue_result = await db.execute(
         select(Lead.estimated_value).where(
-            Lead.property_id == property_id,
+            Lead.business_id == business_id,
             Lead.captured_at >= today_start,
             Lead.conversation_id.in_(
                 select(Conversation.id).where(Conversation.is_after_hours == True)
@@ -344,14 +344,14 @@ async def get_realtime_stats(
         if val is not None:
             total_revenue += val
         else:
-            total_revenue += adr
+            pass
 
     estimated_revenue = float(total_revenue * Decimal("0.20"))
     
     # Actual revenue (converted leads today)
     leads_actual_result = await db.execute(
         select(func.sum(Lead.actual_revenue)).where(
-            Lead.property_id == property_id,
+            Lead.business_id == business_id,
             Lead.captured_at >= today_start,
             Lead.status == "converted"
         )
@@ -363,7 +363,7 @@ async def get_realtime_stats(
         select(Message.metadata_["response_time_ms"]).where(
             Message.conversation_id.in_(
                 select(Conversation.id).where(
-                    Conversation.property_id == property_id,
+                    Conversation.business_id == business_id,
                     Conversation.started_at >= today_start,
                 )
             ),
@@ -384,7 +384,7 @@ async def get_realtime_stats(
     status_result = await db.execute(
         select(Conversation.status, func.count(Conversation.id))
         .where(
-            Conversation.property_id == property_id,
+            Conversation.business_id == business_id,
             Conversation.started_at >= today_start,
         )
         .group_by(Conversation.status)
@@ -397,7 +397,7 @@ async def get_realtime_stats(
     inquiries_handled_by_ai = total_inquiries - inquiries_handled_manually
 
     prop_result2 = await db.execute(
-        select(Property.hourly_rate).where(Property.id == property_id)
+        select(Business.hourly_rate).where(Business.id == business_id)
     )
     hourly_rate = prop_result2.scalar() or Decimal("25.00")
     cost_savings = float(Decimal(str(inquiries_handled_by_ai)) * Decimal("0.25") * hourly_rate)

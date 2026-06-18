@@ -5,8 +5,8 @@ import { apiGet } from '@/lib/api';
 import Link from 'next/link';
 
 interface LiveStats {
-    property_id: string;
-    property_name: string;
+    business_id: string;
+    business_name: string;
     report_date: string;
     total_inquiries: number;
     after_hours_inquiries: number;
@@ -34,7 +34,7 @@ interface PeriodTotals {
 }
 
 interface AnalyticsData {
-    property_id: string;
+    business_id: string;
     period: { from: string; to: string };
     totals: PeriodTotals;
 }
@@ -63,7 +63,7 @@ export default function DashboardPage() {
     const [live, setLive] = useState<LiveStats | null>(null);
     const [period, setPeriod] = useState<AnalyticsData | null>(null);
     const [loading, setLoading] = useState(true);
-    const [noProperty, setNoProperty] = useState(false);
+    const [noBusiness, setNoBusiness] = useState(false);
 
     useEffect(() => {
         apiGet<LiveStats>('/analytics/dashboard')
@@ -72,12 +72,12 @@ export default function DashboardPage() {
                 const to = new Date().toISOString().split('T')[0];
                 const from = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
                 return apiGet<AnalyticsData>(
-                    `/properties/${data.property_id}/analytics?from_date=${from}&to_date=${to}`
+                    `/businesses/${data.business_id}/analytics?from_date=${from}&to_date=${to}`
                 );
             })
             .then(setPeriod)
             .catch((err) => {
-                if (err?.status === 404) setNoProperty(true);
+                if (err?.status === 404) setNoBusiness(true);
             })
             .finally(() => setLoading(false));
     }, []);
@@ -90,13 +90,13 @@ export default function DashboardPage() {
         );
     }
 
-    if (noProperty || !live) {
+    if (noBusiness || !live) {
         return (
             <div className="empty-state" style={{ marginTop: 80 }}>
                 <div className="empty-icon" style={{ fontSize: 32, opacity: 0.4 }}>◎</div>
-                <p style={{ color: 'var(--text2)', fontSize: 14, marginTop: 8 }}>No property configured yet.</p>
+                <p style={{ color: 'var(--text2)', fontSize: 14, marginTop: 8 }}>No business configured yet.</p>
                 <p className="text-sm" style={{ marginTop: 6, color: 'var(--text3)' }}>
-                    Your account manager is setting up your property. You&apos;ll see live data here once your AI concierge goes live.
+                    Your account manager is setting up your business. You&apos;ll see live data here once your AI concierge goes live.
                 </p>
             </div>
         );
@@ -118,7 +118,7 @@ export default function DashboardPage() {
             {/* Header */}
             <div className="page-header">
                 <div>
-                    <h1>{live.property_name}</h1>
+                    <h1>{live.business_name}</h1>
                     <p className="text-sm" style={{ marginTop: 4, color: 'var(--text3)' }}>
                         Today · {today}
                     </p>
@@ -192,7 +192,7 @@ export default function DashboardPage() {
                     <div style={{ fontSize: 28, marginBottom: 14, color: 'var(--text3)' }}>◎</div>
                     <h3 style={{ marginBottom: 8, color: 'var(--text2)', fontWeight: 500 }}>AI concierge is live and listening</h3>
                     <p style={{ fontSize: 13, color: 'var(--text3)' }}>
-                        No inquiries yet today. When guests message on WhatsApp or your web widget, their conversations and leads will appear here in real time.
+                        No inquiries yet today. When customers message on WhatsApp or your web widget, their conversations and leads will appear here in real time.
                     </p>
                 </div>
             )}
@@ -247,7 +247,7 @@ export default function DashboardPage() {
                         <p className="text-sm" style={{ color: 'var(--text3)' }}>
                             {live.active_conversations > 0
                                 ? `${live.active_conversations} active · ${live.handed_off_conversations} need attention`
-                                : 'View all guest conversations'}
+                                : 'View all customer conversations'}
                         </p>
                     </div>
                 </Link>
@@ -275,7 +275,7 @@ export default function DashboardPage() {
 
             {/* Revenue formula transparency */}
             <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 20, textAlign: 'center' }}>
-                Revenue estimated as: leads captured × property ADR × 20% conversion rate.{' '}
+                Revenue estimated as: leads captured × business ADR × 20% conversion rate.{' '}
                 <Link href="/dashboard/analytics" style={{ color: 'var(--teal)', textDecoration: 'none' }}>
                     See full breakdown →
                 </Link>

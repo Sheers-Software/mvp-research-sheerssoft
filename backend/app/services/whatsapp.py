@@ -162,11 +162,11 @@ def normalize_whatsapp_message(payload: dict) -> dict:
         if contacts:
             guest_name = contacts[0].get("profile", {}).get("name")
 
-        # Get both phone number identifiers for property lookup
+        # Get both phone number identifiers for business lookup
         meta = value.get("metadata", {})
         phone_number_id = meta.get("phone_number_id")
         # display_phone_number is the human-readable number (e.g. +15557220306)
-        # and is the value stored in Property.whatsapp_number
+        # and is the value stored in Business.whatsapp_number
         display_phone_number = meta.get("display_phone_number")
 
         if not from_number:

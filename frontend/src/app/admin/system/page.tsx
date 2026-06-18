@@ -19,7 +19,7 @@ interface MaintenanceConfig {
 const JOB_LABELS: Record<keyof SchedulerJobs, { label: string; description: string; icon: string }> = {
     daily_report: {
         label: 'Daily Report Email',
-        description: 'Sends the 7:30am intelligence report to each property\'s notification email.',
+        description: 'Sends the 7:30am intelligence report to each business\'s notification email.',
         icon: '📧',
     },
     followups: {

@@ -1,6 +1,6 @@
 """
 Daily Report generation and scheduling.
-Handles generating the email body and sending it to property stakeholders.
+Handles generating the email body and sending it to business stakeholders.
 """
 
 import asyncio
@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import async_session
-from app.models import Property, AnalyticsDaily, Lead, Conversation, Message, OnboardingProgress
+from app.models import Business, AnalyticsDaily, Lead, Conversation, Message, OnboardingProgress
 from app.services.analytics import compute_all_properties_daily, compute_daily_analytics
 from app.services.email import send_email
 
@@ -29,7 +29,7 @@ scheduler = AsyncIOScheduler()
 
 async def _get_queued_leads(
     db: AsyncSession,
-    property_id,
+    business_id,
     report_date: date,
     limit: int = 5,
 ) -> list[dict]:
@@ -40,7 +40,7 @@ async def _get_queued_leads(
     result = await db.execute(
         select(Lead)
         .where(
-            Lead.property_id == property_id,
+            Lead.business_id == business_id,
             Lead.captured_at >= day_start,
             Lead.captured_at < day_end,
             Lead.status.in_(["new", "contacted"]),
@@ -79,7 +79,7 @@ async def _get_queued_leads(
 
 async def _compute_daily_sentiment(
     db: AsyncSession,
-    property_id,
+    business_id,
     report_date: date,
 ) -> tuple[int, str]:
     """
@@ -92,7 +92,7 @@ async def _compute_daily_sentiment(
 
     conv_result = await db.execute(
         select(Conversation.id, Conversation.status).where(
-            Conversation.property_id == property_id,
+            Conversation.business_id == business_id,
             Conversation.started_at >= day_start,
             Conversation.started_at < day_end,
         )
@@ -161,7 +161,7 @@ async def _compute_daily_sentiment(
 
 
 def _format_daily_report_email(
-    prop: Property,
+    prop: Business,
     stats: AnalyticsDaily,
     queued_leads: list[dict],
     sentiment_score: int,
@@ -349,7 +349,7 @@ def _format_daily_report_email(
 
 async def run_daily_reports(report_date: date | None = None):
     """
-    Cron job: Generate and send the Daily GM Report for all active properties.
+    Cron job: Generate and send the Daily GM Report for all active businesses.
     Sent each morning at 9:00 AM MYT covering the previous day's activity.
     Includes: revenue recovered, OTA fees saved, inquiries handled, guest sentiment,
     queued leads table, and a Gemini-generated sentiment summary.
@@ -367,11 +367,11 @@ async def run_daily_reports(report_date: date | None = None):
     logger.info("Starting daily GM report generation", report_date=report_date)
 
     async with async_session() as db:
-        # Compute analytics for all properties
+        # Compute analytics for all businesses
         analytics_records = await compute_all_properties_daily(db, report_date)
 
         for stats in analytics_records:
-            res = await db.execute(select(Property).where(Property.id == stats.property_id))
+            res = await db.execute(select(Business).where(Business.id == stats.business_id))
             prop = res.scalar_one_or_none()
             if prop is None or not prop.is_active or prop.deleted_at is not None:
                 continue
@@ -389,7 +389,7 @@ async def run_daily_reports(report_date: date | None = None):
 
             recipient = prop.notification_email or settings.staff_notification_email
             if not recipient:
-                logger.warning("daily_report: no recipient configured", property_id=str(prop.id))
+                logger.warning("daily_report: no recipient configured", business_id=str(prop.id))
                 continue
 
             await send_email(
@@ -403,7 +403,7 @@ async def run_daily_reports(report_date: date | None = None):
             try:
                 op_res = await db.execute(
                     select(OnboardingProgress).where(
-                        OnboardingProgress.property_id == prop.id,
+                        OnboardingProgress.business_id == prop.id,
                         OnboardingProgress.first_morning_report_sent.is_(False),
                     )
                 )
@@ -416,7 +416,7 @@ async def run_daily_reports(report_date: date | None = None):
 
             logger.info(
                 "Daily GM report sent",
-                property=prop.name,
+                business=prop.name,
                 recipient=recipient,
                 leads_in_queue=len(queued_leads),
                 sentiment_score=sentiment_score,
@@ -470,7 +470,7 @@ async def process_automated_follow_ups(db: AsyncSession = None):
     Hourly job: Check for active conversations that need 24h/72h/7d follow-ups.
     """
     from app.database import async_session, set_db_context
-    from app.models import Conversation, Property
+    from app.models import Conversation, Business
     from app.services.conversation import process_guest_message
     from app.services.whatsapp import send_whatsapp_message
     from app.services.twilio_whatsapp import send_twilio_message
@@ -490,8 +490,8 @@ async def process_automated_follow_ups(db: AsyncSession = None):
 
             # Fetch all active conversations that haven't exhausted follow-ups
             result = await session.execute(
-                select(Conversation, Property)
-                .join(Property, Conversation.property_id == Property.id)
+                select(Conversation, Business)
+                .join(Business, Conversation.business_id == Business.id)
                 .where(
                     Conversation.status == "active",
                     Conversation.follow_up_stage < 3
@@ -524,7 +524,7 @@ async def process_automated_follow_ups(db: AsyncSession = None):
                         # Process system triggered follow up
                         response = await process_guest_message(
                             db=session,
-                            property_id=prop.id,
+                            business_id=prop.id,
                             guest_identifier=conv.guest_identifier,
                             channel=conv.channel,
                             message_text="",  # System triggered
@@ -572,7 +572,7 @@ async def generate_monthly_insights(db: AsyncSession = None):
     Monthly job (1st of month): generate guest insight reports.
     """
     from app.database import async_session, set_db_context
-    from app.models import Property
+    from app.models import Business
     from app.services.system_config import is_job_enabled as _is_job_enabled
 
     async with async_session() as _db:
@@ -585,11 +585,11 @@ async def generate_monthly_insights(db: AsyncSession = None):
     logger.info("Running monthly insights job")
     async with async_session() as session:
         try:
-            # Get all properties
-            result = await session.execute(select(Property))
-            properties = result.scalars().all()
+            # Get all businesses
+            result = await session.execute(select(Business))
+            businesses = result.scalars().all()
 
-            for prop in properties:
+            for prop in businesses:
                 report_md = await compute_monthly_insights(session, prop.id, days_back=30)
                 if not report_md:
                     continue
@@ -614,16 +614,16 @@ async def generate_monthly_insights(db: AsyncSession = None):
                     content=html_body,
                     is_html=True
                 )
-                logger.info("Sent monthly insights report", property_id=str(prop.id))
+                logger.info("Sent monthly insights report", business_id=str(prop.id))
         except Exception as e:
             logger.error("Monthly insights job failed", error=str(e))
 
 
 async def run_weekly_audit_report():
     """
-    Weekly job (Monday 08:00 MYT) for shadow pilot properties.
+    Weekly job (Monday 08:00 MYT) for shadow pilot businesses.
 
-    For each property with audit_only_mode=True, counts after-hours inquiries
+    For each business with audit_only_mode=True, counts after-hours inquiries
     from the past 7 days and sends the GM a plain-language email:
     "Your hotel received X after-hours inquiries last week. Based on your ADR
     of RM Y, you left approximately RM Z on the table."
@@ -632,7 +632,7 @@ async def run_weekly_audit_report():
     the GM sees their own real data before we ask them to commit to Stage 3.
     """
     from sqlalchemy import select
-    from app.models import Property, Conversation
+    from app.models import Business, Conversation
     from app.database import async_session
 
     week_ago = datetime.now(timezone.utc) - timedelta(days=7)
@@ -640,16 +640,16 @@ async def run_weekly_audit_report():
     async with async_session() as db:
         try:
             result = await db.execute(
-                select(Property).where(
-                    Property.audit_only_mode.is_(True),
-                    Property.is_active.is_(True),
-                    Property.deleted_at.is_(None),
+                select(Business).where(
+                    Business.audit_only_mode.is_(True),
+                    Business.is_active.is_(True),
+                    Business.deleted_at.is_(None),
                 )
             )
             shadow_properties = result.scalars().all()
 
             if not shadow_properties:
-                logger.info("weekly_audit_report: no shadow pilot properties found")
+                logger.info("weekly_audit_report: no shadow pilot businesses found")
                 return
 
             for prop in shadow_properties:
@@ -657,7 +657,7 @@ async def run_weekly_audit_report():
                     # Count after-hours conversations in the past 7 days
                     conv_result = await db.execute(
                         select(func.count()).where(
-                            Conversation.property_id == prop.id,
+                            Conversation.business_id == prop.id,
                             Conversation.is_after_hours.is_(True),
                             Conversation.created_at >= week_ago,
                         )
@@ -667,7 +667,7 @@ async def run_weekly_audit_report():
                     # Count total conversations
                     total_result = await db.execute(
                         select(func.count()).where(
-                            Conversation.property_id == prop.id,
+                            Conversation.business_id == prop.id,
                             Conversation.created_at >= week_ago,
                         )
                     )
@@ -737,7 +737,7 @@ async def run_weekly_audit_report():
 
                     recipient = prop.notification_email or settings.staff_notification_email
                     if not recipient:
-                        logger.warning("weekly_audit_report: no recipient for property", property_id=str(prop.id))
+                        logger.warning("weekly_audit_report: no recipient for business", business_id=str(prop.id))
                         continue
 
                     await send_email(
@@ -748,16 +748,16 @@ async def run_weekly_audit_report():
                     )
                     logger.info(
                         "weekly_audit_report sent",
-                        property_id=str(prop.id),
-                        property_name=prop.name,
+                        business_id=str(prop.id),
+                        business_name=prop.name,
                         after_hours_count=after_hours_count,
                         revenue_estimate=revenue_estimate,
                     )
 
                 except Exception as e:
                     logger.error(
-                        "weekly_audit_report: failed for property",
-                        property_id=str(prop.id),
+                        "weekly_audit_report: failed for business",
+                        business_id=str(prop.id),
                         error=str(e),
                     )
 
@@ -838,7 +838,7 @@ async def start_scheduler():
         replace_existing=True
     )
 
-    # Schedule weekly audit report for shadow pilot properties (Monday 08:00 MYT)
+    # Schedule weekly audit report for shadow pilot businesses (Monday 08:00 MYT)
     scheduler.add_job(
         run_weekly_audit_report,
         trigger=CronTrigger(day_of_week="mon", hour=8, minute=0, timezone=settings.timezone),

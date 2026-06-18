@@ -127,7 +127,9 @@
       "Bash(cp /d/repos/mvp-research-sheerssoft/docs/updated_docs/prd.md /d/repos/mvp-research-sheerssoft/docs/prd.md)",
       "Bash(cp /d/repos/mvp-research-sheerssoft/docs/updated_docs/architecture.md /d/repos/mvp-research-sheerssoft/docs/architecture.md)",
       "Bash(cp /d/repos/mvp-research-sheerssoft/docs/updated_docs/build_plan.md /d/repos/mvp-research-sheerssoft/docs/build_plan.md)",
-      "Bash(cp /d/repos/mvp-research-sheerssoft/docs/updated_docs/shadow_pilot_spec.md /d/repos/mvp-research-sheerssoft/docs/shadow_pilot_spec.md)"
+      "Bash(cp /d/repos/mvp-research-sheerssoft/docs/updated_docs/shadow_pilot_spec.md /d/repos/mvp-research-sheerssoft/docs/shadow_pilot_spec.md)",
+      "Bash(dir D:\\\\repos\\\\mvp-research-sheerssoft)",
+      "PowerShell(git checkout -b refactor/investor-ready-vercel)"
     ]
   }
 }

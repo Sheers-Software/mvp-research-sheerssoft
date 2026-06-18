@@ -140,8 +140,8 @@ function Landing() {
           </div>
           <div className="grid grid-3" style={{ gap: 18 }}>
             {[
-              { p: 'staff' as DemoPersona, href: '/dashboard', icon: '📊', t: 'Property Staff', d: 'Live conversations, lead triage, and daily ROI — the operational cockpit for front-office teams.' },
-              { p: 'owner' as DemoPersona, href: '/portal', icon: '🏨', t: 'Hotel Owner', d: 'Configure the business: knowledge base, team, channels, billing, and multi-property analytics.' },
+              { p: 'staff' as DemoPersona, href: '/dashboard', icon: '📊', t: 'Business Staff', d: 'Live conversations, lead triage, and daily ROI — the operational cockpit for front-office teams.' },
+              { p: 'owner' as DemoPersona, href: '/portal', icon: '🏨', t: 'Solopreneur', d: 'Configure the business: knowledge base, team, channels, billing, and multi-business analytics.' },
               { p: 'superadmin' as DemoPersona, href: '/admin', icon: '🛠️', t: 'SheersSoft Admin', d: 'Platform operations: tenants, onboarding pipeline, support tickets, and system health.' },
             ].map((c) => (
               <div

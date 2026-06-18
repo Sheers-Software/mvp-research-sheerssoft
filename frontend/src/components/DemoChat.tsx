@@ -15,7 +15,7 @@ interface ChatMsg {
 
 export default function DemoChat() {
     const [messages, setMessages] = useState<ChatMsg[]>([
-        { role: 'assistant', content: 'Welcome to Lumière Suites 🌙 — try sending a message below to see the AI concierge in action.' },
+        { role: 'assistant', content: 'Welcome to Sarah Photography 🌙 — try sending a message below to see the AI concierge in action.' },
     ]);
     const [step, setStep] = useState(0);
     const [typing, setTyping] = useState(false);
@@ -38,7 +38,7 @@ export default function DemoChat() {
     };
 
     const reset = () => {
-        setMessages([{ role: 'assistant', content: 'Welcome to Lumière Suites 🌙 — try sending a message below to see the AI concierge in action.' }]);
+        setMessages([{ role: 'assistant', content: 'Welcome to Sarah Photography 🌙 — try sending a message below to see the AI concierge in action.' }]);
         setStep(0);
     };
 

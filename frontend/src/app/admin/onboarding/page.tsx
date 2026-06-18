@@ -23,7 +23,7 @@ export default function OnboardingNewPage() {
 
     const [form, setForm] = useState({
         tenant_name: '',
-        property_name: '',
+        business_name: '',
         owner_email: '',
         owner_name: '',
         owner_phone: '',
@@ -82,8 +82,8 @@ export default function OnboardingNewPage() {
                             <code style={{ fontSize: 12 }}>{result.tenant_id}</code>
                         </div>
                         <div className="flex justify-between" style={{ padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                            <span className="text-muted">Property ID</span>
-                            <code style={{ fontSize: 12 }}>{result.property_id}</code>
+                            <span className="text-muted">Business ID</span>
+                            <code style={{ fontSize: 12 }}>{result.business_id}</code>
                         </div>
                         <div className="flex justify-between" style={{ padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
                             <span className="text-muted">Magic Link</span>
@@ -100,7 +100,7 @@ export default function OnboardingNewPage() {
                     </div>
 
                     <div className="flex gap-md" style={{ marginTop: 24 }}>
-                        <button className="btn btn-primary" onClick={() => { setResult(null); setForm({ ...form, tenant_name: '', property_name: '', owner_email: '', owner_name: '', owner_phone: '' }); }}>
+                        <button className="btn btn-primary" onClick={() => { setResult(null); setForm({ ...form, tenant_name: '', business_name: '', owner_email: '', owner_name: '', owner_phone: '' }); }}>
                             ➕ Onboard Another
                         </button>
                         <a href="/admin/pipeline" className="btn btn-secondary">View Pipeline →</a>
@@ -115,21 +115,21 @@ export default function OnboardingNewPage() {
             <div style={{ marginBottom: 32 }}>
                 <h1>Onboard New Client</h1>
                 <p className="text-muted text-sm" style={{ marginTop: 4 }}>
-                    One-click tenant provisioning — creates account, property, user, and starts channel auto-setup.
+                    One-click tenant provisioning — creates account, business, user, and starts channel auto-setup.
                 </p>
             </div>
 
             <form onSubmit={handleSubmit} style={{ maxWidth: 680 }}>
                 <div className="card animate-in" style={{ marginBottom: 20 }}>
-                    <h3 style={{ marginBottom: 16 }}>🏨 Hotel Details</h3>
+                    <h3 style={{ marginBottom: 16 }}>🏨 Business Details</h3>
                     <div className="grid grid-2 gap-md">
                         <div className="input-group">
-                            <label>Hotel / Group Name *</label>
+                            <label>Business Name *</label>
                             <input className="input" required value={form.tenant_name} onChange={(e) => updateField('tenant_name', e.target.value)} placeholder="e.g. Vivatel Kuala Lumpur" />
                         </div>
                         <div className="input-group">
-                            <label>Property Name *</label>
-                            <input className="input" required value={form.property_name} onChange={(e) => updateField('property_name', e.target.value)} placeholder="e.g. Vivatel KL City Centre" />
+                            <label>Business Name *</label>
+                            <input className="input" required value={form.business_name} onChange={(e) => updateField('business_name', e.target.value)} placeholder="e.g. Vivatel KL City Centre" />
                         </div>
                     </div>
                 </div>
@@ -143,7 +143,7 @@ export default function OnboardingNewPage() {
                         </div>
                         <div className="input-group">
                             <label>Email *</label>
-                            <input className="input" required type="email" value={form.owner_email} onChange={(e) => updateField('owner_email', e.target.value)} placeholder="gm@hotel.com" />
+                            <input className="input" required type="email" value={form.owner_email} onChange={(e) => updateField('owner_email', e.target.value)} placeholder="owner@business.com" />
                         </div>
                         <div className="input-group">
                             <label>Phone (WhatsApp)</label>
@@ -208,14 +208,14 @@ export default function OnboardingNewPage() {
                     {form.preferred_channels.includes('email') && (
                         <div className="input-group" style={{ marginTop: 12 }}>
                             <label>Reservation Email (to forward)</label>
-                            <input className="input" type="email" value={form.reservation_email} onChange={(e) => updateField('reservation_email', e.target.value)} placeholder="reservations@hotel.com" />
+                            <input className="input" type="email" value={form.reservation_email} onChange={(e) => updateField('reservation_email', e.target.value)} placeholder="hello@business.com" />
                         </div>
                     )}
 
                     {form.preferred_channels.includes('website') && (
                         <div className="input-group" style={{ marginTop: 12 }}>
-                            <label>Hotel Website URL</label>
-                            <input className="input" value={form.website_url} onChange={(e) => updateField('website_url', e.target.value)} placeholder="https://www.hotel.com" />
+                            <label>Business Website URL</label>
+                            <input className="input" value={form.website_url} onChange={(e) => updateField('website_url', e.target.value)} placeholder="https://www.yourbusiness.com" />
                         </div>
                     )}
                 </div>

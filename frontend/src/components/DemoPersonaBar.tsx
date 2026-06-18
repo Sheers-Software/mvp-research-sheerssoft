@@ -11,8 +11,8 @@ import { getPersona, setPersona, type DemoPersona } from '@/lib/demo/data';
  * re-reads the seeded user for that plane.
  */
 const PLANES: { persona: DemoPersona; label: string; href: string }[] = [
-    { persona: 'staff', label: 'Property Staff', href: '/dashboard' },
-    { persona: 'owner', label: 'Hotel Owner', href: '/portal' },
+    { persona: 'staff', label: 'Business Staff', href: '/dashboard' },
+    { persona: 'owner', label: 'Solopreneur', href: '/portal' },
     { persona: 'superadmin', label: 'SheersSoft Admin', href: '/admin' },
 ];
 

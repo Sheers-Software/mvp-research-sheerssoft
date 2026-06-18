@@ -64,7 +64,7 @@ export default function LoginPage() {
             <div className="login-card">
                 <div className="login-logo">
                     <h1>Nocturn AI</h1>
-                    <p>Hotel Concierge Intelligence</p>
+                    <p>AI Concierge for Solopreneurs</p>
                 </div>
 
                 {sent ? (
@@ -91,7 +91,7 @@ export default function LoginPage() {
                                         id="email"
                                         type="email"
                                         className="input"
-                                        placeholder="you@yourhotel.com"
+                                        placeholder="you@yourbusiness.com"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
                                         required

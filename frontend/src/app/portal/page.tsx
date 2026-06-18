@@ -29,7 +29,7 @@ function ChannelDot({ status }: { status: string }) {
 
 export default function PortalHomePage() {
     const { user } = useAuth();
-    const { tenantName, tenantTier, properties, loading } = useTenant();
+    const { tenantName, tenantTier, businesses, loading } = useTenant();
 
     if (loading) {
         return (
@@ -39,7 +39,7 @@ export default function PortalHomePage() {
         );
     }
 
-    const incompleteProperties = properties.filter((p) => p.onboarding_score < 100);
+    const incompleteBusinesses = businesses.filter((p) => p.onboarding_score < 100);
 
     return (
         <div>
@@ -57,14 +57,14 @@ export default function PortalHomePage() {
                     </p>
                 </div>
                 {(user?.role === 'owner' || user?.role === 'admin') && (
-                    <Link href="/portal/properties" className="btn btn-primary btn-sm">
-                        + Add Property
+                    <Link href="/portal/businesses" className="btn btn-primary btn-sm">
+                        + Add Business
                     </Link>
                 )}
             </div>
 
-            {/* Onboarding checklist if any property is incomplete */}
-            {incompleteProperties.length > 0 && (
+            {/* Onboarding checklist if any business is incomplete */}
+            {incompleteBusinesses.length > 0 && (
                 <div className="card animate-in" style={{ marginBottom: 28, borderColor: 'rgba(99,102,241,0.25)' }}>
                     <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
                         <h3 style={{ fontSize: 14 }}>Onboarding in progress</h3>
@@ -72,7 +72,7 @@ export default function PortalHomePage() {
                             Resume wizard →
                         </Link>
                     </div>
-                    {incompleteProperties.map((p) => (
+                    {incompleteBusinesses.map((p) => (
                         <div key={p.id} style={{ marginBottom: 10 }}>
                             <div className="flex items-center justify-between" style={{ marginBottom: 4 }}>
                                 <span className="text-sm">{p.name}</span>
@@ -94,25 +94,25 @@ export default function PortalHomePage() {
                 </div>
             )}
 
-            {/* Properties grid */}
-            {properties.length === 0 ? (
+            {/* Businesses grid */}
+            {businesses.length === 0 ? (
                 <div className="empty-state" style={{ marginTop: 60 }}>
                     <div className="empty-icon">🏨</div>
-                    <p>No properties yet</p>
+                    <p>No businesses yet</p>
                     <p className="text-sm text-muted" style={{ marginTop: 8, marginBottom: 16 }}>
-                        Your account manager will set up your property, or you can add one.
+                        Your account manager will set up your business, or you can add one.
                     </p>
                     {(user?.role === 'owner' || user?.role === 'admin') && (
-                        <Link href="/portal/properties" className="btn btn-primary btn-sm">
-                            Add your first property
+                        <Link href="/portal/businesses" className="btn btn-primary btn-sm">
+                            Add your first business
                         </Link>
                     )}
                 </div>
             ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
-                    {properties.map((prop) => (
+                    {businesses.map((prop) => (
                         <div key={prop.id} className="card animate-in" style={{ padding: 24 }}>
-                            {/* Property header */}
+                            {/* Business header */}
                             <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
                                 <h3 style={{ fontSize: 15, fontWeight: 600 }}>{prop.name}</h3>
                                 <span className={`badge ${prop.is_active ? 'badge-success' : 'badge-warning'}`}>

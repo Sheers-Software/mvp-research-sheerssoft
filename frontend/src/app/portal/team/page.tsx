@@ -106,7 +106,7 @@ export default function PortalTeamPage() {
                                 type="email"
                                 value={inviteForm.email}
                                 onChange={(e) => setInviteForm((f) => ({ ...f, email: e.target.value }))}
-                                placeholder="staff@yourhotel.com"
+                                placeholder="staff@business.com"
                                 style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box' }}
                             />
                         </div>
@@ -161,7 +161,7 @@ export default function PortalTeamPage() {
                     <div className="empty-icon">👥</div>
                     <p>No team members yet</p>
                     <p className="text-sm text-muted" style={{ marginTop: 4 }}>
-                        Invite your hotel staff to access the dashboard
+                        Invite your business staff to access the dashboard
                     </p>
                 </div>
             ) : (

@@ -33,7 +33,7 @@ function tabForType(docType: string): Tab {
 
 export default function PortalKBPage() {
     const params = useParams();
-    const propertyId = params?.propertyId as string;
+    const businessId = params?.businessId as string;
 
     const [documents, setDocuments] = useState<KBDoc[]>([]);
     const [loading, setLoading] = useState(true);
@@ -48,16 +48,16 @@ export default function PortalKBPage() {
 
     const loadDocs = () => {
         setLoading(true);
-        apiGet<KBDoc[]>(`/properties/${propertyId}/kb`)
+        apiGet<KBDoc[]>(`/businesses/${businessId}/kb`)
             .then((data) => setDocuments(data || []))
             .catch(() => setDocuments([]))
             .finally(() => setLoading(false));
     };
 
     useEffect(() => {
-        if (propertyId) loadDocs();
+        if (businessId) loadDocs();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [propertyId]);
+    }, [businessId]);
 
     const visibleDocs = documents.filter((d) => tabForType(d.doc_type) === activeTab);
 
@@ -66,7 +66,7 @@ export default function PortalKBPage() {
         setSaving(true);
         setError('');
         try {
-            await apiPost(`/properties/${propertyId}/kb`, addForm);
+            await apiPost(`/businesses/${businessId}/kb`, addForm);
             setAddForm({ doc_type: 'faqs', title: '', content: '' });
             setShowAddModal(false);
             loadDocs();
@@ -81,7 +81,7 @@ export default function PortalKBPage() {
         setEditSaving(true);
         setError('');
         try {
-            await apiPut(`/properties/${propertyId}/kb/${doc.id}`, { ...doc, content: editContent });
+            await apiPut(`/businesses/${businessId}/kb/${doc.id}`, { ...doc, content: editContent });
             setEditingId(null);
             loadDocs();
         } catch (e: unknown) {
@@ -94,7 +94,7 @@ export default function PortalKBPage() {
     const handleDelete = async (docId: string) => {
         if (!window.confirm('Delete this document?')) return;
         try {
-            await apiDelete(`/properties/${propertyId}/kb/${docId}`);
+            await apiDelete(`/businesses/${businessId}/kb/${docId}`);
             loadDocs();
         } catch (e: unknown) {
             setError((e instanceof Error ? e.message : String(e)) || 'Failed to delete');
@@ -108,7 +108,7 @@ export default function PortalKBPage() {
                 <div>
                     <h1>Knowledge Base</h1>
                     <p className="text-muted text-sm" style={{ marginTop: 4 }}>
-                        Manage what your AI concierge knows about this property
+                        Manage what your AI concierge knows about this business
                     </p>
                 </div>
                 <div className="flex items-center gap-sm">

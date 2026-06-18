@@ -15,7 +15,7 @@ const navItems = [
     { href: '/dashboard/settings', label: 'Settings' },
 ];
 
-interface PropertyInfo {
+interface BusinessInfo {
     id: string;
     name: string;
 }
@@ -38,7 +38,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const { user, loading, logout } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
-    const [property, setProperty] = useState<PropertyInfo | null>(null);
+    const [business, setBusiness] = useState<BusinessInfo | null>(null);
     const [maintenance, setMaintenance] = useState<MaintenanceInfo | null>(null);
     const [bannerDismissed, setBannerDismissed] = useState(false);
     const [announcements, setAnnouncements] = useState<ActiveAnnouncement[]>([]);
@@ -56,11 +56,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }, [pathname]);
 
     useEffect(() => {
-        // Fetch the user's primary property for display and API calls
+        // Fetch the user's primary business for display and API calls
         apiGet<any>('/analytics/dashboard')
             .then((data) => {
-                if (data?.property_id && data?.property_name) {
-                    setProperty({ id: data.property_id, name: data.property_name });
+                if (data?.business_id && data?.business_name) {
+                    setBusiness({ id: data.business_id, name: data.business_name });
                 }
             })
             .catch(() => {});
@@ -115,7 +115,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <span />
                 </button>
                 <span className="mobile-header-brand">Nocturn AI</span>
-                {property && <span className="text-sm" style={{ flexShrink: 0, color: 'var(--text3)' }}>{property.name}</span>}
+                {business && <span className="text-sm" style={{ flexShrink: 0, color: 'var(--text3)' }}>{business.name}</span>}
             </header>
 
             {/* Sidebar overlay — closes sidebar when tapping outside on mobile */}
@@ -127,7 +127,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
                 <div className="sidebar-brand">
                     <h2>Nocturn AI</h2>
-                    <p>{property?.name || 'Hotel Dashboard'}</p>
+                    <p>{business?.name || 'Business Dashboard'}</p>
                 </div>
 
                 <nav className="sidebar-nav">
@@ -147,7 +147,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         <>
                             <span className="nav-section" style={{ marginTop: 8 }}>Management</span>
                             <Link href="/portal" className="nav-link" onClick={() => setSidebarOpen(false)}>
-                                Property Portal
+                                Business Portal
                             </Link>
                         </>
                     )}

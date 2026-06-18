@@ -128,7 +128,7 @@ async def create_fpx_payment_link(
     amount_rm: float,
     description: str,
     lead_id: str,
-    property_id: str,
+    business_id: str,
     success_url: str,
     cancel_url: str,
 ) -> dict:
@@ -155,7 +155,7 @@ async def create_fpx_payment_link(
         payment_method_types=["fpx", "card"],
         metadata={
             "lead_id": lead_id,
-            "property_id": property_id,
+            "business_id": business_id,
             "type": "direct_booking",
         },
         after_completion={

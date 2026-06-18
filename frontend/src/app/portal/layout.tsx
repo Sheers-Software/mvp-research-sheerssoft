@@ -9,7 +9,7 @@ import { TenantProvider, useTenant } from '@/lib/tenant-context';
 
 const navItems = [
     { href: '/portal', label: 'Overview', icon: '🏠' },
-    { href: '/portal/properties', label: 'Properties', icon: '🏨' },
+    { href: '/portal/businesses', label: 'Businesses', icon: '🏨' },
     { href: '/portal/kb', label: 'Knowledge Base', icon: '📚' },
     { href: '/portal/team', label: 'Team', icon: '👥' },
     { href: '/portal/channels', label: 'Channels', icon: '📡' },
@@ -116,7 +116,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
             <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
                 <div className="sidebar-brand">
                     <h2>AI Concierge</h2>
-                    <p>{tenantName || 'Property Portal'}</p>
+                    <p>{tenantName || 'Business Portal'}</p>
                 </div>
 
                 <nav className="sidebar-nav">

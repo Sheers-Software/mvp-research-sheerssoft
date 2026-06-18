@@ -79,7 +79,7 @@ export default function ConversationsPage() {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [detail, setDetail] = useState<ConversationDetail | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
-    const [propertyId, setPropertyId] = useState<string | null>(null);
+    const [businessId, setBusinessId] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState('');
     const [replyText, setReplyText] = useState('');
     const [replySending, setReplySending] = useState(false);
@@ -94,28 +94,28 @@ export default function ConversationsPage() {
     const [paymentLinkUrl, setPaymentLinkUrl] = useState('');
     const [error, setError] = useState('');
 
-    // Resolve property ID from dashboard stats
+    // Resolve business ID from dashboard stats
     useEffect(() => {
         apiGet<any>('/analytics/dashboard')
             .then((data) => {
-                if (data?.property_id) {
-                    setPropertyId(data.property_id);
+                if (data?.business_id) {
+                    setBusinessId(data.business_id);
                 }
             })
             .catch(() => { });
     }, []);
 
     useEffect(() => {
-        if (!propertyId) return;
+        if (!businessId) return;
         setLoading(true);
         const url = filter
-            ? `/properties/${propertyId}/conversations?status=${filter}`
-            : `/properties/${propertyId}/conversations`;
+            ? `/businesses/${businessId}/conversations?status=${filter}`
+            : `/businesses/${businessId}/conversations`;
         apiGet<ConversationItem[]>(url)
             .then(setConversations)
             .catch(() => { })
             .finally(() => setLoading(false));
-    }, [propertyId, filter]);
+    }, [businessId, filter]);
 
     const handleGeneratePaymentLink = async () => {
         if (!detail?.lead?.id || !paymentLinkAmount) return;
@@ -197,10 +197,10 @@ export default function ConversationsPage() {
         try {
             await apiPost(`/conversations/${id}/${action}`);
             // Refresh the conversation detail and list
-            if (propertyId) {
+            if (businessId) {
                 const url = filter
-                    ? `/properties/${propertyId}/conversations?status=${filter}`
-                    : `/properties/${propertyId}/conversations`;
+                    ? `/businesses/${businessId}/conversations?status=${filter}`
+                    : `/businesses/${businessId}/conversations`;
                 const updated = await apiGet<ConversationItem[]>(url);
                 setConversations(updated);
             }
@@ -424,7 +424,7 @@ export default function ConversationsPage() {
                                 )}
 
                                 {/* Payment link section */}
-                                {detail.status !== 'resolved' && detail.lead?.intent === 'room_booking' && (
+                                {detail.status !== 'resolved' && detail.lead?.intent === 'service_booking' && (
                                     <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border-subtle)' }}>
                                         <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 14, marginTop: 2 }}>
                                             <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: 'var(--text-muted)' }}>
@@ -464,7 +464,7 @@ export default function ConversationsPage() {
                                                         type="text"
                                                         value={paymentLinkDesc}
                                                         onChange={(e) => setPaymentLinkDesc(e.target.value)}
-                                                        placeholder="e.g. Deluxe King × 2 nights, 3–5 May"
+                                                        placeholder="e.g. Portrait Session × 2 nights, 3–5 May"
                                                         style={{ padding: '7px 10px', borderRadius: 4, border: '1px solid var(--border-default)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13 }}
                                                     />
                                                     <button

@@ -17,7 +17,7 @@ interface DailyData {
 }
 
 interface AnalyticsData {
-    property_id: string;
+    business_id: string;
     period: { from: string; to: string };
     totals: {
         total_inquiries: number;
@@ -81,26 +81,26 @@ export default function AnalyticsPage() {
     const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
     const [loading, setLoading] = useState(true);
     const [rangeDays, setRangeDays] = useState(30);
-    const [propertyId, setPropertyId] = useState<string | null>(null);
+    const [businessId, setBusinessId] = useState<string | null>(null);
 
     useEffect(() => {
         apiGet<any>('/analytics/dashboard')
             .then((data) => {
-                if (data?.property_id) setPropertyId(data.property_id);
+                if (data?.business_id) setBusinessId(data.business_id);
             })
             .catch(() => { });
     }, []);
 
     useEffect(() => {
-        if (!propertyId) return;
+        if (!businessId) return;
         setLoading(true);
         const to = new Date().toISOString().split('T')[0];
         const from = new Date(Date.now() - rangeDays * 86400000).toISOString().split('T')[0];
-        apiGet<AnalyticsData>(`/properties/${propertyId}/analytics?from_date=${from}&to_date=${to}`)
+        apiGet<AnalyticsData>(`/businesses/${businessId}/analytics?from_date=${from}&to_date=${to}`)
             .then(setAnalytics)
             .catch(() => { })
             .finally(() => setLoading(false));
-    }, [propertyId, rangeDays]);
+    }, [businessId, rangeDays]);
 
     const t = analytics?.totals;
 

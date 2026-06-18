@@ -33,7 +33,7 @@ class ConversationResponse(BaseModel):
 
 class WebChatStartRequest(BaseModel):
     """Start a new web chat conversation."""
-    property_id: str
+    business_id: str
     message: str = Field(..., min_length=1, max_length=4000)
     guest_name: str | None = None
     session_id: str | None = None  # Browser session ID for continuity
@@ -116,14 +116,14 @@ class LeadUpdateRequest(BaseModel):
 
 # ─── Properties ───
 
-class PropertyResponse(BaseModel):
+class BusinessResponse(BaseModel):
     id: uuid.UUID
     name: str
     whatsapp_number: str | None
     website_url: str | None
-    adr: float
-    ota_commission_pct: float
-    hourly_rate: float
+    industry: str | None = None
+    business_url: str | None = None
+    booking_link: str | None = None
     brand_vocabulary: str | None = None
     required_questions: list[str] | None = None
     created_at: datetime | None = None
@@ -133,27 +133,28 @@ class PropertyResponse(BaseModel):
         from_attributes = True
 
 
-PropertyInDB = PropertyResponse
+PropertyInDB = BusinessResponse
 
 
-class PropertyCreateRequest(BaseModel):
+class BusinessCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     whatsapp_number: str | None = None
     website_url: str | None = None
     operating_hours: dict | None = None
-    adr: float = 230.00
-    ota_commission_pct: float = 20.00
-    hourly_rate: float = 25.00
+    industry: str | None = None
+    business_url: str | None = None
+    booking_link: str | None = None
     brand_vocabulary: str | None = None
     required_questions: list[str] | None = None
 
 
-class PropertySettingsUpdateRequest(BaseModel):
+class BusinessSettingsUpdateRequest(BaseModel):
     notification_email: str | None = None
     operating_hours: dict | None = None
     timezone: str | None = None
-    adr: float | None = None
-    hourly_rate: float | None = None
+    industry: str | None = None
+    business_url: str | None = None
+    booking_link: str | None = None
     brand_vocabulary: str | None = None
     required_questions: list[str] | None = None
 
@@ -172,7 +173,7 @@ class KBIngestRequest(BaseModel):
 
 class KBIngestResponse(BaseModel):
     documents_ingested: int
-    property_id: str
+    business_id: str
 
 
 # ─── Analytics ───
@@ -186,8 +187,6 @@ class AnalyticsSummaryResponse(BaseModel):
     inquiries_handled_by_ai: int
     inquiries_handled_manually: int
     avg_response_time_sec: float
-    estimated_revenue_recovered: float
-    cost_savings: float
     channel_breakdown: dict | None
 
 
@@ -203,7 +202,6 @@ class DashboardStatsResponse(BaseModel):
     handoff_rate: float = 0.0
     ai_handled_rate: float = 0.0
     avg_response_time_sec: float = 0.0
-    estimated_revenue_recovered: float = 0.0
     channel_breakdown: dict = {}
 
 
@@ -217,8 +215,6 @@ class AnalyticsDailyResponse(BaseModel):
     inquiries_handled_by_ai: int
     inquiries_handled_manually: int
     avg_response_time_sec: float
-    estimated_revenue_recovered: float
-    cost_savings: float
     channel_breakdown: dict | None
 
     class Config:
@@ -310,7 +306,7 @@ class TenantUpdateRequest(BaseModel):
 class ProvisionTenantRequest(BaseModel):
     """One-click tenant provisioning from SuperAdmin dashboard."""
     tenant_name: str = Field(..., min_length=1, max_length=255)
-    property_name: str = Field(..., min_length=1, max_length=255)
+    business_name: str = Field(..., min_length=1, max_length=255)
     owner_email: str = Field(..., min_length=5, max_length=255)
     owner_name: str = Field(..., min_length=1, max_length=255)
     owner_phone: str | None = None
@@ -328,7 +324,7 @@ class ProvisionTenantRequest(BaseModel):
 
 class ProvisionTenantResponse(BaseModel):
     tenant_id: uuid.UUID
-    property_id: uuid.UUID
+    business_id: uuid.UUID
     user_id: uuid.UUID
     magic_link_sent: bool
     channels_setup_initiated: bool
@@ -338,7 +334,7 @@ class ProvisionTenantResponse(BaseModel):
 class OnboardingProgressResponse(BaseModel):
     """Gamified onboarding milestone status."""
     tenant_id: uuid.UUID
-    property_id: uuid.UUID
+    business_id: uuid.UUID
     # Channel statuses
     whatsapp_status: str
     email_status: str
@@ -406,26 +402,21 @@ class SupportChatRequest(BaseModel):
 
 class ApplicationCreateRequest(BaseModel):
     """Intake from ai.sheerssoft.com/apply."""
-    hotel_name: str = Field(..., min_length=1, max_length=255)
     contact_name: str = Field(..., min_length=1, max_length=255)
     email: str = Field(..., min_length=5, max_length=255)
     phone: str | None = None
-    property_name: str | None = None
-    room_count: int | None = None
-    adr_estimate: float | None = None
+    business_name: str = Field(..., min_length=1, max_length=255)
     monthly_inquiry_volume: int | None = None
-    star_rating: int | None = None
     current_channels: list[str] | None = None
     message: str | None = None
 
 
 class ApplicationResponse(BaseModel):
     id: uuid.UUID
-    hotel_name: str
+    business_name: str
     contact_name: str
     email: str
     phone: str | None
-    room_count: int | None
     status: str
     notes: str | None
     converted_to_tenant_id: uuid.UUID | None
@@ -452,3 +443,13 @@ class PlatformMetricsResponse(BaseModel):
     total_leads_mtd: int
     open_support_tickets: int
     pending_applications: int
+
+
+class ScrapeUrlRequest(BaseModel):
+    url: str = Field(..., min_length=5, max_length=500)
+
+class ScrapeUrlResponse(BaseModel):
+    tenant_id: uuid.UUID
+    business_id: uuid.UUID
+    business_name: str
+    message: str

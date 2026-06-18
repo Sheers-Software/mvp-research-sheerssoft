@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user
 from app.config import get_settings
 from app.database import get_db
-from app.models import Tenant, Lead, Property
+from app.models import Tenant, Lead, Business
 from app.services.stripe_service import create_checkout_session, create_subscription_session
 
 logger = logging.getLogger(__name__)
@@ -295,7 +295,7 @@ async def stripe_webhook(
 
                 tenant_result = await db.execute(
                     select(Tenant).where(Tenant.id == (
-                        select(Property.tenant_id).where(Property.id == lead.property_id).scalar_subquery()
+                        select(Business.tenant_id).where(Business.id == lead.business_id).scalar_subquery()
                     ))
                 )
                 tenant = tenant_result.scalar_one_or_none()

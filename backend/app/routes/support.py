@@ -33,18 +33,18 @@ async def support_chat(
 ):
     """
     Send a message to the Nocturn AI support chatbot (public — no auth required).
-    Uses the dedicated 'Nocturn AI Support' property's RAG engine.
+    Uses the dedicated 'Nocturn AI Support' business's RAG engine.
     If conversation doesn't exist, starts a new one.
     """
-    from app.models import Property, Conversation, Message
+    from app.models import Business, Conversation, Message
 
-    # Find the Nocturn AI Support property
-    stmt = select(Property).where(Property.slug == "nocturn-ai-support")
+    # Find the Nocturn AI Support business
+    stmt = select(Business).where(Business.slug == "nocturn-ai-support")
     result = await db.execute(stmt)
     support_property = result.scalar_one_or_none()
 
     if not support_property:
-        # Graceful fallback if support property not provisioned yet
+        # Graceful fallback if support business not provisioned yet
         return {
             "response": "Our support system is being set up. Please contact us directly via WhatsApp.",
             "conversation_id": None,
@@ -62,7 +62,7 @@ async def support_chat(
             raise HTTPException(status_code=404, detail="Conversation not found")
     else:
         conversation = Conversation(
-            property_id=support_property.id,
+            business_id=support_property.id,
             channel="support",
             guest_identifier=user_email,
             guest_name=user_name,
@@ -85,7 +85,7 @@ async def support_chat(
         from app.services.conversation import process_message
         ai_response = await process_message(
             db=db,
-            property_id=str(support_property.id),
+            business_id=str(support_property.id),
             conversation_id=str(conversation.id),
             guest_message=body.message,
             guest_name=user_name,
@@ -251,7 +251,7 @@ async def get_faq():
             },
             {
                 "question": "Will guests know they're talking to AI?",
-                "answer": "Our AI is trained specifically on YOUR property's tone. When a guest needs a human, it transfers instantly with full context.",
+                "answer": "Our AI is trained specifically on YOUR business's tone. When a guest needs a human, it transfers instantly with full context.",
             },
             {
                 "question": "How accurate is the AI?",
@@ -259,11 +259,11 @@ async def get_faq():
             },
             {
                 "question": "How long does setup take?",
-                "answer": "48 hours from your first call to live. We handle the technical setup. Your team spends about 30 minutes sharing property information.",
+                "answer": "48 hours from your first call to live. We handle the technical setup. Your team spends about 30 minutes sharing business information.",
             },
             {
                 "question": "Is my data secure?",
-                "answer": "All data is encrypted. Each property's data is fully isolated. We comply with Malaysia's PDPA requirements. Your guest data is YOUR data.",
+                "answer": "All data is encrypted. Each business's data is fully isolated. We comply with Malaysia's PDPA requirements. Your guest data is YOUR data.",
             },
             {
                 "question": "What happens after the 30-day pilot?",

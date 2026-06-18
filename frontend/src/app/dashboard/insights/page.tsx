@@ -27,7 +27,7 @@ interface InsightsData {
     top_topics: TopicCount[];
     sentiment: SentimentSummary;
     kb_gaps: KBGap[];
-    property_id: string;
+    business_id: string;
 }
 
 function CSSBar({ value, max, color }: { value: number; max: number; color: string }) {
@@ -53,21 +53,21 @@ function CSSBar({ value, max, color }: { value: number; max: number; color: stri
 export default function DashboardInsightsPage() {
     const [insights, setInsights] = useState<InsightsData | null>(null);
     const [loading, setLoading] = useState(true);
-    const [propertyId, setPropertyId] = useState<string | null>(null);
+    const [businessId, setBusinessId] = useState<string | null>(null);
 
     useEffect(() => {
-        apiGet<{ property_id: string }>('/analytics/dashboard')
+        apiGet<{ business_id: string }>('/analytics/dashboard')
             .then((data) => {
-                if (data?.property_id) {
-                    setPropertyId(data.property_id);
-                    return apiGet<InsightsData>(`/properties/${data.property_id}/insights`);
+                if (data?.business_id) {
+                    setBusinessId(data.business_id);
+                    return apiGet<InsightsData>(`/businesses/${data.business_id}/insights`);
                 }
-                throw new Error('No property');
+                throw new Error('No business');
             })
             .then((data) => setInsights(data))
             .catch((e: unknown) => {
                 const msg = e instanceof Error ? e.message : '';
-                if (msg !== 'No property') {
+                if (msg !== 'No business') {
                     // Insights not available yet — not an error, just no data
                     setInsights(null);
                 }
@@ -196,8 +196,8 @@ export default function DashboardInsightsPage() {
                         <div className="card animate-in" style={{ padding: 24 }}>
                             <div className="flex items-center justify-between" style={{ marginBottom: 4 }}>
                                 <h3>Knowledge Base Gaps</h3>
-                                {propertyId && (
-                                    <Link href={`/portal/kb/${propertyId}`} className="btn btn-primary btn-sm">
+                                {businessId && (
+                                    <Link href={`/portal/kb/${businessId}`} className="btn btn-primary btn-sm">
                                         + Add to KB
                                     </Link>
                                 )}
@@ -218,9 +218,9 @@ export default function DashboardInsightsPage() {
                                         </div>
                                         <div className="flex items-center gap-sm">
                                             <span className="text-xs text-muted">{gap.frequency} guests asked</span>
-                                            {propertyId && (
+                                            {businessId && (
                                                 <Link
-                                                    href={`/portal/kb/${propertyId}`}
+                                                    href={`/portal/kb/${businessId}`}
                                                     className="text-xs"
                                                     style={{ color: 'var(--accent)', textDecoration: 'none' }}
                                                 >

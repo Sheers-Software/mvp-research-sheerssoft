@@ -11,7 +11,7 @@ interface Tenant {
     slug: string;
 }
 
-interface Property {
+interface Business {
     id: string;
     name: string;
     slug: string;
@@ -29,7 +29,7 @@ interface Faq {
 }
 
 interface KbForm {
-    property_name: string;
+    business_name: string;
     rooms: Room[];
     facilities: string;
     faqs: Faq[];
@@ -48,12 +48,12 @@ interface KbForm {
 
 interface IngestResult {
     docs_created: number;
-    property_id: string;
+    business_id: string;
     message?: string;
 }
 
 const defaultForm = (): KbForm => ({
-    property_name: '',
+    business_name: '',
     rooms: [
         { name: '', description: '', rate_myr: '' },
         { name: '', description: '', rate_myr: '' },
@@ -85,12 +85,12 @@ export default function KbIngestionPage() {
     const [selectedTenantId, setSelectedTenantId] = useState<string | null>(
         searchParams.get('tenantId') || null
     );
-    const [properties, setProperties] = useState<Property[]>([]);
-    const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(
-        searchParams.get('propertyId') || null
+    const [businesses, setBusinesses] = useState<Business[]>([]);
+    const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(
+        searchParams.get('businessId') || null
     );
     const [loading, setLoading] = useState(true);
-    const [propertiesLoading, setPropertiesLoading] = useState(false);
+    const [businessesLoading, setBusinessesLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [result, setResult] = useState<IngestResult | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -104,35 +104,35 @@ export default function KbIngestionPage() {
             .finally(() => setLoading(false));
     }, []);
 
-    // Load properties when tenant selected
+    // Load businesses when tenant selected
     useEffect(() => {
         if (!selectedTenantId) {
-            setProperties([]);
-            setSelectedPropertyId(null);
+            setBusinesses([]);
+            setSelectedBusinessId(null);
             return;
         }
-        setPropertiesLoading(true);
-        apiGet<{ properties: Property[] }>(`/superadmin/tenants/${selectedTenantId}`)
+        setBusinessesLoading(true);
+        apiGet<{ businesses: Business[] }>(`/superadmin/tenants/${selectedTenantId}`)
             .then((data) => {
-                setProperties(data.properties || []);
-                // If propertyId is in query params and matches this tenant, keep selection
-                const qpPropId = searchParams.get('propertyId');
-                if (qpPropId && data.properties?.some((p: Property) => p.id === qpPropId)) {
-                    setSelectedPropertyId(qpPropId);
+                setBusinesses(data.businesses || []);
+                // If businessId is in query params and matches this tenant, keep selection
+                const qpPropId = searchParams.get('businessId');
+                if (qpPropId && data.businesses?.some((p: Business) => p.id === qpPropId)) {
+                    setSelectedBusinessId(qpPropId);
                 }
             })
             .catch(() => {})
-            .finally(() => setPropertiesLoading(false));
+            .finally(() => setBusinessesLoading(false));
     }, [selectedTenantId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Pre-fill property name when property is selected
+    // Pre-fill business name when business is selected
     useEffect(() => {
-        if (!selectedPropertyId) return;
-        const prop = properties.find((p) => p.id === selectedPropertyId);
+        if (!selectedBusinessId) return;
+        const prop = businesses.find((p) => p.id === selectedBusinessId);
         if (prop) {
-            setForm((f) => ({ ...f, property_name: prop.name }));
+            setForm((f) => ({ ...f, business_name: prop.name }));
         }
-    }, [selectedPropertyId, properties]);
+    }, [selectedBusinessId, businesses]);
 
     // --- Form helpers ---
 
@@ -167,13 +167,13 @@ export default function KbIngestionPage() {
     // --- Submit ---
 
     const handleIngest = async () => {
-        if (!selectedPropertyId) return;
+        if (!selectedBusinessId) return;
         setSaving(true);
         setError(null);
         setResult(null);
         try {
             const payload = {
-                property_name: form.property_name,
+                business_name: form.business_name,
                 rooms: form.rooms.filter((r) => r.name.trim()),
                 facilities: form.facilities,
                 faqs: form.faqs.filter((f) => f.question.trim()),
@@ -181,7 +181,7 @@ export default function KbIngestionPage() {
                 contact: form.contact,
             };
             const res = await apiPost<IngestResult>(
-                `/properties/${selectedPropertyId}/kb/ingest-wizard`,
+                `/businesses/${selectedBusinessId}/kb/ingest-wizard`,
                 payload
             );
             setResult(res);
@@ -195,24 +195,23 @@ export default function KbIngestionPage() {
     // --- Render ---
 
     const selectedTenant = tenants.find((t) => t.id === selectedTenantId);
-    const selectedProperty = properties.find((p) => p.id === selectedPropertyId);
+    const selectedBusiness = businesses.find((p) => p.id === selectedBusinessId);
 
     const inputStyle: React.CSSProperties = {
         width: '100%',
         padding: '8px 12px',
         border: '1px solid var(--border)',
-        borderRadius: 6,
-        fontSize: 14,
-        background: 'var(--bg-secondary)',
+        borderRadius: '6px',
+        background: 'var(--bg)',
         color: 'var(--text)',
-        boxSizing: 'border-box',
+        fontSize: '14px',
+        fontFamily: 'inherit',
     };
 
     const textareaStyle: React.CSSProperties = {
         ...inputStyle,
-        minHeight: 80,
         resize: 'vertical',
-        fontFamily: 'inherit',
+        minHeight: '80px',
     };
 
     const selectStyle: React.CSSProperties = {
@@ -225,13 +224,13 @@ export default function KbIngestionPage() {
             {/* Header */}
             <div style={{ marginBottom: 32 }}>
                 <h1 style={{ marginBottom: 4 }}>KB Ingestion Tool</h1>
-                <p className="text-muted text-sm">Set up knowledge base for a client property</p>
+                <p className="text-muted text-sm">Set up knowledge base for a client business</p>
             </div>
 
-            {/* Step 1: Tenant + Property selection */}
+            {/* Step 1: Tenant + Business selection */}
             <div className="card" style={{ padding: 24, marginBottom: 24 }}>
                 <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>
-                    Step 1 — Select Client &amp; Property
+                    Step 1 — Select Client &amp; Business
                 </h3>
                 <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                     <div>
@@ -246,7 +245,7 @@ export default function KbIngestionPage() {
                                 value={selectedTenantId || ''}
                                 onChange={(e) => {
                                     setSelectedTenantId(e.target.value || null);
-                                    setSelectedPropertyId(null);
+                                    setSelectedBusinessId(null);
                                     setResult(null);
                                     setForm(defaultForm());
                                 }}
@@ -262,24 +261,24 @@ export default function KbIngestionPage() {
                     </div>
                     <div>
                         <label className="text-sm" style={{ display: 'block', marginBottom: 6, fontWeight: 500 }}>
-                            Property
+                            Business
                         </label>
-                        {propertiesLoading ? (
+                        {businessesLoading ? (
                             <div className="loader" style={{ width: 20, height: 20 }} />
                         ) : (
                             <select
                                 style={selectStyle}
-                                value={selectedPropertyId || ''}
+                                value={selectedBusinessId || ''}
                                 disabled={!selectedTenantId}
                                 onChange={(e) => {
-                                    setSelectedPropertyId(e.target.value || null);
+                                    setSelectedBusinessId(e.target.value || null);
                                     setResult(null);
                                 }}
                             >
                                 <option value="">
-                                    {!selectedTenantId ? '— Select a tenant first —' : '— Select a property —'}
+                                    {!selectedTenantId ? '— Select a tenant first —' : '— Select a business —'}
                                 </option>
-                                {properties.map((p) => (
+                                {businesses.map((p) => (
                                     <option key={p.id} value={p.id}>
                                         {p.name}
                                     </option>
@@ -290,33 +289,33 @@ export default function KbIngestionPage() {
                 </div>
             </div>
 
-            {/* Step 2: KB Form — shown only after property selected */}
-            {selectedPropertyId && (
+            {/* Step 2: KB Form — shown only after business selected */}
+            {selectedBusinessId && (
                 <div className="animate-in">
                     <div className="card" style={{ padding: 24, marginBottom: 24 }}>
                         <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
                             Step 2 — Knowledge Base Content
                         </h3>
                         <p className="text-muted text-sm" style={{ marginBottom: 24 }}>
-                            Filling in for: <strong>{selectedProperty?.name}</strong>
+                            Filling in for: <strong>{selectedBusiness?.name}</strong>
                             {selectedTenant && (
                                 <span> ({selectedTenant.name})</span>
                             )}
                         </p>
 
-                        {/* Property Info */}
+                        {/* Business Info */}
                         <section style={{ marginBottom: 32 }}>
                             <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
-                                Property Info
+                                Business Info
                             </h4>
                             <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                                 <div>
                                     <label className="text-sm" style={{ display: 'block', marginBottom: 6 }}>Display Name</label>
                                     <input
                                         style={inputStyle}
-                                        value={form.property_name}
-                                        onChange={(e) => setForm((f) => ({ ...f, property_name: e.target.value }))}
-                                        placeholder="e.g. The Grand Hotel KL"
+                                        value={form.business_name}
+                                        onChange={(e) => setForm((f) => ({ ...f, business_name: e.target.value }))}
+                                        placeholder="e.g. The Grand Business KL"
                                     />
                                 </div>
                                 <div>
@@ -335,7 +334,7 @@ export default function KbIngestionPage() {
                                         type="email"
                                         value={form.contact.email}
                                         onChange={(e) => setForm((f) => ({ ...f, contact: { ...f.contact, email: e.target.value } }))}
-                                        placeholder="reservations@hotel.com"
+                                        placeholder="hello@business.com"
                                     />
                                 </div>
                                 <div>
@@ -345,7 +344,7 @@ export default function KbIngestionPage() {
                                         type="url"
                                         value={form.contact.website}
                                         onChange={(e) => setForm((f) => ({ ...f, contact: { ...f.contact, website: e.target.value } }))}
-                                        placeholder="https://www.hotel.com"
+                                        placeholder="https://www.yourbusiness.com"
                                     />
                                 </div>
                                 <div style={{ gridColumn: '1 / -1' }}>
@@ -544,7 +543,7 @@ export default function KbIngestionPage() {
                             <button
                                 className="btn btn-primary"
                                 onClick={handleIngest}
-                                disabled={saving || !selectedPropertyId}
+                                disabled={saving || !selectedBusinessId}
                             >
                                 {saving ? 'Ingesting…' : 'Ingest KB'}
                             </button>
@@ -568,7 +567,7 @@ export default function KbIngestionPage() {
                             </div>
                             <p className="text-sm" style={{ marginBottom: 16 }}>
                                 <strong>{result.docs_created}</strong> document{result.docs_created !== 1 ? 's' : ''} created and embedded for{' '}
-                                <strong>{selectedProperty?.name}</strong>.
+                                <strong>{selectedBusiness?.name}</strong>.
                             </p>
                             {result.message && (
                                 <p className="text-muted text-sm" style={{ marginBottom: 16 }}>{result.message}</p>
@@ -585,10 +584,10 @@ export default function KbIngestionPage() {
                                     onClick={() => {
                                         setResult(null);
                                         setForm(defaultForm());
-                                        setSelectedPropertyId(null);
+                                        setSelectedBusinessId(null);
                                     }}
                                 >
-                                    Ingest Another Property
+                                    Ingest Another Business
                                 </button>
                             </div>
                         </div>
@@ -597,10 +596,10 @@ export default function KbIngestionPage() {
             )}
 
             {/* Empty state before selection */}
-            {!selectedPropertyId && !loading && (
+            {!selectedBusinessId && !loading && (
                 <div className="empty-state" style={{ paddingTop: 40 }}>
                     <div className="empty-icon">📚</div>
-                    <p className="text-muted">Select a tenant and property above to begin KB setup.</p>
+                    <p className="text-muted">Select a tenant and business above to begin KB setup.</p>
                 </div>
             )}
         </div>

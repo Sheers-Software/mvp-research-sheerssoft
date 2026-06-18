@@ -23,20 +23,20 @@ logger = structlog.get_logger()
 router = APIRouter()
 
 
-@router.get("/properties/{property_id}/conversations")
+@router.get("/businesses/{business_id}/conversations")
 async def list_conversations(
-    property_id: str,
+    business_id: str,
     status: str = None,
     after_hours: bool = None,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(check_property_access),
 ):
-    """List conversations for a property (staff dashboard)."""
+    """List conversations for a business (staff dashboard)."""
     from fastapi import Query
     query = (
         select(Conversation)
-        .where(Conversation.property_id == uuid.UUID(property_id))
+        .where(Conversation.business_id == uuid.UUID(business_id))
         .options(selectinload(Conversation.lead))
         .order_by(Conversation.started_at.desc())
         .limit(limit)
@@ -194,7 +194,7 @@ async def staff_reply(
     token: dict = Depends(verify_jwt),
 ):
     """Staff sends a reply from the dashboard — saved as role='staff' and forwarded to guest via original channel."""
-    from app.models import Property
+    from app.models import Business
 
     result = await db.execute(
         select(Conversation).where(Conversation.id == uuid.UUID(conversation_id))
@@ -221,7 +221,7 @@ async def staff_reply(
 
     # Forward to guest via original channel
     prop_result = await db.execute(
-        select(Property).where(Property.id == conv.property_id)
+        select(Business).where(Business.id == conv.business_id)
     )
     prop = prop_result.scalar_one_or_none()
 
@@ -272,7 +272,7 @@ async def draft_reply(
     Does NOT persist or send anything — staff reviews and sends manually.
     Returns draft text in English, BM, or both.
     """
-    from app.models import Property, KBDocument
+    from app.models import Business, KBDocument
     from app.services.conversation import _call_llm
     from app.services import search_knowledge_base
 
@@ -286,11 +286,11 @@ async def draft_reply(
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     prop_result = await db.execute(
-        select(Property).where(Property.id == conv.property_id)
+        select(Business).where(Business.id == conv.business_id)
     )
     prop = prop_result.scalar_one_or_none()
     if not prop:
-        raise HTTPException(status_code=404, detail="Property not found")
+        raise HTTPException(status_code=404, detail="Business not found")
 
     # Fetch relevant KB context for the last guest message
     sorted_msgs = sorted(conv.messages, key=lambda m: m.sent_at)
@@ -300,7 +300,7 @@ async def draft_reply(
     kb_context = ""
     if last_guest_msg:
         try:
-            kb_docs = await search_knowledge_base(db, conv.property_id, last_guest_msg, limit=3)
+            kb_docs = await search_knowledge_base(db, conv.business_id, last_guest_msg, limit=3)
             kb_context = "\n\n".join(d.content for d in kb_docs) if kb_docs else ""
         except Exception:
             kb_context = ""
@@ -355,51 +355,51 @@ async def draft_reply(
 
 @router.get("/analytics/dashboard")
 async def get_dashboard_stats(
-    property_id: Optional[str] = Query(None, description="Property UUID. Defaults to first accessible property."),
+    business_id: Optional[str] = Query(None, description="Business UUID. Defaults to first accessible business."),
     user: dict = Depends(verify_jwt),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Get real-time dashboard statistics for a specific property.
-    If property_id is not provided, resolves to the first property accessible
+    Get real-time dashboard statistics for a specific business.
+    If business_id is not provided, resolves to the first business accessible
     to the authenticated user (from their JWT property_ids claim).
     """
-    from app.models import Property
+    from app.models import Business
 
-    if property_id:
+    if business_id:
         result = await db.execute(
-            select(Property).where(
-                Property.id == uuid.UUID(property_id),
-                Property.is_active == True,
+            select(Business).where(
+                Business.id == uuid.UUID(business_id),
+                Business.is_active == True,
             )
         )
     else:
-        # Resolve from the user's JWT property list
+        # Resolve from the user's JWT business list
         prop_ids = user.get("property_ids", ["*"])
         if prop_ids and prop_ids[0] != "*":
             result = await db.execute(
-                select(Property).where(
-                    Property.id == uuid.UUID(prop_ids[0]),
-                    Property.is_active == True,
+                select(Business).where(
+                    Business.id == uuid.UUID(prop_ids[0]),
+                    Business.is_active == True,
                 )
             )
         else:
-            # Wildcard access — pick property with most activity
+            # Wildcard access — pick business with most activity
             from sqlalchemy import func as sqlfunc
             result = await db.execute(
-                select(Property)
-                .outerjoin(Conversation, Conversation.property_id == Property.id)
-                .where(Property.is_active == True)
-                .group_by(Property.id)
+                select(Business)
+                .outerjoin(Conversation, Conversation.business_id == Business.id)
+                .where(Business.is_active == True)
+                .group_by(Business.id)
                 .order_by(sqlfunc.count(Conversation.id).desc())
                 .limit(1)
             )
 
     prop = result.scalar_one_or_none()
     if not prop:
-        raise HTTPException(status_code=404, detail="No property found")
+        raise HTTPException(status_code=404, detail="No business found")
 
     stats = await get_realtime_stats(db, prop.id)
-    stats["property_id"] = str(prop.id)
-    stats["property_name"] = prop.name
+    stats["business_id"] = str(prop.id)
+    stats["business_name"] = prop.name
     return stats

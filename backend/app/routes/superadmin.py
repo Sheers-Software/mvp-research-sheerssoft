@@ -17,7 +17,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.auth import require_superadmin, get_current_user
 from app.models import (
-    Tenant, Property, User, TenantMembership,
+    Tenant, Business, User, TenantMembership,
     Conversation, Lead, SupportTicket, Application,
     OnboardingProgress, Announcement, AuditRecord,
 )
@@ -49,7 +49,7 @@ async def get_platform_metrics(
     active_tenants = (await db.execute(
         select(func.count(Tenant.id)).where(Tenant.is_active == True)
     )).scalar() or 0
-    total_properties = (await db.execute(select(func.count(Property.id)))).scalar() or 0
+    total_properties = (await db.execute(select(func.count(Business.id)))).scalar() or 0
     total_conversations = (await db.execute(select(func.count(Conversation.id)))).scalar() or 0
     mtd_conversations = (await db.execute(
         select(func.count(Conversation.id)).where(Conversation.started_at >= month_start)
@@ -330,8 +330,8 @@ async def list_tenants(
     db: AsyncSession = Depends(get_db),
     admin=Depends(require_superadmin),
 ):
-    """List all tenants with property count and stats."""
-    stmt = select(Tenant).options(selectinload(Tenant.properties))
+    """List all tenants with business count and stats."""
+    stmt = select(Tenant).options(selectinload(Tenant.businesses))
 
     if status:
         stmt = stmt.where(Tenant.subscription_status == status)
@@ -353,7 +353,7 @@ async def list_tenants(
             "pilot_end_date": t.pilot_end_date.isoformat() if t.pilot_end_date else None,
             "assigned_account_manager": t.assigned_account_manager,
             "is_active": t.is_active,
-            "property_count": len(t.properties),
+            "property_count": len(t.businesses),
             "created_at": t.created_at.isoformat() if t.created_at else None,
         }
         for t in tenants
@@ -366,11 +366,11 @@ async def get_tenant_detail(
     db: AsyncSession = Depends(get_db),
     admin=Depends(require_superadmin),
 ):
-    """Detailed tenant view with properties, users, and usage stats."""
+    """Detailed tenant view with businesses, users, and usage stats."""
     stmt = (
         select(Tenant)
         .options(
-            selectinload(Tenant.properties),
+            selectinload(Tenant.businesses),
             selectinload(Tenant.memberships).selectinload(TenantMembership.user),
             selectinload(Tenant.onboarding_progress),
         )
@@ -382,21 +382,21 @@ async def get_tenant_detail(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
-    # Get conversation stats for this tenant's properties
-    property_ids = [p.id for p in tenant.properties]
+    # Get conversation stats for this tenant's businesses
+    property_ids = [p.id for p in tenant.businesses]
     total_convos = 0
     total_leads = 0
     if property_ids:
         convos_result = await db.execute(
             select(func.count(Conversation.id)).where(
-                Conversation.property_id.in_(property_ids)
+                Conversation.business_id.in_(property_ids)
             )
         )
         total_convos = convos_result.scalar() or 0
 
         leads_result = await db.execute(
             select(func.count(Lead.id)).where(
-                Lead.property_id.in_(property_ids)
+                Lead.business_id.in_(property_ids)
             )
         )
         total_leads = leads_result.scalar() or 0
@@ -412,14 +412,14 @@ async def get_tenant_detail(
         "assigned_account_manager": tenant.assigned_account_manager,
         "is_active": tenant.is_active,
         "created_at": tenant.created_at.isoformat() if tenant.created_at else None,
-        "properties": [
+        "businesses": [
             {
                 "id": str(p.id),
                 "name": p.name,
                 "slug": p.slug,
                 "is_active": p.is_active,
             }
-            for p in tenant.properties
+            for p in tenant.businesses
         ],
         "users": [
             {
@@ -432,7 +432,7 @@ async def get_tenant_detail(
         ],
         "onboarding": [
             {
-                "property_id": str(op.property_id),
+                "business_id": str(op.business_id),
                 "whatsapp_status": op.whatsapp_status,
                 "email_status": op.email_status,
                 "website_status": op.website_status,
@@ -445,7 +445,7 @@ async def get_tenant_detail(
         "stats": {
             "total_conversations": total_convos,
             "total_leads": total_leads,
-            "property_count": len(tenant.properties),
+            "property_count": len(tenant.businesses),
             "user_count": len(tenant.memberships),
         },
     }
@@ -487,10 +487,10 @@ async def retry_channel_setup(
     db: AsyncSession = Depends(get_db),
     admin=Depends(require_superadmin),
 ):
-    """Retry a failed channel setup for a tenant's primary property."""
+    """Retry a failed channel setup for a tenant's primary business."""
     from app.services.channel_setup import setup_channels
 
-    # Get the primary property
+    # Get the primary business
     stmt = select(OnboardingProgress).where(
         OnboardingProgress.tenant_id == uuid.UUID(tenant_id)
     )
@@ -500,15 +500,15 @@ async def retry_channel_setup(
     if not progress:
         raise HTTPException(status_code=404, detail="Onboarding progress not found")
 
-    # Get property's whatsapp provider
-    prop_stmt = select(Property).where(Property.id == progress.property_id)
+    # Get business's whatsapp provider
+    prop_stmt = select(Business).where(Business.id == progress.business_id)
     prop_result = await db.execute(prop_stmt)
     prop = prop_result.scalar_one_or_none()
 
     errors = await setup_channels(
         db=db,
         tenant_id=tenant_id,
-        property_id=str(progress.property_id),
+        business_id=str(progress.business_id),
         channels=[channel],
         whatsapp_provider=prop.whatsapp_provider if prop else "meta",
     )
@@ -557,7 +557,7 @@ async def get_onboarding_pipeline(
         item = {
             "tenant_id": str(p.tenant_id),
             "tenant_name": p.tenant.name if p.tenant else "Unknown",
-            "property_id": str(p.property_id),
+            "business_id": str(p.business_id),
             "created_at": p.created_at.isoformat() if p.created_at else None,
         }
 
@@ -655,13 +655,13 @@ async def list_support_chats(
     admin=Depends(require_superadmin),
 ):
     """List all handed-off support conversations awaiting human response."""
-    from app.models import Conversation, Property
+    from app.models import Conversation, Business
 
     stmt = (
         select(Conversation)
-        .join(Property, Conversation.property_id == Property.id)
+        .join(Business, Conversation.business_id == Business.id)
         .where(
-            Property.slug == "nocturn-ai-support",
+            Business.slug == "nocturn-ai-support",
             Conversation.status == "handed_off",
         )
         .order_by(Conversation.last_message_at.desc())
@@ -701,9 +701,7 @@ async def submit_application(
         contact_name=body.contact_name,
         email=body.email,
         phone=body.phone,
-        property_name=body.property_name,
-        room_count=body.room_count,
-        adr_estimate=body.adr_estimate,
+        business_name=body.business_name,
         monthly_inquiry_volume=body.monthly_inquiry_volume,
         star_rating=body.star_rating,
         current_channels=body.current_channels,
@@ -990,17 +988,17 @@ async def list_shadow_pilots(
     admin=Depends(require_superadmin),
 ):
     """
-    List all properties with their shadow pilot status.
+    List all businesses with their shadow pilot status.
     Used by the /admin/shadow-pilots management page.
     """
     from sqlalchemy.orm import selectinload as _sil
     result = await db.execute(
-        select(Property)
-        .options(_sil(Property.tenant))
-        .where(Property.deleted_at.is_(None))
-        .order_by(Property.audit_only_mode.desc(), Property.created_at.desc())
+        select(Business)
+        .options(_sil(Business.tenant))
+        .where(Business.deleted_at.is_(None))
+        .order_by(Business.audit_only_mode.desc(), Business.created_at.desc())
     )
-    properties = result.scalars().all()
+    businesses = result.scalars().all()
 
     return [
         {
@@ -1015,26 +1013,26 @@ async def list_shadow_pilots(
             "is_active": p.is_active,
             "created_at": p.created_at.isoformat() if p.created_at else None,
         }
-        for p in properties
+        for p in businesses
     ]
 
 
-@router.patch("/superadmin/shadow-pilots/{property_id}")
+@router.patch("/superadmin/shadow-pilots/{business_id}")
 async def update_shadow_pilot(
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     body: dict,
     db: AsyncSession = Depends(get_db),
     admin=Depends(require_superadmin),
 ):
     """
-    Enable or disable shadow pilot mode for a property.
+    Enable or disable shadow pilot mode for a business.
     Accepts: audit_only_mode (bool), shadow_pilot_phone (str), shadow_pilot_start_date (str ISO).
     Setting audit_only_mode=True auto-sets shadow_pilot_start_date to now if not provided.
     """
-    result = await db.execute(select(Property).where(Property.id == property_id))
+    result = await db.execute(select(Business).where(Business.id == business_id))
     prop = result.scalar_one_or_none()
     if not prop:
-        raise HTTPException(status_code=404, detail="Property not found")
+        raise HTTPException(status_code=404, detail="Business not found")
 
     if "audit_only_mode" in body:
         prop.audit_only_mode = bool(body["audit_only_mode"])
@@ -1072,21 +1070,21 @@ async def provision_shadow_pilot(
     """
     Provision a new shadow pilot: set shadow_pilot_mode=True, generate dashboard token,
     trigger Baileys bridge to start session.
-    Body: {property_id, hotel_phone, gm_email, adr, avg_stay_nights, operating_hours}
+    Body: {business_id, hotel_phone, gm_email, adr, avg_stay_nights, operating_hours}
     """
     import jwt
     from datetime import timedelta
     from app.config import get_settings as _get_settings
 
-    prop = await db.scalar(select(Property).where(Property.id == uuid.UUID(body["property_id"])))
+    prop = await db.scalar(select(Business).where(Business.id == uuid.UUID(body["business_id"])))
     if not prop:
-        raise HTTPException(status_code=404, detail="Property not found")
+        raise HTTPException(status_code=404, detail="Business not found")
 
     # Generate dashboard token (30 days)
     _settings = _get_settings()
     exp = datetime.now(timezone.utc) + timedelta(days=30)
     token_payload = {
-        "property_id": str(prop.id),
+        "business_id": str(prop.id),
         "type": "shadow_dashboard",
         "exp": exp,
     }
@@ -1101,22 +1099,20 @@ async def provision_shadow_pilot(
         prop.shadow_pilot_phone = body["hotel_phone"]
     if body.get("gm_email"):
         prop.notification_email = body["gm_email"]
-    if body.get("adr"):
-        prop.adr = body["adr"]
     if body.get("avg_stay_nights"):
         prop.avg_stay_nights = body["avg_stay_nights"]
     if body.get("operating_hours"):
         prop.operating_hours = body["operating_hours"]
 
-    # Link audit record to property for Day-7 email comparison
+    # Link audit record to business for Day-7 email comparison
     property_email = prop.notification_email or body.get("gm_email") or ""
-    property_name = prop.name or ""
+    business_name = prop.name or ""
     audit_result = await db.execute(
         select(AuditRecord)
         .where(
             or_(
                 AuditRecord.email == property_email,
-                AuditRecord.hotel_name.ilike(f"%{property_name}%")
+                AuditRecord.hotel_name.ilike(f"%{business_name}%")
             )
         )
         .order_by(AuditRecord.created_at.desc())
@@ -1127,7 +1123,7 @@ async def provision_shadow_pilot(
         prop.audit_estimated_monthly_leakage_rm = audit_record.total_monthly_leakage
         logger.info(
             "Linked audit record to shadow pilot",
-            property_id=str(prop.id),
+            business_id=str(prop.id),
             estimated_leakage_rm=float(audit_record.total_monthly_leakage)
         )
 
@@ -1141,13 +1137,13 @@ async def provision_shadow_pilot(
             async with httpx.AsyncClient(timeout=10) as client:
                 await client.post(
                     f"{bridge_url}/internal/start-session",
-                    json={"property_slug": prop.slug, "property_phone": prop.shadow_pilot_phone},
+                    json={"business_slug": prop.slug, "property_phone": prop.shadow_pilot_phone},
                 )
         except Exception as e:
             logger.warning("baileys_start_session_failed", error=str(e))
 
     return {
-        "property_id": str(prop.id),
+        "business_id": str(prop.id),
         "shadow_pilot_mode": True,
         "shadow_pilot_start_date": prop.shadow_pilot_start_date.isoformat(),
         "dashboard_token": dashboard_token,
@@ -1155,16 +1151,16 @@ async def provision_shadow_pilot(
     }
 
 
-@router.get("/superadmin/shadow-pilots/{property_id}/qr")
+@router.get("/superadmin/shadow-pilots/{business_id}/qr")
 async def get_shadow_pilot_qr(
-    property_id: str,
+    business_id: str,
     db: AsyncSession = Depends(get_db),
     admin=Depends(require_superadmin),
 ):
     """Proxy QR code from Baileys bridge for scanning in the admin UI."""
-    prop = await db.scalar(select(Property).where(Property.id == uuid.UUID(property_id)))
+    prop = await db.scalar(select(Business).where(Business.id == uuid.UUID(business_id)))
     if not prop:
-        raise HTTPException(status_code=404, detail="Property not found")
+        raise HTTPException(status_code=404, detail="Business not found")
 
     from app.config import get_settings as _get_settings
     _settings = _get_settings()
@@ -1182,16 +1178,16 @@ async def get_shadow_pilot_qr(
         return {"qr_base64": None, "status": "bridge_unavailable", "error": str(e)}
 
 
-@router.delete("/superadmin/shadow-pilots/{property_id}")
+@router.delete("/superadmin/shadow-pilots/{business_id}")
 async def stop_shadow_pilot(
-    property_id: str,
+    business_id: str,
     db: AsyncSession = Depends(get_db),
     admin=Depends(require_superadmin),
 ):
     """Stop shadow pilot — disconnect Baileys session, set shadow_pilot_mode=False."""
-    prop = await db.scalar(select(Property).where(Property.id == uuid.UUID(property_id)))
+    prop = await db.scalar(select(Business).where(Business.id == uuid.UUID(business_id)))
     if not prop:
-        raise HTTPException(status_code=404, detail="Property not found")
+        raise HTTPException(status_code=404, detail="Business not found")
 
     from app.config import get_settings as _get_settings
     _settings = _get_settings()
@@ -1203,7 +1199,7 @@ async def stop_shadow_pilot(
             async with httpx.AsyncClient(timeout=10) as client:
                 await client.post(
                     f"{bridge_url}/internal/stop-session",
-                    json={"property_slug": prop.slug},
+                    json={"business_slug": prop.slug},
                 )
         except Exception as e:
             logger.warning("baileys_stop_session_failed", error=str(e))
@@ -1211,24 +1207,24 @@ async def stop_shadow_pilot(
     prop.shadow_pilot_mode = False
     prop.shadow_pilot_session_active = False
     await db.commit()
-    return {"status": "stopped", "property_id": property_id}
+    return {"status": "stopped", "business_id": business_id}
 
 
-@router.get("/superadmin/shadow-pilots/{property_id}/analytics")
+@router.get("/superadmin/shadow-pilots/{business_id}/analytics")
 async def get_shadow_pilot_analytics(
-    property_id: str,
+    business_id: str,
     db: AsyncSession = Depends(get_db),
     admin=Depends(require_superadmin),
 ):
-    """Full daily analytics for a shadow pilot property."""
+    """Full daily analytics for a shadow pilot business."""
     from app.models import ShadowPilotAnalyticsDaily
     rows = list(await db.scalars(
         select(ShadowPilotAnalyticsDaily).where(
-            ShadowPilotAnalyticsDaily.property_id == uuid.UUID(property_id)
+            ShadowPilotAnalyticsDaily.business_id == uuid.UUID(business_id)
         ).order_by(ShadowPilotAnalyticsDaily.report_date)
     ))
     return {
-        "property_id": property_id,
+        "business_id": business_id,
         "rows": [
             {
                 "date": r.report_date.isoformat(),

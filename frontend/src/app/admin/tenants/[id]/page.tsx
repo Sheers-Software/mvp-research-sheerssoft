@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiGet } from '@/lib/api';
 
-interface Property {
+interface Business {
     id: string;
     name: string;
     slug: string;
@@ -20,7 +20,7 @@ interface User {
 }
 
 interface OnboardingProgress {
-    property_id: string;
+    business_id: string;
     whatsapp_status: string;
     email_status: string;
     website_status: string;
@@ -34,7 +34,7 @@ interface KbDoc {
 }
 
 interface KbStatus {
-    property_id: string;
+    business_id: string;
     total: number;
     by_category: Record<string, number>;
 }
@@ -50,13 +50,13 @@ interface TenantDetails {
     assigned_account_manager: string | null;
     is_active: boolean;
     created_at: string | null;
-    properties: Property[];
+    businesses: Business[];
     users: User[];
     onboarding: OnboardingProgress[];
     stats: {
         total_conversations: number;
         total_leads: number;
-        property_count: number;
+        business_count: number;
         user_count: number;
     };
 }
@@ -97,9 +97,9 @@ export default function TenantDetailsPage() {
         apiGet<TenantDetails>(`/superadmin/tenants/${params.id}`)
             .then((data) => {
                 setTenant(data);
-                // Load KB status for each property
-                (data.properties || []).forEach((prop) => {
-                    apiGet<{ documents: KbDoc[] }>(`/properties/${prop.id}/kb`)
+                // Load KB status for each business
+                (data.businesses || []).forEach((prop) => {
+                    apiGet<{ documents: KbDoc[] }>(`/businesses/${prop.id}/kb`)
                         .then((kb) => {
                             const docs = kb.documents || [];
                             const by_category: Record<string, number> = {};
@@ -107,8 +107,8 @@ export default function TenantDetailsPage() {
                                 by_category[d.category] = (by_category[d.category] || 0) + 1;
                             });
                             setKbStatuses((prev) => [
-                                ...prev.filter((s) => s.property_id !== prop.id),
-                                { property_id: prop.id, total: docs.length, by_category },
+                                ...prev.filter((s) => s.business_id !== prop.id),
+                                { business_id: prop.id, total: docs.length, by_category },
                             ]);
                         })
                         .catch(() => {});
@@ -169,7 +169,7 @@ export default function TenantDetailsPage() {
                         >
                             Open KB Ingestion →
                         </Link>
-                        {tenant.properties.length > 0 && tenant.users.length === 0 && (
+                        {tenant.businesses.length > 0 && tenant.users.length === 0 && (
                             <Link
                                 href={`/admin/tenants/${tenant.id}/invite`}
                                 className="btn btn-ghost btn-sm"
@@ -192,8 +192,8 @@ export default function TenantDetailsPage() {
                     <p className="metric-value text-success">{tenant.stats.total_leads.toLocaleString()}</p>
                 </div>
                 <div className="metric-card">
-                    <p className="metric-label">Properties</p>
-                    <p className="metric-value">{tenant.stats.property_count}</p>
+                    <p className="metric-label">Businesses</p>
+                    <p className="metric-value">{tenant.stats.business_count}</p>
                 </div>
                 <div className="metric-card">
                     <p className="metric-label">Team Members</p>
@@ -205,9 +205,9 @@ export default function TenantDetailsPage() {
                 {/* Left Column */}
                 <div className="flex flex-col gap-lg">
                     
-                    {/* Properties Section */}
+                    {/* Businesses Section */}
                     <section>
-                        <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>Properties</h3>
+                        <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>Businesses</h3>
                         <div className="table-container">
                             <table>
                                 <thead>
@@ -218,7 +218,7 @@ export default function TenantDetailsPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {tenant.properties.map((p) => (
+                                    {tenant.businesses.map((p) => (
                                         <tr key={p.id}>
                                             <td><strong>{p.name}</strong></td>
                                             <td className="text-muted text-sm">{p.slug}</td>
@@ -229,8 +229,8 @@ export default function TenantDetailsPage() {
                                             </td>
                                         </tr>
                                     ))}
-                                    {tenant.properties.length === 0 && (
-                                        <tr><td colSpan={3} className="text-center text-muted" style={{ padding: 24 }}>No properties</td></tr>
+                                    {tenant.businesses.length === 0 && (
+                                        <tr><td colSpan={3} className="text-center text-muted" style={{ padding: 24 }}>No businesses</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -241,8 +241,8 @@ export default function TenantDetailsPage() {
                     <section>
                         <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>KB Status</h3>
                         <div className="flex flex-col gap-sm">
-                            {tenant.properties.map((prop) => {
-                                const kb = kbStatuses.find((s) => s.property_id === prop.id);
+                            {tenant.businesses.map((prop) => {
+                                const kb = kbStatuses.find((s) => s.business_id === prop.id);
                                 const cats = ['faqs', 'rooms', 'facilities', 'policies'];
                                 return (
                                     <div key={prop.id} className="card" style={{ padding: 16 }}>
@@ -250,7 +250,7 @@ export default function TenantDetailsPage() {
                                             <strong className="text-sm">{prop.name}</strong>
                                             <div className="flex gap-sm">
                                                 <Link
-                                                    href={`/admin/kb-ingestion?tenantId=${tenant.id}&propertyId=${prop.id}`}
+                                                    href={`/admin/kb-ingestion?tenantId=${tenant.id}&businessId=${prop.id}`}
                                                     className="btn btn-ghost btn-sm"
                                                 >
                                                     Ingest KB
@@ -276,8 +276,8 @@ export default function TenantDetailsPage() {
                                     </div>
                                 );
                             })}
-                            {tenant.properties.length === 0 && (
-                                <p className="text-muted text-sm">No properties to show KB status for.</p>
+                            {tenant.businesses.length === 0 && (
+                                <p className="text-muted text-sm">No businesses to show KB status for.</p>
                             )}
                         </div>
                     </section>
@@ -339,7 +339,7 @@ export default function TenantDetailsPage() {
                     <section>
                         <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>Onboarding Status</h3>
                         {tenant.onboarding.map((obs, idx) => {
-                            const propName = tenant.properties.find(p => p.id === obs.property_id)?.name || 'Unknown Property';
+                            const propName = tenant.businesses.find(p => p.id === obs.business_id)?.name || 'Unknown Business';
 
                             // Compute progress score from channel statuses + milestone flags
                             const channelPoints: Record<string, number> = { active: 20, skipped: 10, configuring: 5, pending: 0, failed: 0 };

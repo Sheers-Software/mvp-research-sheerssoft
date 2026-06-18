@@ -37,7 +37,7 @@ class Base(DeclarativeBase):
 
 
 # ─────────────────────────────────────────────────────────────
-# Multi-Tenant Hierarchy: Tenant → Property → User
+# Multi-Tenant Hierarchy: Tenant → Business → User
 # ─────────────────────────────────────────────────────────────
 
 
@@ -63,12 +63,13 @@ class Tenant(Base):
     pilot_end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255))
     stripe_subscription_id: Mapped[str | None] = mapped_column(String(255))
-    performance_fee_balance_rm: Mapped[Decimal] = mapped_column(
-        Numeric(12, 2), default=Decimal('0'), server_default="0"
-    )
     assigned_account_manager: Mapped[str | None] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    industry: Mapped[str | None] = mapped_column(String(255))
+    business_url: Mapped[str | None] = mapped_column(String(500))
+    booking_link: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(
+
         DateTime(timezone=True), server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
@@ -76,7 +77,7 @@ class Tenant(Base):
     )
 
     # Relationships
-    properties: Mapped[list["Property"]] = relationship(
+    businesses: Mapped[list["Business"]] = relationship(
         back_populates="tenant", cascade="all, delete-orphan"
     )
     memberships: Mapped[list["TenantMembership"]] = relationship(
@@ -118,7 +119,7 @@ class User(Base):
 
 class TenantMembership(Base):
     """
-    Links a User to a Tenant with a specific role and property access scope.
+    Links a User to a Tenant with a specific role and business access scope.
     """
     __tablename__ = "tenant_memberships"
 
@@ -134,8 +135,8 @@ class TenantMembership(Base):
     role: Mapped[str] = mapped_column(
         String(20), default="staff", server_default="staff"
     )  # "owner" | "admin" | "staff"
-    accessible_property_ids: Mapped[list | None] = mapped_column(JSON)
-    # null = all properties, [...] = specific property UUIDs
+    accessible_business_ids: Mapped[list | None] = mapped_column(JSON)
+    # null = all businesses, [...] = specific business UUIDs
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -154,7 +155,7 @@ class TenantMembership(Base):
 class OnboardingProgress(Base):
     """
     Tracks onboarding milestones for the gamified getting-started experience.
-    One record per property provisioned.
+    One record per business provisioned.
     """
     __tablename__ = "onboarding_progress"
 
@@ -164,8 +165,8 @@ class OnboardingProgress(Base):
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False
     )
-    property_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("properties.id"), nullable=False
+    business_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("businesses.id"), nullable=False
     )
     # Channel setup status: "pending" | "configuring" | "active" | "failed" | "skipped"
     whatsapp_status: Mapped[str] = mapped_column(
@@ -194,10 +195,10 @@ class OnboardingProgress(Base):
 
     # Relationships
     tenant: Mapped["Tenant"] = relationship(back_populates="onboarding_progress")
-    property: Mapped["Property"] = relationship(back_populates="onboarding_progress")
+    business: Mapped["Business"] = relationship(back_populates="onboarding_progress")
 
     __table_args__ = (
-        UniqueConstraint("tenant_id", "property_id", name="uq_onboarding_tenant_property"),
+        UniqueConstraint("tenant_id", "business_id", name="uq_onboarding_tenant_property"),
     )
 
 
@@ -258,7 +259,7 @@ class Application(Base):
     contact_name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False)
     phone: Mapped[str | None] = mapped_column(String(30))
-    property_name: Mapped[str | None] = mapped_column(String(255))
+    business_name: Mapped[str | None] = mapped_column(String(255))
     room_count: Mapped[int | None] = mapped_column(Integer)
     adr_estimate: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     monthly_inquiry_volume: Mapped[int | None] = mapped_column(Integer)
@@ -286,16 +287,16 @@ class Application(Base):
 
 
 # ─────────────────────────────────────────────────────────────
-# Property (Hotel Location) — Now scoped under Tenant
+# Business (Hotel Location) — Now scoped under Tenant
 # ─────────────────────────────────────────────────────────────
 
 
-class Property(Base):
+class Business(Base):
     """
-    A hotel property (location). Belongs to a Tenant.
-    All operational data is scoped to a property via property_id foreign keys.
+    A hotel business (location). Belongs to a Tenant.
+    All operational data is scoped to a business via business_id foreign keys.
     """
-    __tablename__ = "properties"
+    __tablename__ = "businesses"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -314,18 +315,9 @@ class Property(Base):
     operating_hours: Mapped[dict | None] = mapped_column(JSON)
     # Example: {"start": "09:00", "end": "18:00", "timezone": "Asia/Kuala_Lumpur"}
     knowledge_base_config: Mapped[dict | None] = mapped_column(JSON)
-    adr: Mapped[Decimal] = mapped_column(
-        Numeric(10, 2), default=Decimal("230.00")
-    )  # Average Daily Rate for revenue calculations
-    ota_commission_pct: Mapped[Decimal] = mapped_column(
-        Numeric(5, 2), default=Decimal("20.00")
-    )  # OTA commission % for savings calculations
     conversion_rate: Mapped[Decimal] = mapped_column(
         Numeric(5, 2), default=Decimal("0.20"), server_default="0.20"
     ) # Assumed lead-to-booking conversion rate
-    hourly_rate: Mapped[Decimal] = mapped_column(
-        Numeric(10, 2), default=Decimal("25.00"), server_default="25.00"
-    )  # Hourly rate for front desk staff (used for cost savings calculations)
     brand_vocabulary: Mapped[str | None] = mapped_column(Text)
     # E.g. "We say 'Welcome Home' instead of 'Hello'. We are formal but warm."
     required_questions: Mapped[list[str] | None] = mapped_column(JSON)
@@ -345,34 +337,23 @@ class Property(Base):
     # Shadow Pilot / Audit-Only Mode (Stage 2 of three-stage sales funnel)
     # When True: messages are logged but the AI does NOT send any reply.
     # Used during the 7-day shadow pilot to capture real inquiry volume data.
-    audit_only_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    shadow_pilot_start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    shadow_pilot_phone: Mapped[str | None] = mapped_column(String(20))
-    shadow_pilot_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    shadow_pilot_session_active: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    shadow_pilot_session_last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    shadow_pilot_dashboard_token: Mapped[str | None] = mapped_column(Text)
-    shadow_pilot_dashboard_token_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    avg_stay_nights: Mapped[float] = mapped_column(Numeric(5, 2), default=1.0, server_default="1.0")
-    shadow_pilot_report_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    audit_estimated_monthly_leakage_rm: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
-
+                                            
     # Relationships
-    tenant: Mapped["Tenant | None"] = relationship(back_populates="properties")
+    tenant: Mapped["Tenant | None"] = relationship(back_populates="businesses")
     conversations: Mapped[list["Conversation"]] = relationship(
-        back_populates="property", cascade="all, delete-orphan"
+        back_populates="business", cascade="all, delete-orphan"
     )
     leads: Mapped[list["Lead"]] = relationship(
-        back_populates="property", cascade="all, delete-orphan"
+        back_populates="business", cascade="all, delete-orphan"
     )
     kb_documents: Mapped[list["KBDocument"]] = relationship(
-        back_populates="property", cascade="all, delete-orphan"
+        back_populates="business", cascade="all, delete-orphan"
     )
     analytics_daily: Mapped[list["AnalyticsDaily"]] = relationship(
-        back_populates="property", cascade="all, delete-orphan"
+        back_populates="business", cascade="all, delete-orphan"
     )
     onboarding_progress: Mapped["OnboardingProgress | None"] = relationship(
-        back_populates="property", uselist=False
+        back_populates="business", uselist=False
     )
 
 
@@ -386,8 +367,8 @@ class Conversation(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    property_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("properties.id"), nullable=False
+    business_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("businesses.id"), nullable=False
     )
     channel: Mapped[str] = mapped_column(
         String(20), nullable=False
@@ -420,7 +401,7 @@ class Conversation(Base):
     message_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     # Relationships
-    property: Mapped["Property"] = relationship(back_populates="conversations")
+    business: Mapped["Business"] = relationship(back_populates="conversations")
     messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation",
         cascade="all, delete-orphan",
@@ -431,9 +412,9 @@ class Conversation(Base):
     )
 
     __table_args__ = (
-        Index("ix_conversations_property_status", "property_id", "status"),
-        Index("ix_conversations_property_after_hours", "property_id", "is_after_hours"),
-        Index("ix_conversations_guest", "property_id", "guest_identifier"),
+        Index("ix_conversations_property_status", "business_id", "status"),
+        Index("ix_conversations_property_after_hours", "business_id", "is_after_hours"),
+        Index("ix_conversations_guest", "business_id", "guest_identifier"),
     )
 
 
@@ -482,8 +463,8 @@ class Lead(Base):
     conversation_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("conversations.id"), nullable=False
     )
-    property_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("properties.id"), nullable=False
+    business_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("businesses.id"), nullable=False
     )
     guest_name: Mapped[str | None] = mapped_column(String(255))
     guest_phone: Mapped[str | None] = mapped_column(String(20))
@@ -517,11 +498,11 @@ class Lead(Base):
 
     # Relationships
     conversation: Mapped["Conversation"] = relationship(back_populates="lead")
-    property: Mapped["Property"] = relationship(back_populates="leads")
+    business: Mapped["Business"] = relationship(back_populates="leads")
 
     __table_args__ = (
-        Index("ix_leads_property_status", "property_id", "status"),
-        Index("ix_leads_property_date", "property_id", "captured_at"),
+        Index("ix_leads_property_status", "business_id", "status"),
+        Index("ix_leads_property_date", "business_id", "captured_at"),
     )
 
 
@@ -535,8 +516,8 @@ class KBDocument(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    property_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("properties.id"), nullable=False
+    business_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("businesses.id"), nullable=False
     )
     doc_type: Mapped[str] = mapped_column(
         String(30), nullable=False
@@ -551,16 +532,16 @@ class KBDocument(Base):
     )
 
     # Relationships
-    property: Mapped["Property"] = relationship(back_populates="kb_documents")
+    business: Mapped["Business"] = relationship(back_populates="kb_documents")
 
     __table_args__ = (
-        Index("ix_kb_property_type", "property_id", "doc_type"),
+        Index("ix_kb_property_type", "business_id", "doc_type"),
     )
 
 
 class AnalyticsDaily(Base):
     """
-    Pre-aggregated daily analytics per property.
+    Pre-aggregated daily analytics per business.
     Populated by a nightly cron job or materialized view refresh.
     Powers the GM dashboard and daily email report.
     """
@@ -569,8 +550,8 @@ class AnalyticsDaily(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    property_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("properties.id"), nullable=False
+    business_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("businesses.id"), nullable=False
     )
     report_date: Mapped[date] = mapped_column(Date, nullable=False)
     total_inquiries: Mapped[int] = mapped_column(Integer, default=0)
@@ -596,12 +577,12 @@ class AnalyticsDaily(Base):
     # Example: {"whatsapp": 29, "web": 14, "email": 4, "facebook": 2, "instagram": 1, "tiktok": 0}
 
     # Relationships
-    property: Mapped["Property"] = relationship(back_populates="analytics_daily")
+    business: Mapped["Business"] = relationship(back_populates="analytics_daily")
 
     __table_args__ = (
         Index(
             "ix_analytics_property_date",
-            "property_id",
+            "business_id",
             "report_date",
             unique=True,
         ),
@@ -662,51 +643,6 @@ class SystemConfig(Base):
 # ─────────────────────────────────────────────────────────────
 
 
-class AuditRecord(Base):
-    """
-    Stores a completed after-hours revenue audit submitted via the public
-    calculator at /audit or the internal admin tool.
-    """
-    __tablename__ = "audit_records"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-
-    # Contact info (filled after lead gate)
-    hotel_name: Mapped[str | None] = mapped_column(String(255))
-    contact_name: Mapped[str | None] = mapped_column(String(255))
-    email: Mapped[str | None] = mapped_column(String(255))
-    phone: Mapped[str | None] = mapped_column(String(30))
-
-    # Audit inputs
-    room_count: Mapped[int] = mapped_column(Integer, nullable=False)
-    adr: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    daily_msgs: Mapped[Decimal] = mapped_column(Numeric(8, 1), nullable=False)
-    front_desk_close: Mapped[str] = mapped_column(String(10), nullable=False, server_default="22:00")
-    ota_commission_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, server_default="18.0")
-
-    # Computed results (RM)
-    revenue_lost_monthly: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    ota_commission_monthly: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    total_monthly_leakage: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    annual_leakage: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    conservative_annual: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    roi_multiple: Mapped[Decimal] = mapped_column(Numeric(8, 1), nullable=False)
-
-    # Pipeline tracking
-    source: Mapped[str] = mapped_column(String(20), nullable=False, server_default="web")
-    # "web" | "admin"
-    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="submitted")
-    # "calculated" | "submitted" | "contacted" | "qualified" | "converted" | "closed"
-    notes: Mapped[str | None] = mapped_column(Text)
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
 
 
 # ─────────────────────────────────────────────────────────────
@@ -714,93 +650,5 @@ class AuditRecord(Base):
 # ─────────────────────────────────────────────────────────────
 
 
-class ShadowPilotConversation(Base):
-    """
-    Tracks individual guest conversations observed during shadow pilot mode.
-    Guest phone is encrypted at rest; only a SHA-256 hash is used for lookups.
-    Staff message content is NEVER stored — timestamps only.
-    """
-    __tablename__ = "shadow_pilot_conversations"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    property_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("properties.id"), nullable=False)
-    guest_phone_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
-    guest_phone_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    guest_name: Mapped[str | None] = mapped_column(String(255))
-    first_guest_message_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    last_guest_message_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    first_staff_reply_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    last_staff_reply_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    response_time_minutes: Mapped[float | None] = mapped_column(Numeric(10, 2))
-    is_after_hours: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    is_unanswered: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    is_booking_intent: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    is_group_booking: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    is_repeat_guest: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    intent: Mapped[str | None] = mapped_column(String(50))
-    intent_confidence: Mapped[float | None] = mapped_column(Numeric(5, 4))
-    top_topic: Mapped[str | None] = mapped_column(String(100))
-    message_count_guest: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
-    message_count_staff: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    language_detected: Mapped[str | None] = mapped_column(String(20))
-    estimated_value_rm: Mapped[float | None] = mapped_column(Numeric(10, 2))
-    status: Mapped[str] = mapped_column(String(20), default="open", server_default="open")
-    first_guest_message_preview: Mapped[str | None] = mapped_column(String(500))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-    __table_args__ = (
-        Index("idx_spc_property_id", "property_id"),
-        Index("idx_spc_first_message", "first_guest_message_at"),
-        Index("idx_spc_property_after_hours", "property_id", "is_after_hours"),
-        Index("idx_spc_property_unanswered", "property_id", "is_unanswered"),
-        Index("idx_spc_phone_hash", "property_id", "guest_phone_hash"),
-    )
 
 
-class ShadowPilotAnalyticsDaily(Base):
-    """
-    Pre-aggregated daily analytics for shadow pilot properties.
-    One row per property per day — computed by the daily aggregation job.
-    """
-    __tablename__ = "shadow_pilot_analytics_daily"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    property_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("properties.id"), nullable=False)
-    report_date: Mapped[date] = mapped_column(Date, nullable=False)
-    total_inquiries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    after_hours_inquiries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    business_hours_inquiries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    booking_intent_inquiries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    group_booking_inquiries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    repeat_guest_contacts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    responded_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    unanswered_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    after_hours_unanswered: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    after_hours_responded_next_day: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    avg_response_time_minutes: Mapped[float | None] = mapped_column(Numeric(10, 2))
-    avg_response_time_business_hours: Mapped[float | None] = mapped_column(Numeric(10, 2))
-    avg_response_time_after_hours: Mapped[float | None] = mapped_column(Numeric(10, 2))
-    response_time_over_1hr: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    response_time_over_4hr: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    response_time_over_8hr: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    response_time_over_24hr: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    revenue_at_risk_total: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0, server_default="0.0")
-    revenue_at_risk_conservative: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0, server_default="0.0")
-    ota_commission_equivalent: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0, server_default="0.0")
-    slow_response_revenue_at_risk: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0, server_default="0.0")
-    daily_revenue_leakage: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0, server_default="0.0")
-    peak_inquiry_hour: Mapped[int | None] = mapped_column(Integer)
-    after_hours_peak_hour: Mapped[int | None] = mapped_column(Integer)
-    inquiries_by_hour: Mapped[dict | None] = mapped_column(JSON)
-    inquiries_by_day_of_week: Mapped[dict | None] = mapped_column(JSON)
-    top_inquiry_topics: Mapped[list | None] = mapped_column(JSON)
-    top_unanswered_topics: Mapped[list | None] = mapped_column(JSON)
-    booking_intent_rate: Mapped[float | None] = mapped_column(Numeric(5, 4))
-    language_breakdown: Mapped[dict | None] = mapped_column(JSON)
-    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    __table_args__ = (
-        UniqueConstraint("property_id", "report_date", name="uq_spad_property_date"),
-        Index("idx_spad_property_date", "property_id", "report_date"),
-    )

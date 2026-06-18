@@ -95,7 +95,7 @@ export default function AnnouncementsPage() {
             <div style={{ marginBottom: 32 }}>
                 <h1>Announcements</h1>
                 <p className="text-muted text-sm" style={{ marginTop: 4 }}>
-                    Broadcast maintenance notices, incidents, and feature updates to hotel clients
+                    Broadcast maintenance notices, incidents, and feature updates to solopreneur clients
                 </p>
             </div>
 

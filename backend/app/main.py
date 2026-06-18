@@ -92,7 +92,7 @@ async def lifespan(app: FastAPI):
         (
             "properties_shadow_pilot",
             """
-            ALTER TABLE properties
+            ALTER TABLE businesses
                 ADD COLUMN IF NOT EXISTS audit_only_mode BOOLEAN NOT NULL DEFAULT FALSE,
                 ADD COLUMN IF NOT EXISTS shadow_pilot_start_date TIMESTAMPTZ,
                 ADD COLUMN IF NOT EXISTS shadow_pilot_phone VARCHAR(20);
@@ -101,14 +101,14 @@ async def lifespan(app: FastAPI):
         (
             "properties_shadow_pilot_v2",
             """
-            ALTER TABLE properties
+            ALTER TABLE businesses
                 ADD COLUMN IF NOT EXISTS shadow_pilot_mode BOOLEAN NOT NULL DEFAULT FALSE,
                 ADD COLUMN IF NOT EXISTS shadow_pilot_session_active BOOLEAN NOT NULL DEFAULT FALSE,
                 ADD COLUMN IF NOT EXISTS shadow_pilot_session_last_seen TIMESTAMPTZ,
                 ADD COLUMN IF NOT EXISTS shadow_pilot_dashboard_token TEXT,
                 ADD COLUMN IF NOT EXISTS shadow_pilot_dashboard_token_expires TIMESTAMPTZ,
                 ADD COLUMN IF NOT EXISTS avg_stay_nights NUMERIC(5,2) NOT NULL DEFAULT 1.0;
-            UPDATE properties SET shadow_pilot_mode = audit_only_mode WHERE audit_only_mode = TRUE AND shadow_pilot_mode = FALSE;
+            UPDATE businesses SET shadow_pilot_mode = audit_only_mode WHERE audit_only_mode = TRUE AND shadow_pilot_mode = FALSE;
             """
         ),
         (
@@ -116,7 +116,7 @@ async def lifespan(app: FastAPI):
             """
             CREATE TABLE IF NOT EXISTS shadow_pilot_conversations (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+                business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
                 guest_phone_encrypted TEXT NOT NULL,
                 guest_phone_hash VARCHAR(64) NOT NULL,
                 guest_name VARCHAR(255),
@@ -142,11 +142,11 @@ async def lifespan(app: FastAPI):
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 updated_at TIMESTAMPTZ DEFAULT NOW()
             );
-            CREATE INDEX IF NOT EXISTS idx_spc_property_id ON shadow_pilot_conversations(property_id);
+            CREATE INDEX IF NOT EXISTS idx_spc_property_id ON shadow_pilot_conversations(business_id);
             CREATE INDEX IF NOT EXISTS idx_spc_first_message ON shadow_pilot_conversations(first_guest_message_at);
-            CREATE INDEX IF NOT EXISTS idx_spc_property_after_hours ON shadow_pilot_conversations(property_id, is_after_hours);
-            CREATE INDEX IF NOT EXISTS idx_spc_property_unanswered ON shadow_pilot_conversations(property_id, is_unanswered);
-            CREATE INDEX IF NOT EXISTS idx_spc_phone_hash ON shadow_pilot_conversations(property_id, guest_phone_hash);
+            CREATE INDEX IF NOT EXISTS idx_spc_property_after_hours ON shadow_pilot_conversations(business_id, is_after_hours);
+            CREATE INDEX IF NOT EXISTS idx_spc_property_unanswered ON shadow_pilot_conversations(business_id, is_unanswered);
+            CREATE INDEX IF NOT EXISTS idx_spc_phone_hash ON shadow_pilot_conversations(business_id, guest_phone_hash);
             """
         ),
         (
@@ -154,7 +154,7 @@ async def lifespan(app: FastAPI):
             """
             CREATE TABLE IF NOT EXISTS shadow_pilot_analytics_daily (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+                business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
                 report_date DATE NOT NULL,
                 total_inquiries INTEGER NOT NULL DEFAULT 0,
                 after_hours_inquiries INTEGER NOT NULL DEFAULT 0,
@@ -187,9 +187,9 @@ async def lifespan(app: FastAPI):
                 booking_intent_rate NUMERIC(5,4),
                 language_breakdown JSONB,
                 computed_at TIMESTAMPTZ DEFAULT NOW(),
-                UNIQUE(property_id, report_date)
+                UNIQUE(business_id, report_date)
             );
-            CREATE INDEX IF NOT EXISTS idx_spad_property_date ON shadow_pilot_analytics_daily(property_id, report_date);
+            CREATE INDEX IF NOT EXISTS idx_spad_property_date ON shadow_pilot_analytics_daily(business_id, report_date);
             """
         ),
         (
@@ -223,7 +223,6 @@ async def lifespan(app: FastAPI):
                 email                  VARCHAR(255),
                 phone                  VARCHAR(30),
                 room_count             INTEGER NOT NULL,
-                adr                    NUMERIC(10,2) NOT NULL,
                 daily_msgs             NUMERIC(8,1) NOT NULL,
                 front_desk_close       VARCHAR(10) NOT NULL DEFAULT '22:00',
                 ota_commission_rate    NUMERIC(5,2) NOT NULL DEFAULT 18.0,
@@ -248,7 +247,7 @@ async def lifespan(app: FastAPI):
         (
             "properties_shadow_pilot_report_sent_at",
             """
-            ALTER TABLE properties
+            ALTER TABLE businesses
                 ADD COLUMN IF NOT EXISTS shadow_pilot_report_sent_at TIMESTAMPTZ;
             """
         ),
@@ -264,7 +263,7 @@ async def lifespan(app: FastAPI):
         (
             "properties_audit_leakage",
             """
-            ALTER TABLE properties
+            ALTER TABLE businesses
                 ADD COLUMN IF NOT EXISTS audit_estimated_monthly_leakage_rm NUMERIC(12,2);
             """
         ),

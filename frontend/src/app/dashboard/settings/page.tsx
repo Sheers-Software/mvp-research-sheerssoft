@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { apiGet, apiPut } from '@/lib/api';
 
-interface PropertySettings {
+interface BusinessSettings {
     id: string;
     name: string;
     notification_email: string | null;
@@ -19,8 +19,8 @@ interface PropertySettings {
 }
 
 export default function SettingsPage() {
-    const [settings, setSettings] = useState<PropertySettings | null>(null);
-    const [propertyId, setPropertyId] = useState<string | null>(null);
+    const [settings, setSettings] = useState<BusinessSettings | null>(null);
+    const [businessId, setBusinessId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
@@ -38,9 +38,9 @@ export default function SettingsPage() {
     useEffect(() => {
         apiGet<any>('/analytics/dashboard')
             .then((data) => {
-                if (data?.property_id) {
-                    setPropertyId(data.property_id);
-                    return apiGet<PropertySettings>(`/properties/${data.property_id}/settings`);
+                if (data?.business_id) {
+                    setBusinessId(data.business_id);
+                    return apiGet<BusinessSettings>(`/businesses/${data.business_id}/settings`);
                 }
             })
             .then((s) => {
@@ -59,11 +59,11 @@ export default function SettingsPage() {
     }, []);
 
     const save = async () => {
-        if (!propertyId) return;
+        if (!businessId) return;
         setSaving(true);
         setError('');
         try {
-            await apiPut(`/properties/${propertyId}/settings`, {
+            await apiPut(`/businesses/${businessId}/settings`, {
                 notification_email: notificationEmail || null,
                 operating_hours: {
                     start: hoursStart,
@@ -91,9 +91,9 @@ export default function SettingsPage() {
     return (
         <div>
             <div style={{ marginBottom: 32 }}>
-                <h1>Property Settings</h1>
+                <h1>Business Settings</h1>
                 <p className="text-muted text-sm" style={{ marginTop: 4 }}>
-                    Configure your property for the AI concierge
+                    Configure your business for the AI concierge
                 </p>
             </div>
 
@@ -232,13 +232,13 @@ export default function SettingsPage() {
 
             </div>
 
-            {/* Property Info (read-only) */}
+            {/* Business Info (read-only) */}
             {settings && (
                 <div className="card" style={{ padding: 24, marginTop: 24 }}>
-                    <h3 style={{ fontSize: 15, marginBottom: 16 }}>🏨 Property Information</h3>
+                    <h3 style={{ fontSize: 15, marginBottom: 16 }}>🏨 Business Information</h3>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                         <div>
-                            <div className="text-sm text-muted">Property Name</div>
+                            <div className="text-sm text-muted">Business Name</div>
                             <div className="text-sm" style={{ marginTop: 2, fontWeight: 500 }}>{settings.name}</div>
                         </div>
                         <div>

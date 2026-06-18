@@ -36,11 +36,11 @@ class SessionService:
         redis = await self._get_redis()
         await redis.delete(session_key)
 
-    def generate_key(self, property_id: str, channel: str, guest_identifier: str) -> str:
+    def generate_key(self, business_id: str, channel: str, guest_identifier: str) -> str:
         """
         Generate a standardized session key.
-        Format: session:{property_id}:{channel}:{guest_identifier}
+        Format: session:{business_id}:{channel}:{guest_identifier}
         """
-        return f"session:{property_id}:{channel}:{guest_identifier}"
+        return f"session:{business_id}:{channel}:{guest_identifier}"
 
 session_service = SessionService()

@@ -11,7 +11,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.models import OnboardingProgress, Property
+from app.models import OnboardingProgress, Business
 
 logger = structlog.get_logger()
 
@@ -19,7 +19,7 @@ logger = structlog.get_logger()
 async def setup_channels(
     db: AsyncSession,
     tenant_id: str,
-    property_id: str,
+    business_id: str,
     channels: list[str],
     whatsapp_provider: str = "meta",
 ):
@@ -31,24 +31,24 @@ async def setup_channels(
     for channel in channels:
         try:
             if channel == "whatsapp":
-                await _setup_whatsapp(db, property_id, whatsapp_provider)
+                await _setup_whatsapp(db, business_id, whatsapp_provider)
             elif channel == "email":
-                await _setup_email(db, property_id)
+                await _setup_email(db, business_id)
             elif channel == "website":
-                await _setup_website(db, property_id)
+                await _setup_website(db, business_id)
             else:
                 logger.warning(f"Unknown channel: {channel}")
                 continue
 
             # Mark channel as active
-            await _update_channel_status(db, tenant_id, property_id, channel, "active")
-            logger.info(f"Channel '{channel}' setup successful", property_id=property_id)
+            await _update_channel_status(db, tenant_id, business_id, channel, "active")
+            logger.info(f"Channel '{channel}' setup successful", business_id=business_id)
 
         except Exception as e:
             error_msg = str(e)
             errors[channel] = error_msg
-            await _update_channel_status(db, tenant_id, property_id, channel, "failed")
-            logger.error(f"Channel '{channel}' setup failed", property_id=property_id, error=error_msg)
+            await _update_channel_status(db, tenant_id, business_id, channel, "failed")
+            logger.error(f"Channel '{channel}' setup failed", business_id=business_id, error=error_msg)
 
     # Store errors if any
     if errors:
@@ -56,7 +56,7 @@ async def setup_channels(
             update(OnboardingProgress)
             .where(
                 OnboardingProgress.tenant_id == uuid.UUID(tenant_id),
-                OnboardingProgress.property_id == uuid.UUID(property_id),
+                OnboardingProgress.business_id == uuid.UUID(business_id),
             )
             .values(channel_errors=errors)
         )
@@ -64,13 +64,13 @@ async def setup_channels(
         await db.commit()
 
         # Notify account manager of failures
-        await _notify_account_manager_failure(db, tenant_id, property_id, errors)
+        await _notify_account_manager_failure(db, tenant_id, business_id, errors)
 
     return errors
 
 
 async def _update_channel_status(
-    db: AsyncSession, tenant_id: str, property_id: str, channel: str, status: str
+    db: AsyncSession, tenant_id: str, business_id: str, channel: str, status: str
 ):
     """Update a specific channel's status in OnboardingProgress."""
     column_map = {
@@ -86,7 +86,7 @@ async def _update_channel_status(
         update(OnboardingProgress)
         .where(
             OnboardingProgress.tenant_id == uuid.UUID(tenant_id),
-            OnboardingProgress.property_id == uuid.UUID(property_id),
+            OnboardingProgress.business_id == uuid.UUID(business_id),
         )
         .values(**{column: status})
     )
@@ -98,9 +98,9 @@ async def _update_channel_status(
 # WhatsApp Setup
 # ─────────────────────────────────────────────────────────────
 
-async def _setup_whatsapp(db: AsyncSession, property_id: str, provider: str):
+async def _setup_whatsapp(db: AsyncSession, business_id: str, provider: str):
     """
-    Configure WhatsApp channel for a property.
+    Configure WhatsApp channel for a business.
 
     Meta Cloud API: Semi-automated — stores credentials, verifies webhook URL.
     The client must manually grant access to our Meta Business App.
@@ -108,62 +108,62 @@ async def _setup_whatsapp(db: AsyncSession, property_id: str, provider: str):
     Twilio: Fully automated — configures webhook URL via Twilio API.
     """
     settings = get_settings()
-    prop_stmt = select(Property).where(Property.id == uuid.UUID(property_id))
+    prop_stmt = select(Business).where(Business.id == uuid.UUID(business_id))
     result = await db.execute(prop_stmt)
     prop = result.scalar_one_or_none()
 
     if not prop:
-        raise Exception(f"Property {property_id} not found")
+        raise Exception(f"Business {business_id} not found")
 
     if provider == "twilio":
         if not settings.twilio_account_sid or not settings.twilio_auth_token:
             raise Exception("Twilio credentials not configured. Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN.")
 
         if not prop.twilio_phone_number:
-            raise Exception("Twilio phone number not set on property.")
+            raise Exception("Twilio phone number not set on business.")
 
         # In production, we would call Twilio API to set the webhook URL:
         # POST /2010-04-01/Accounts/{sid}/IncomingPhoneNumbers/{phone_sid}
         # Setting SmsUrl/StatusCallback to our webhook endpoint
         logger.info(
             "WhatsApp (Twilio) setup: webhook URL configured",
-            property_id=property_id,
+            business_id=business_id,
             webhook_url=f"https://api.nocturnai.com/api/v1/webhook/twilio/whatsapp",
             phone=prop.twilio_phone_number,
         )
 
     elif provider == "meta":
         if not prop.whatsapp_number:
-            raise Exception("WhatsApp Business number not set on property.")
+            raise Exception("WhatsApp Business number not set on business.")
 
         # Meta requires manual business verification.
         # We log the required webhook URL for the onboarding team.
         logger.info(
             "WhatsApp (Meta) setup: awaiting client Meta Business access grant",
-            property_id=property_id,
-            webhook_url=f"https://api.nocturnai.com/api/v1/webhook/whatsapp?property_slug={prop.slug}",
+            business_id=business_id,
+            webhook_url=f"https://api.nocturnai.com/api/v1/webhook/whatsapp?business_slug={prop.slug}",
             phone=prop.whatsapp_number,
         )
 
-    logger.info("WhatsApp channel configured", property_id=property_id, provider=provider)
+    logger.info("WhatsApp channel configured", business_id=business_id, provider=provider)
 
 
 # ─────────────────────────────────────────────────────────────
 # Email Setup (SendGrid Inbound Parse)
 # ─────────────────────────────────────────────────────────────
 
-async def _setup_email(db: AsyncSession, property_id: str):
+async def _setup_email(db: AsyncSession, business_id: str):
     """
     Configure email channel via SendGrid Inbound Parse.
     Generates a unique inbound address and (in production) configures SendGrid via API.
     """
     settings = get_settings()
-    prop_stmt = select(Property).where(Property.id == uuid.UUID(property_id))
+    prop_stmt = select(Business).where(Business.id == uuid.UUID(business_id))
     result = await db.execute(prop_stmt)
     prop = result.scalar_one_or_none()
 
     if not prop:
-        raise Exception(f"Property {property_id} not found")
+        raise Exception(f"Business {business_id} not found")
 
     # Generate inbound email address
     inbound_email = f"{prop.slug}@inbound.nocturnai.com"
@@ -173,7 +173,7 @@ async def _setup_email(db: AsyncSession, property_id: str):
     # { "hostname": "inbound.nocturnai.com", "url": webhook_url, "spam_check": true }
     logger.info(
         "Email channel configured",
-        property_id=property_id,
+        business_id=business_id,
         inbound_email=inbound_email,
         note="Client must forward reservation email to this address",
     )
@@ -188,26 +188,26 @@ async def _setup_email(db: AsyncSession, property_id: str):
 # Website Chat Widget Setup
 # ─────────────────────────────────────────────────────────────
 
-async def _setup_website(db: AsyncSession, property_id: str):
+async def _setup_website(db: AsyncSession, business_id: str):
     """
-    Generate the web chat widget embed code for a property.
+    Generate the web chat widget embed code for a business.
     This is fully automated — just generates the script tag.
     """
-    prop_stmt = select(Property).where(Property.id == uuid.UUID(property_id))
+    prop_stmt = select(Business).where(Business.id == uuid.UUID(business_id))
     result = await db.execute(prop_stmt)
     prop = result.scalar_one_or_none()
 
     if not prop:
-        raise Exception(f"Property {property_id} not found")
+        raise Exception(f"Business {business_id} not found")
 
     embed_code = (
         f'<script src="https://widget.nocturnai.com/chat.js" '
-        f'data-property="{prop.slug}"></script>'
+        f'data-business="{prop.slug}"></script>'
     )
 
     logger.info(
         "Website chat widget configured",
-        property_id=property_id,
+        business_id=business_id,
         embed_code=embed_code,
     )
 
@@ -217,7 +217,7 @@ async def _setup_website(db: AsyncSession, property_id: str):
 # ─────────────────────────────────────────────────────────────
 
 async def _notify_account_manager_failure(
-    db: AsyncSession, tenant_id: str, property_id: str, errors: dict
+    db: AsyncSession, tenant_id: str, business_id: str, errors: dict
 ):
     """
     Notify the assigned Account Manager when channel setup fails.
@@ -240,7 +240,7 @@ async def _notify_account_manager_failure(
         f"<p>The following channels encountered errors during auto-setup:</p>"
         f"<pre>{error_lines}</pre>"
         f"<p>Please check the SuperAdmin dashboard to retry or configure manually.</p>"
-        f"<p>Tenant ID: {tenant_id}<br>Property ID: {property_id}</p>"
+        f"<p>Tenant ID: {tenant_id}<br>Business ID: {business_id}</p>"
     )
 
     # Send to assigned account manager or default staff email

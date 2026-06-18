@@ -9,13 +9,13 @@ router = APIRouter()
 
 
 @router.websocket("/ws/chat")
-async def websocket_endpoint(websocket: WebSocket, property_id: str, session_id: str):
+async def websocket_endpoint(websocket: WebSocket, business_id: str, session_id: str):
     """
     WebSocket endpoint for the web chat widget.
-    URL: ws://domain/api/v1/ws/chat?property_id=...&session_id=...
+    URL: ws://domain/api/v1/ws/chat?business_id=...&session_id=...
 
     Protocol:
-      Client → Server:  {"message": "text...", "property_id": "...", "session_id": "..."}
+      Client → Server:  {"message": "text...", "business_id": "...", "session_id": "..."}
       Server → Client:  {"type": "typing"}
       Server → Client:  {"type": "ai_response", "response": "text..."}
       Server → Client:  {"type": "error", "detail": "..."}
@@ -24,10 +24,10 @@ async def websocket_endpoint(websocket: WebSocket, property_id: str, session_id:
 
     from app.database import async_session, set_db_context
 
-    logger.info("WEBSOCKET_CONNECT", session_id=session_id, property_id=property_id)
+    logger.info("WEBSOCKET_CONNECT", session_id=session_id, business_id=business_id)
 
     try:
-        pid = uuid.UUID(property_id)
+        pid = uuid.UUID(business_id)
         guest_identifier = f"web:{session_id}"
 
         while True:
@@ -44,11 +44,11 @@ async def websocket_endpoint(websocket: WebSocket, property_id: str, session_id:
 
             # Process with AI
             async with async_session() as db:
-                await set_db_context(db, property_id)
+                await set_db_context(db, business_id)
 
                 result = await process_guest_message(
                     db=db,
-                    property_id=pid,
+                    business_id=pid,
                     guest_identifier=guest_identifier,
                     channel="web",
                     message_text=user_text,

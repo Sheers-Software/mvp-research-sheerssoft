@@ -27,9 +27,9 @@ logger = structlog.get_logger()
 router = APIRouter()
 
 
-@router.get("/properties/{property_id}/leads", response_model=list[LeadResponse])
+@router.get("/businesses/{business_id}/leads", response_model=list[LeadResponse])
 async def list_leads(
-    property_id: str,
+    business_id: str,
     status: str = Query(None),
     intent: str = Query(None),
     from_date: date = Query(None),
@@ -38,10 +38,10 @@ async def list_leads(
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(check_property_access),
 ):
-    """List leads for a property (GM dashboard leads view)."""
+    """List leads for a business (GM dashboard leads view)."""
     query = (
         select(Lead)
-        .where(Lead.property_id == uuid.UUID(property_id))
+        .where(Lead.business_id == uuid.UUID(business_id))
         .order_by(Lead.captured_at.desc())
         .limit(limit)
     )
@@ -180,9 +180,9 @@ async def convert_lead(
     )
 
 
-@router.get("/properties/{property_id}/leads/export")
+@router.get("/businesses/{business_id}/leads/export")
 async def export_leads_csv(
-    property_id: str,
+    business_id: str,
     status: str = Query(None),
     intent: str = Query(None),
     from_date: date = Query(None),
@@ -193,7 +193,7 @@ async def export_leads_csv(
     """Export leads as CSV file."""
     query = (
         select(Lead)
-        .where(Lead.property_id == uuid.UUID(property_id))
+        .where(Lead.business_id == uuid.UUID(business_id))
         .order_by(Lead.captured_at.desc())
     )
 
@@ -234,7 +234,7 @@ async def export_leads_csv(
         ])
 
     output.seek(0)
-    filename = f"leads_{property_id}_{date.today().isoformat()}.csv"
+    filename = f"leads_{business_id}_{date.today().isoformat()}.csv"
 
     return StreamingResponse(
         iter([output.getvalue()]),
@@ -269,7 +269,7 @@ async def generate_payment_link(
             amount_rm=body.amount_rm,
             description=body.description,
             lead_id=lead_id,
-            property_id=str(lead.property_id),
+            business_id=str(lead.business_id),
             success_url=f"{settings.frontend_url}/portal?booking_confirmed=true",
             cancel_url=f"{settings.frontend_url}/portal",
         )

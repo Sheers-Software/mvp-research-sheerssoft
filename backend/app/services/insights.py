@@ -1,6 +1,6 @@
 """
 Insights service for determining guest sentiment and extracting common FAQs over time.
-Used to generate the '30-Day Guest Insight Report' marketed to properties.
+Used to generate the '30-Day Guest Insight Report' marketed to businesses.
 """
 
 import uuid
@@ -31,12 +31,12 @@ Output format should be clean markdown that can be sent directly in an email blo
 
 async def compute_monthly_insights(
     db: AsyncSession,
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     days_back: int = 30
 ) -> str | None:
     """
     Fetch all conversations over the last N days and run them through Gemini to
-    extract high-level insights for the property manager.
+    extract high-level insights for the business manager.
     """
     if not gemini_client:
         logger.warning("Monthly Insights: Gemini API key not configured, skipping report.")
@@ -48,7 +48,7 @@ async def compute_monthly_insights(
     conv_result = await db.execute(
         select(Conversation.id)
         .where(
-            Conversation.property_id == property_id,
+            Conversation.business_id == business_id,
             Conversation.started_at >= cutoff_date
         )
     )
@@ -87,7 +87,7 @@ async def compute_monthly_insights(
         return "Insufficient conversational data to extract meaningful insights."
 
     # 4. Generate Insight Report using Gemini
-    logger.info("Generating Monthly Insights Report", property_id=str(property_id), transcript_words=len(full_transcript.split()))
+    logger.info("Generating Monthly Insights Report", business_id=str(business_id), transcript_words=len(full_transcript.split()))
     try:
         from google.genai import types
         response = await gemini_client.aio.models.generate_content(
@@ -100,5 +100,5 @@ async def compute_monthly_insights(
         )
         return response.text.strip()
     except Exception as e:
-        logger.error("Failed to generate insights report", property_id=str(property_id), error=str(e))
+        logger.error("Failed to generate insights report", business_id=str(business_id), error=str(e))
         return "Error analyzing transcripts. Please try again later."

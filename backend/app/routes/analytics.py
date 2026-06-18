@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import AnalyticsDaily, Property, Tenant
+from app.models import AnalyticsDaily, Business, Tenant
 from app.schemas import AnalyticsSummaryResponse
 from app.auth import verify_jwt, check_property_access
 
@@ -19,19 +19,19 @@ logger = structlog.get_logger()
 router = APIRouter()
 
 
-@router.get("/properties/{property_id}/analytics")
+@router.get("/businesses/{business_id}/analytics")
 async def get_analytics(
-    property_id: str,
+    business_id: str,
     from_date: date = Query(None),
     to_date: date = Query(None),
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(check_property_access),
 ):
     """
-    Get analytics for a property over a date range.
+    Get analytics for a business over a date range.
     Used by the GM dashboard Money View and Operations View.
     """
-    pid = uuid.UUID(property_id)
+    pid = uuid.UUID(business_id)
 
     if not from_date:
         from_date = date.today() - timedelta(days=30)
@@ -41,7 +41,7 @@ async def get_analytics(
     result = await db.execute(
         select(AnalyticsDaily)
         .where(
-            AnalyticsDaily.property_id == pid,
+            AnalyticsDaily.business_id == pid,
             AnalyticsDaily.report_date >= from_date,
             AnalyticsDaily.report_date <= to_date,
         )
@@ -98,7 +98,7 @@ async def get_analytics(
     performance_fee_balance_rm = 0.0
     try:
         prop_result = await db.execute(
-            select(Property).where(Property.id == pid)
+            select(Business).where(Business.id == pid)
         )
         prop = prop_result.scalar_one_or_none()
         if prop and prop.tenant_id:
@@ -112,7 +112,7 @@ async def get_analytics(
         pass
 
     return {
-        "property_id": property_id,
+        "business_id": business_id,
         "period": {"from": from_date.isoformat(), "to": to_date.isoformat()},
         "totals": totals,
         "daily": daily,
@@ -120,28 +120,28 @@ async def get_analytics(
     }
 
 
-@router.get("/properties/{property_id}/analytics/live")
+@router.get("/businesses/{business_id}/analytics/live")
 async def get_analytics_live(
-    property_id: str,
+    business_id: str,
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(verify_jwt),
 ):
     """Get real-time analytics for the current day."""
     from app.services.analytics import get_realtime_stats
-    stats = await get_realtime_stats(db, uuid.UUID(property_id))
+    stats = await get_realtime_stats(db, uuid.UUID(business_id))
     return stats
 
 
-@router.get("/properties/{property_id}/analytics/summary", response_model=AnalyticsSummaryResponse)
+@router.get("/businesses/{business_id}/analytics/summary", response_model=AnalyticsSummaryResponse)
 async def get_analytics_summary(
-    property_id: str,
+    business_id: str,
     from_date: date = Query(None),
     to_date: date = Query(None),
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(check_property_access),
 ):
     """Get aggregated analytics summary (hero stats for Money Slide)."""
-    pid = uuid.UUID(property_id)
+    pid = uuid.UUID(business_id)
     
     if not from_date:
         from_date = date.today() - timedelta(days=30)
@@ -151,7 +151,7 @@ async def get_analytics_summary(
     result = await db.execute(
         select(AnalyticsDaily)
         .where(
-            AnalyticsDaily.property_id == pid,
+            AnalyticsDaily.business_id == pid,
             AnalyticsDaily.report_date >= from_date,
             AnalyticsDaily.report_date <= to_date
         )

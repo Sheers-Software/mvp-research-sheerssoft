@@ -6,7 +6,7 @@ import { apiGet } from '@/lib/api';
 interface PipelineItem {
     tenant_id: string;
     tenant_name: string;
-    property_id: string;
+    business_id: string;
     created_at: string | null;
 }
 

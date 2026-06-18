@@ -15,7 +15,7 @@ class NormalizedMessage(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     
     # Context info
-    property_id: str = Field(..., description="Target property UUID")
+    business_id: str = Field(..., description="Target business UUID")
     
     # Raw metadata for debugging/logging
     metadata: Optional[Dict[str, Any]] = None

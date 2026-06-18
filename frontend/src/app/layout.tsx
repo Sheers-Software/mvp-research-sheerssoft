@@ -14,8 +14,8 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Nocturn AI — Hotel Concierge Intelligence",
-  description: "AI-powered hotel inquiry capture and conversion engine by SheersSoft",
+  title: "Nocturn AI — AI Concierge for Solopreneurs",
+  description: "AI-powered business inquiry capture and conversion engine by SheersSoft",
   icons: { icon: '/favicon.ico' },
 };
 

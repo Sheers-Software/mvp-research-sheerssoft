@@ -9,7 +9,7 @@ interface Membership {
     tenant_id: string;
     tenant_name: string | null;
     role: string;
-    accessible_property_ids: string[] | null;
+    accessible_business_ids: string[] | null;
 }
 
 export interface User {

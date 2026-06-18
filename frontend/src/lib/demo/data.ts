@@ -2,7 +2,7 @@
  * Self-contained seeded demo dataset for the investor/buyer demo build.
  *
  * Everything here is fake but internally consistent and tuned to tell a strong
- * ROI story for a fictional hotel group ("Lumière Hospitality Group"). When
+ * ROI story for a fictional business portfolio ("Sarah's Creative Services"). When
  * NEXT_PUBLIC_DEMO_MODE === 'true', lib/api.ts and lib/auth.tsx read from this
  * module instead of hitting a backend — so the entire app runs on Vercel's free
  * tier with zero infrastructure and nothing to break during a live pitch.
@@ -30,10 +30,10 @@ export function setPersona(p: DemoPersona) {
 // ─── Core IDs ─────────────────────────────────────────────────────────────────
 
 export const TENANT_ID = 'demo-tenant-lumiere';
-export const PROPERTY_ID = 'demo-prop-lumiere-kl';
-export const PROPERTY_ID_2 = 'demo-prop-lumiere-penang';
-export const PROPERTY_NAME = 'Lumière Suites Kuala Lumpur';
-export const PROPERTY_NAME_2 = 'Lumière Boutique Penang';
+export const BUSINESS_ID = 'demo-prop-lumiere-kl';
+export const BUSINESS_ID_2 = 'demo-prop-lumiere-penang';
+export const BUSINESS_NAME = 'Sarah Photography';
+export const BUSINESS_NAME_2 = 'Sarah Videography';
 
 const now = () => new Date();
 const iso = (d: Date) => d.toISOString();
@@ -50,13 +50,13 @@ export function demoUser(persona: DemoPersona = getPersona()) {
             persona === 'superadmin'
                 ? 'admin@sheerssoft.com'
                 : persona === 'owner'
-                ? 'aisha.rahman@lumierehotels.com'
-                : 'staff@lumierehotels.com',
+                ? 'sarah@sarahphotography.com'
+                : 'staff@sarahphotography.com',
         full_name:
             persona === 'superadmin'
                 ? 'SheersSoft Admin'
                 : persona === 'owner'
-                ? 'Aisha Rahman'
+                ? 'Sarah Jane'
                 : 'Daniel Tan',
         phone: '+60 12-345 6789',
         last_login_at: iso(hoursAgo(2)),
@@ -81,9 +81,9 @@ export function demoUser(persona: DemoPersona = getPersona()) {
             {
                 id: 'demo-membership-1',
                 tenant_id: TENANT_ID,
-                tenant_name: 'Lumière Hospitality Group',
+                tenant_name: "Sarah's Creative Services",
                 role,
-                accessible_property_ids: null,
+                accessible_business_ids: null,
             },
         ],
         role,
@@ -95,11 +95,11 @@ export function demoUser(persona: DemoPersona = getPersona()) {
 
 export function portalHome() {
     return {
-        tenant: { id: TENANT_ID, name: 'Lumière Hospitality Group', subscription_tier: 'premium' },
-        properties: [
+        tenant: { id: TENANT_ID, name: "Sarah's Creative Services", subscription_tier: 'premium' },
+        businesses: [
             {
-                id: PROPERTY_ID,
-                name: PROPERTY_NAME,
+                id: BUSINESS_ID,
+                name: BUSINESS_NAME,
                 slug: 'lumiere-kl',
                 is_active: true,
                 weekly_inquiries: 182,
@@ -109,8 +109,8 @@ export function portalHome() {
                 channel_statuses: { whatsapp: 'active', email: 'active', website: 'active' },
             },
             {
-                id: PROPERTY_ID_2,
-                name: PROPERTY_NAME_2,
+                id: BUSINESS_ID_2,
+                name: BUSINESS_NAME_2,
                 slug: 'lumiere-penang',
                 is_active: true,
                 weekly_inquiries: 96,
@@ -127,8 +127,8 @@ export function portalHome() {
 
 export function liveStats() {
     return {
-        property_id: PROPERTY_ID,
-        property_name: PROPERTY_NAME,
+        business_id: BUSINESS_ID,
+        business_name: BUSINESS_NAME,
         report_date: iso(now()).split('T')[0],
         total_inquiries: 47,
         after_hours_inquiries: 29,
@@ -190,7 +190,7 @@ function buildDaily(days: number): DailyRow[] {
     return rows;
 }
 
-export function analytics(propertyId: string, from?: string, to?: string) {
+export function analytics(businessId: string, from?: string, to?: string) {
     let days = 30;
     if (from && to) {
         const diff = Math.round(
@@ -203,7 +203,7 @@ export function analytics(propertyId: string, from?: string, to?: string) {
         daily.reduce((acc, r) => acc + (typeof r[k] === 'number' ? (r[k] as number) : 0), 0);
     const totalInq = sum('total_inquiries');
     return {
-        property_id: propertyId,
+        business_id: businessId,
         period: {
             from: from || daily[0].date,
             to: to || daily[daily.length - 1].date,
@@ -227,12 +227,12 @@ export function analytics(propertyId: string, from?: string, to?: string) {
 
 // ─── Insights ─────────────────────────────────────────────────────────────────
 
-export function insights(propertyId: string) {
+export function insights(businessId: string) {
     return {
         generated_at: iso(daysAgo(1)),
         period_start: iso(daysAgo(30)).split('T')[0],
         period_end: iso(now()).split('T')[0],
-        property_id: propertyId,
+        business_id: businessId,
         top_topics: [
             { topic: 'Room availability & rates', count: 312 },
             { topic: 'Airport transfer / parking', count: 188 },
@@ -250,20 +250,20 @@ export function insights(propertyId: string) {
     };
 }
 
-// ─── Property settings ────────────────────────────────────────────────────────
+// ─── Business settings ────────────────────────────────────────────────────────
 
 export const settingsState: Record<string, any> = {
-    [PROPERTY_ID]: {
-        id: PROPERTY_ID,
-        name: PROPERTY_NAME,
-        notification_email: 'frontoffice@lumierehotels.com',
+    [BUSINESS_ID]: {
+        id: BUSINESS_ID,
+        name: BUSINESS_NAME,
+        notification_email: 'frontoffice@sarahphotography.com',
         operating_hours: { start: '09:00', end: '18:00', timezone: 'Asia/Kuala_Lumpur' },
         timezone: 'Asia/Kuala_Lumpur',
         adr: 420,
         hourly_rate: 18,
         brand_vocabulary: 'Warm, concise, professional. Address guests as "Encik/Puan" when in Malay.',
         whatsapp_number: '+60 3-2710 1234',
-        website_url: 'https://lumierehotels.com/kl',
+        website_url: 'https://sarahphotography.com/kl',
         plan_tier: 'premium',
         is_active: true,
     },
@@ -274,12 +274,12 @@ export const settingsState: Record<string, any> = {
 export const leadsState: any[] = [
     {
         id: 'lead-1', conversation_id: 'conv-1', guest_name: 'Sarah Lim', guest_phone: '+60 16-228 9931',
-        guest_email: 'sarah.lim@gmail.com', intent: 'room_booking', status: 'new', estimated_value: 2520,
+        guest_email: 'sarah.lim@gmail.com', intent: 'service_booking', status: 'new', estimated_value: 2520,
         actual_revenue: null, priority: 'high', flag_reason: null, captured_at: iso(hoursAgo(3)),
     },
     {
         id: 'lead-2', conversation_id: 'conv-2', guest_name: 'James Wong', guest_phone: '+60 12-771 4420',
-        guest_email: 'jwong@outlook.com', intent: 'room_booking', status: 'contacted', estimated_value: 1680,
+        guest_email: 'jwong@outlook.com', intent: 'service_booking', status: 'contacted', estimated_value: 1680,
         actual_revenue: null, priority: 'medium', flag_reason: null, captured_at: iso(hoursAgo(7)),
     },
     {
@@ -289,12 +289,12 @@ export const leadsState: any[] = [
     },
     {
         id: 'lead-4', conversation_id: 'conv-4', guest_name: 'Ahmad Faisal', guest_phone: '+60 13-882 5567',
-        guest_email: null, intent: 'room_booking', status: 'converted', estimated_value: 1260,
+        guest_email: null, intent: 'service_booking', status: 'converted', estimated_value: 1260,
         actual_revenue: 1380, priority: 'medium', flag_reason: null, captured_at: iso(daysAgo(2)),
     },
     {
         id: 'lead-5', conversation_id: 'conv-5', guest_name: 'Mei Chen', guest_phone: '+60 17-009 1123',
-        guest_email: 'meichen@gmail.com', intent: 'room_booking', status: 'converted', estimated_value: 3360,
+        guest_email: 'meichen@gmail.com', intent: 'service_booking', status: 'converted', estimated_value: 3360,
         actual_revenue: 3360, priority: 'high', flag_reason: null, captured_at: iso(daysAgo(3)),
     },
     {
@@ -321,28 +321,28 @@ export const conversationsState: any[] = [
     {
         id: 'conv-1', channel: 'whatsapp', guest_name: 'Sarah Lim', guest_identifier: '+60 16-228 9931',
         status: 'handed_off', ai_mode: 'lead_capture', is_after_hours: true, message_count: 6,
-        started_at: iso(hoursAgo(3)), last_message_at: iso(minsAgo(40)), has_lead: true, lead_intent: 'room_booking',
+        started_at: iso(hoursAgo(3)), last_message_at: iso(minsAgo(40)), has_lead: true, lead_intent: 'service_booking',
         messages: mkMessages([
             ['user', 'Hi, do you have a deluxe room available this Friday to Sunday?'],
-            ['assistant', 'Good evening! Yes — our Deluxe King is available Fri–Sun at RM420/night. Would you like me to hold it for you?'],
+            ['assistant', 'Good evening! Yes — our Portrait Session is available Fri–Sun at RM420/night. Would you like me to hold it for you?'],
             ['user', 'Yes please. Does it include breakfast?'],
             ['assistant', 'It does — breakfast for two at our rooftop café is included. May I have your name and email to send the confirmation?'],
             ['user', 'Sarah Lim, sarah.lim@gmail.com'],
             ['assistant', "Thank you, Sarah! I've noted your details and our front office will confirm shortly. Total for 2 nights: RM840 + breakfast included."],
         ], 180),
-        lead: { id: 'lead-1', guest_name: 'Sarah Lim', guest_email: 'sarah.lim@gmail.com', guest_phone: '+60 16-228 9931', intent: 'room_booking', status: 'new', estimated_value: 2520 },
+        lead: { id: 'lead-1', guest_name: 'Sarah Lim', guest_email: 'sarah.lim@gmail.com', guest_phone: '+60 16-228 9931', intent: 'service_booking', status: 'new', estimated_value: 2520 },
     },
     {
         id: 'conv-2', channel: 'web', guest_name: 'James Wong', guest_identifier: 'web-session-8821',
         status: 'active', ai_mode: 'concierge', is_after_hours: false, message_count: 4,
-        started_at: iso(hoursAgo(7)), last_message_at: iso(minsAgo(120)), has_lead: true, lead_intent: 'room_booking',
+        started_at: iso(hoursAgo(7)), last_message_at: iso(minsAgo(120)), has_lead: true, lead_intent: 'service_booking',
         messages: mkMessages([
             ['user', 'What time is check-in and can I park overnight?'],
             ['assistant', 'Check-in is from 3pm. Complimentary covered parking is available for all room guests. Are you planning a stay with us?'],
             ['user', 'Maybe next week for 2 nights'],
-            ['assistant', 'Lovely! Our Superior Queen is RM340/night next week. Shall I check exact availability for your dates?'],
+            ['assistant', 'Lovely! Our Mini Session is RM340/night next week. Shall I check exact availability for your dates?'],
         ], 420),
-        lead: { id: 'lead-2', guest_name: 'James Wong', guest_email: 'jwong@outlook.com', guest_phone: '+60 12-771 4420', intent: 'room_booking', status: 'contacted', estimated_value: 1680 },
+        lead: { id: 'lead-2', guest_name: 'James Wong', guest_email: 'jwong@outlook.com', guest_phone: '+60 12-771 4420', intent: 'service_booking', status: 'contacted', estimated_value: 1680 },
     },
     {
         id: 'conv-3', channel: 'whatsapp', guest_name: 'Priya Nair', guest_identifier: '+60 19-334 0021',
@@ -350,7 +350,7 @@ export const conversationsState: any[] = [
         started_at: iso(daysAgo(1)), last_message_at: iso(daysAgo(1)), has_lead: true, lead_intent: 'event_inquiry',
         messages: mkMessages([
             ['user', 'Do you host corporate events? We need a venue for ~40 people in December.'],
-            ['assistant', 'Absolutely — our Lumière Ballroom seats up to 60 banquet-style. For a 40-pax corporate event we offer half-day and full-day packages.'],
+            ['assistant', 'Absolutely — our Photo Studio seats up to 60 banquet-style. For a 40-pax corporate event we offer half-day and full-day packages.'],
             ['user', 'Full day with lunch. What is the cost?'],
             ['assistant', 'Full-day with buffet lunch starts at RM210/pax. For 40 guests that is approximately RM8,400. I will connect you with our events manager for a tailored quote.'],
             ['user', 'Great, please do. Priya Nair, priya.n@gmail.com'],
@@ -372,8 +372,8 @@ export const conversationsState: any[] = [
 // ─── KB documents ─────────────────────────────────────────────────────────────
 
 export const kbState: any[] = [
-    { id: 'kb-1', doc_type: 'rooms', category: 'rooms', title: 'Deluxe King', content: 'Deluxe King room, 32sqm, king bed, city view. RM420/night incl. breakfast for two.', updated_at: iso(daysAgo(6)) },
-    { id: 'kb-2', doc_type: 'rooms', category: 'rooms', title: 'Superior Queen', content: 'Superior Queen, 26sqm, queen bed. RM340/night. Breakfast add-on RM45/pax.', updated_at: iso(daysAgo(6)) },
+    { id: 'kb-1', doc_type: 'rooms', category: 'rooms', title: 'Portrait Session', content: 'Portrait Session room, 32sqm, king bed, city view. RM420/night incl. breakfast for two.', updated_at: iso(daysAgo(6)) },
+    { id: 'kb-2', doc_type: 'rooms', category: 'rooms', title: 'Mini Session', content: 'Mini Session, 26sqm, queen bed. RM340/night. Breakfast add-on RM45/pax.', updated_at: iso(daysAgo(6)) },
     { id: 'kb-3', doc_type: 'faqs', category: 'faqs', title: 'Check-in / Check-out', content: 'Check-in 3pm, check-out 12pm. Early check-in subject to availability.', updated_at: iso(daysAgo(10)) },
     { id: 'kb-4', doc_type: 'faqs', category: 'faqs', title: 'Parking', content: 'Complimentary covered parking for all room guests.', updated_at: iso(daysAgo(10)) },
     { id: 'kb-5', doc_type: 'policies', category: 'policies', title: 'Cancellation', content: 'Free cancellation up to 48 hours before arrival. Late cancellation charged 1 night.', updated_at: iso(daysAgo(12)) },
@@ -383,15 +383,15 @@ export const kbState: any[] = [
 // ─── Portal: team, channels, support ──────────────────────────────────────────
 
 export const teamState: any[] = [
-    { id: 'tm-1', user_id: 'demo-user-1', full_name: 'Aisha Rahman', email: 'aisha.rahman@lumierehotels.com', role: 'owner', last_login: iso(hoursAgo(2)) },
-    { id: 'tm-2', user_id: 'u-2', full_name: 'Daniel Tan', email: 'daniel.tan@lumierehotels.com', role: 'staff', last_login: iso(hoursAgo(9)) },
-    { id: 'tm-3', user_id: 'u-3', full_name: 'Nurul Izzah', email: 'nurul@lumierehotels.com', role: 'admin', last_login: iso(daysAgo(1)) },
+    { id: 'tm-1', user_id: 'demo-user-1', full_name: 'Sarah Jane', email: 'sarah@sarahphotography.com', role: 'owner', last_login: iso(hoursAgo(2)) },
+    { id: 'tm-2', user_id: 'u-2', full_name: 'Daniel Tan', email: 'daniel.tan@sarahphotography.com', role: 'staff', last_login: iso(hoursAgo(9)) },
+    { id: 'tm-3', user_id: 'u-3', full_name: 'Nurul Izzah', email: 'nurul@sarahphotography.com', role: 'admin', last_login: iso(daysAgo(1)) },
 ];
 
 export function channels() {
     return [
         {
-            property_id: PROPERTY_ID, property_name: PROPERTY_NAME, property_slug: 'lumiere-kl',
+            business_id: BUSINESS_ID, business_name: BUSINESS_NAME, business_slug: 'lumiere-kl',
             channels: {
                 whatsapp: { status: 'active' },
                 email: { status: 'active' },
@@ -399,7 +399,7 @@ export function channels() {
             },
         },
         {
-            property_id: PROPERTY_ID_2, property_name: PROPERTY_NAME_2, property_slug: 'lumiere-penang',
+            business_id: BUSINESS_ID_2, business_name: BUSINESS_NAME_2, business_slug: 'lumiere-penang',
             channels: {
                 whatsapp: { status: 'active' },
                 email: { status: 'active' },
@@ -410,7 +410,7 @@ export function channels() {
 }
 
 export const supportTicketsState: any[] = [
-    { id: 'st-1', subject: 'Add a second WhatsApp number for Penang', description: 'We want a dedicated line for the Penang property.', priority: 'medium', status: 'open', created_at: iso(daysAgo(2)) },
+    { id: 'st-1', subject: 'Add a second WhatsApp number for Penang', description: 'We want a dedicated line for the Penang business.', priority: 'medium', status: 'open', created_at: iso(daysAgo(2)) },
     { id: 'st-2', subject: 'Export leads to CSV', description: 'Can we get a CSV export of monthly leads?', priority: 'low', status: 'resolved', created_at: iso(daysAgo(9)) },
 ];
 
@@ -420,7 +420,7 @@ export function adminMetrics() {
     return {
         total_tenants: 14,
         active_tenants: 11,
-        total_properties: 23,
+        total_businesses: 23,
         total_conversations_alltime: 48217,
         total_conversations_mtd: 6142,
         total_leads_mtd: 1387,
@@ -430,11 +430,11 @@ export function adminMetrics() {
 }
 
 export const tenantsState: any[] = [
-    { id: TENANT_ID, name: 'Lumière Hospitality Group', slug: 'lumiere', subscription_tier: 'premium', subscription_status: 'active', is_active: true, property_count: 2, assigned_account_manager: 'Farah Aziz', created_at: iso(daysAgo(120)) },
-    { id: 'tn-2', name: 'Tropika Resorts', slug: 'tropika', subscription_tier: 'independent', subscription_status: 'active', is_active: true, property_count: 4, assigned_account_manager: 'Farah Aziz', created_at: iso(daysAgo(88)) },
-    { id: 'tn-3', name: 'Heritage Stays Melaka', slug: 'heritage-melaka', subscription_tier: 'boutique', subscription_status: 'trialing', is_active: true, property_count: 1, assigned_account_manager: 'Kavin Rao', created_at: iso(daysAgo(21)) },
-    { id: 'tn-4', name: 'Borneo Eco Lodges', slug: 'borneo-eco', subscription_tier: 'pilot', subscription_status: 'active', is_active: true, property_count: 3, assigned_account_manager: 'Kavin Rao', created_at: iso(daysAgo(40)) },
-    { id: 'tn-5', name: 'City Inn Express', slug: 'city-inn', subscription_tier: 'boutique', subscription_status: 'past_due', is_active: false, property_count: 1, assigned_account_manager: 'Farah Aziz', created_at: iso(daysAgo(200)) },
+    { id: TENANT_ID, name: "Sarah's Creative Services", slug: 'lumiere', subscription_tier: 'premium', subscription_status: 'active', is_active: true, business_count: 2, assigned_account_manager: 'Farah Aziz', created_at: iso(daysAgo(120)) },
+    { id: 'tn-2', name: 'Nail Art Studio', slug: 'tropika', subscription_tier: 'independent', subscription_status: 'active', is_active: true, business_count: 4, assigned_account_manager: 'Farah Aziz', created_at: iso(daysAgo(88)) },
+    { id: 'tn-3', name: 'Boutique Bakery', slug: 'heritage-melaka', subscription_tier: 'boutique', subscription_status: 'trialing', is_active: true, business_count: 1, assigned_account_manager: 'Kavin Rao', created_at: iso(daysAgo(21)) },
+    { id: 'tn-4', name: 'Freelance Designer', slug: 'borneo-eco', subscription_tier: 'pilot', subscription_status: 'active', is_active: true, business_count: 3, assigned_account_manager: 'Kavin Rao', created_at: iso(daysAgo(40)) },
+    { id: 'tn-5', name: 'Local Plumber', slug: 'city-inn', subscription_tier: 'boutique', subscription_status: 'past_due', is_active: false, business_count: 1, assigned_account_manager: 'Farah Aziz', created_at: iso(daysAgo(200)) },
 ];
 
 export function tenantDetail(id: string) {
@@ -443,45 +443,45 @@ export function tenantDetail(id: string) {
         ...t,
         pilot_start_date: iso(daysAgo(110)),
         pilot_end_date: iso(daysAgo(96)),
-        properties: [
-            { id: PROPERTY_ID, name: PROPERTY_NAME, slug: 'lumiere-kl', is_active: true },
-            { id: PROPERTY_ID_2, name: PROPERTY_NAME_2, slug: 'lumiere-penang', is_active: true },
+        businesses: [
+            { id: BUSINESS_ID, name: BUSINESS_NAME, slug: 'lumiere-kl', is_active: true },
+            { id: BUSINESS_ID_2, name: BUSINESS_NAME_2, slug: 'lumiere-penang', is_active: true },
         ],
         users: [
-            { id: 'demo-user-1', email: 'aisha.rahman@lumierehotels.com', full_name: 'Aisha Rahman', role: 'owner' },
-            { id: 'u-2', email: 'daniel.tan@lumierehotels.com', full_name: 'Daniel Tan', role: 'staff' },
+            { id: 'demo-user-1', email: 'sarah@sarahphotography.com', full_name: 'Sarah Jane', role: 'owner' },
+            { id: 'u-2', email: 'daniel.tan@sarahphotography.com', full_name: 'Daniel Tan', role: 'staff' },
         ],
         onboarding: [
-            { property_id: PROPERTY_ID, whatsapp_status: 'active', email_status: 'active', website_status: 'active', kb_populated: true, first_inquiry_received: true, channel_errors: null },
-            { property_id: PROPERTY_ID_2, whatsapp_status: 'active', email_status: 'active', website_status: 'configuring', kb_populated: true, first_inquiry_received: true, channel_errors: null },
+            { business_id: BUSINESS_ID, whatsapp_status: 'active', email_status: 'active', website_status: 'active', kb_populated: true, first_inquiry_received: true, channel_errors: null },
+            { business_id: BUSINESS_ID_2, whatsapp_status: 'active', email_status: 'active', website_status: 'configuring', kb_populated: true, first_inquiry_received: true, channel_errors: null },
         ],
-        stats: { total_conversations: 8217, total_leads: 1942, property_count: 2, user_count: 2 },
+        stats: { total_conversations: 8217, total_leads: 1942, business_count: 2, user_count: 2 },
     };
 }
 
 export function pipeline() {
     const mk = (tenant_name: string, n: number) => ({
-        tenant_id: `tn-${n}`, tenant_name, property_id: `prop-${n}`, created_at: iso(daysAgo(n * 2)),
+        tenant_id: `tn-${n}`, tenant_name, business_id: `prop-${n}`, created_at: iso(daysAgo(n * 2)),
     });
     return {
-        provisioned: [mk('Heritage Stays Melaka', 3)],
-        channels_setup: [mk('Borneo Eco Lodges', 4)],
-        live: [mk('Tropika Resorts', 2)],
-        first_week_review: [mk('Sunset Bay Hotel', 6)],
-        fully_onboarded: [mk('Lumière Hospitality Group', 1)],
+        provisioned: [mk('Boutique Bakery', 3)],
+        channels_setup: [mk('Freelance Designer', 4)],
+        live: [mk('Nail Art Studio', 2)],
+        first_week_review: [mk('Tech Fixes LLC', 6)],
+        fully_onboarded: [mk("Sarah's Creative Services", 1)],
     };
 }
 
 export const ticketsState: any[] = [
-    { id: 'tk-1', tenant_id: 'tn-2', tenant_name: 'Tropika Resorts', subject: 'WhatsApp not receiving messages', description: 'Guests report no replies since this morning.', status: 'open', priority: 'high', created_by_name: 'Ravi (Tropika)', created_at: iso(hoursAgo(5)) },
-    { id: 'tk-2', tenant_id: 'tn-3', tenant_name: 'Heritage Stays Melaka', subject: 'How to add a new room type?', description: 'Need help updating the KB.', status: 'open', priority: 'low', created_by_name: 'Mei (Heritage)', created_at: iso(daysAgo(1)) },
-    { id: 'tk-3', tenant_id: TENANT_ID, tenant_name: 'Lumière Hospitality Group', subject: 'Add second WhatsApp number', description: 'Dedicated line for Penang.', status: 'in_progress', priority: 'medium', created_by_name: 'Aisha (Lumière)', created_at: iso(daysAgo(2)) },
+    { id: 'tk-1', tenant_id: 'tn-2', tenant_name: 'Nail Art Studio', subject: 'WhatsApp not receiving messages', description: 'Guests report no replies since this morning.', status: 'open', priority: 'high', created_by_name: 'Ravi (Tropika)', created_at: iso(hoursAgo(5)) },
+    { id: 'tk-2', tenant_id: 'tn-3', tenant_name: 'Boutique Bakery', subject: 'How to add a new room type?', description: 'Need help updating the KB.', status: 'open', priority: 'low', created_by_name: 'Mei (Heritage)', created_at: iso(daysAgo(1)) },
+    { id: 'tk-3', tenant_id: TENANT_ID, tenant_name: "Sarah's Creative Services", subject: 'Add second WhatsApp number', description: 'Dedicated line for Penang.', status: 'in_progress', priority: 'medium', created_by_name: 'Aisha (Lumière)', created_at: iso(daysAgo(2)) },
 ];
 
 export const applicationsState: any[] = [
-    { id: 'app-1', hotel_name: 'Sunset Bay Resort', contact_name: 'Marcus Lee', email: 'marcus@sunsetbay.com', phone: '+60 12-555 7788', room_count: 64, status: 'new', notes: null, converted_to_tenant_id: null, created_at: iso(hoursAgo(8)) },
-    { id: 'app-2', hotel_name: 'KL Capsule Pods', contact_name: 'Wei Jie', email: 'weijie@klcapsule.com', phone: '+60 16-220 1199', room_count: 120, status: 'contacted', notes: 'Interested in pilot tier.', converted_to_tenant_id: null, created_at: iso(daysAgo(2)) },
-    { id: 'app-3', hotel_name: 'Cameron Highlands Inn', contact_name: 'Siti Aminah', email: 'siti@cameroninn.com', phone: null, room_count: 28, status: 'qualified', notes: 'Demo scheduled.', converted_to_tenant_id: null, created_at: iso(daysAgo(4)) },
+    { id: 'app-1', business_name: 'Tech Fixes LLC', contact_name: 'Marcus Lee', email: 'marcus@sunsetbay.com', phone: '+60 12-555 7788', monthly_inquiries: 64, status: 'new', notes: null, converted_to_tenant_id: null, created_at: iso(hoursAgo(8)) },
+    { id: 'app-2', business_name: 'Marketing Pro', contact_name: 'Wei Jie', email: 'weijie@klcapsule.com', phone: '+60 16-220 1199', monthly_inquiries: 120, status: 'contacted', notes: 'Interested in pilot tier.', converted_to_tenant_id: null, created_at: iso(daysAgo(2)) },
+    { id: 'app-3', business_name: 'FitLife Coaching', contact_name: 'Siti Aminah', email: 'siti@cameroninn.com', phone: null, monthly_inquiries: 28, status: 'qualified', notes: 'Demo scheduled.', converted_to_tenant_id: null, created_at: iso(daysAgo(4)) },
 ];
 
 export function serviceHealth() {
@@ -538,7 +538,7 @@ export interface DemoChatTurn {
 export const demoChatScript: DemoChatTurn[] = [
     {
         user: 'Hi! Do you have a room available this weekend?',
-        ai: "Good evening, and welcome to Lumière Suites! 🌙 Yes — we have our Deluxe King available Fri–Sun at RM420/night, breakfast for two included. Would you like me to hold it?",
+        ai: "Good evening, and welcome to Sarah Photography! 🌙 Yes — we have our Portrait Session available Fri–Sun at RM420/night, breakfast for two included. Would you like me to hold it?",
     },
     {
         user: 'Yes please. Is the pool open late?',

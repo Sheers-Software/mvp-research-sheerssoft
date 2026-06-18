@@ -2,7 +2,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { apiGet } from './api';
 
-interface PropertySummary {
+interface BusinessSummary {
   id: string;
   name: string;
   slug: string;
@@ -18,18 +18,18 @@ interface TenantContextValue {
   tenantId: string | null;
   tenantName: string | null;
   tenantTier: string | null;
-  properties: PropertySummary[];
+  businesses: BusinessSummary[];
   loading: boolean;
   refresh: () => void;
 }
 
 const TenantContext = createContext<TenantContextValue>({
-  tenantId: null, tenantName: null, tenantTier: null, properties: [], loading: true, refresh: () => {}
+  tenantId: null, tenantName: null, tenantTier: null, businesses: [], loading: true, refresh: () => {}
 });
 
 interface PortalHomeData {
   tenant?: { id: string; name: string; subscription_tier: string };
-  properties?: PropertySummary[];
+  businesses?: BusinessSummary[];
 }
 
 export function TenantProvider({ children }: { children: ReactNode }) {
@@ -52,7 +52,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       tenantId: data?.tenant?.id ?? null,
       tenantName: data?.tenant?.name ?? null,
       tenantTier: data?.tenant?.subscription_tier ?? null,
-      properties: data?.properties ?? [],
+      businesses: data?.businesses ?? [],
       loading,
       refresh: load,
     }}>

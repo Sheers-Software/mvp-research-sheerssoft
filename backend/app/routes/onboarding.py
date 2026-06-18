@@ -1,5 +1,5 @@
 """
-Onboarding routes — Tenant provisioning, property setup, channel auto-setup, progress tracking.
+Onboarding routes — Tenant provisioning, business setup, channel auto-setup, progress tracking.
 """
 
 import uuid
@@ -8,7 +8,12 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 import structlog
+
+from pydantic import BaseModel
 import httpx
+from bs4 import BeautifulSoup
+from app.schemas import ScrapeUrlRequest, ScrapeUrlResponse
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,7 +21,7 @@ from app.database import get_db
 from app.config import get_settings
 from app.auth import require_superadmin, get_current_user, check_tenant_access
 from app.models import (
-    Tenant, User, TenantMembership, Property,
+    Tenant, User, TenantMembership, Business,
     OnboardingProgress, KBDocument,
 )
 from app.schemas import (
@@ -81,7 +86,7 @@ async def provision_tenant(
 ):
     """
     One-click tenant provisioning.
-    Creates Tenant + Property + User + TenantMembership + OnboardingProgress.
+    Creates Tenant + Business + User + TenantMembership + OnboardingProgress.
     Sends magic link to owner. Triggers async channel setup.
     """
     settings = get_settings()
@@ -109,16 +114,16 @@ async def provision_tenant(
     db.add(tenant)
     await db.flush()  # Get tenant.id
 
-    # 2. Create Property
-    property_slug = _slugify(body.property_name)
-    existing_prop = await db.execute(select(Property).where(Property.slug == property_slug))
+    # 2. Create Business
+    business_slug = _slugify(body.business_name)
+    existing_prop = await db.execute(select(Business).where(Business.slug == business_slug))
     if existing_prop.scalar_one_or_none():
-        property_slug = f"{property_slug}-{uuid.uuid4().hex[:6]}"
+        business_slug = f"{business_slug}-{uuid.uuid4().hex[:6]}"
 
-    prop = Property(
+    prop = Business(
         tenant_id=tenant.id,
-        name=body.property_name,
-        slug=property_slug,
+        name=body.business_name,
+        slug=business_slug,
         timezone=body.timezone,
         plan_tier=body.subscription_tier,
         whatsapp_number=body.whatsapp_number,
@@ -203,7 +208,7 @@ async def provision_tenant(
     # 5. Create OnboardingProgress
     progress = OnboardingProgress(
         tenant_id=tenant.id,
-        property_id=prop.id,
+        business_id=prop.id,
         whatsapp_status="pending" if "whatsapp" in body.preferred_channels else "skipped",
         email_status="pending" if "email" in body.preferred_channels else "skipped",
         website_status="pending" if "website" in body.preferred_channels else "skipped",
@@ -213,14 +218,14 @@ async def provision_tenant(
     # 6. Seed "Getting Started" KB documents
     getting_started_docs = [
         KBDocument(
-            property_id=prop.id,
+            business_id=prop.id,
             doc_type="faqs",
             title="Welcome to Nocturn AI",
             content=(
                 "Welcome to Nocturn AI! This is your AI-powered hotel concierge. "
-                "I can help answer guest inquiries about your property 24/7, including room rates, "
+                "I can help answer guest inquiries about your business 24/7, including room rates, "
                 "facilities, directions, and booking inquiries. "
-                "Your knowledge base will be customized with your specific property information."
+                "Your knowledge base will be customized with your specific business information."
             ),
         ),
     ]
@@ -233,7 +238,7 @@ async def provision_tenant(
     background_tasks.add_task(
         _setup_channels_async,
         tenant_id=str(tenant.id),
-        property_id=str(prop.id),
+        business_id=str(prop.id),
         channels=body.preferred_channels,
         whatsapp_provider=body.whatsapp_provider,
     )
@@ -241,14 +246,14 @@ async def provision_tenant(
     logger.info(
         "Tenant provisioned",
         tenant_id=str(tenant.id),
-        property_id=str(prop.id),
+        business_id=str(prop.id),
         user_id=str(user.id),
         tier=body.subscription_tier,
     )
 
     return ProvisionTenantResponse(
         tenant_id=tenant.id,
-        property_id=prop.id,
+        business_id=prop.id,
         user_id=user.id,
         magic_link_sent=magic_link_sent,
         channels_setup_initiated=True,
@@ -259,7 +264,7 @@ async def provision_tenant(
 
 async def _setup_channels_async(
     tenant_id: str,
-    property_id: str,
+    business_id: str,
     channels: list[str],
     whatsapp_provider: str = "meta",
 ):
@@ -275,7 +280,7 @@ async def _setup_channels_async(
             await setup_channels(
                 db=db,
                 tenant_id=tenant_id,
-                property_id=property_id,
+                business_id=business_id,
                 channels=channels,
                 whatsapp_provider=whatsapp_provider,
             )
@@ -295,8 +300,8 @@ async def self_provision(
 ):
     """
     Self-service tenant provisioning for new users arriving via magic link.
-    Idempotent — returns existing tenant/property if already provisioned.
-    Creates: Tenant + Property + TenantMembership + OnboardingProgress.
+    Idempotent — returns existing tenant/business if already provisioned.
+    Creates: Tenant + Business + TenantMembership + OnboardingProgress.
     """
     # Check if user already has a membership
     stmt = select(TenantMembership).where(TenantMembership.user_id == user.id)
@@ -306,16 +311,16 @@ async def self_provision(
     if existing_membership:
         # Return existing setup
         prop_stmt = (
-            select(Property)
-            .where(Property.tenant_id == existing_membership.tenant_id)
-            .order_by(Property.created_at)
+            select(Business)
+            .where(Business.tenant_id == existing_membership.tenant_id)
+            .order_by(Business.created_at)
         )
         prop_result = await db.execute(prop_stmt)
         prop = prop_result.scalar_one_or_none()
         return {
             "tenant_id": str(existing_membership.tenant_id),
-            "property_id": str(prop.id) if prop else None,
-            "property_name": prop.name if prop else None,
+            "business_id": str(prop.id) if prop else None,
+            "business_name": prop.name if prop else None,
             "is_new": False,
         }
 
@@ -336,16 +341,16 @@ async def self_provision(
     db.add(tenant)
     await db.flush()
 
-    # Create Property
-    property_slug = _slugify(hotel_name)
-    prop_slug_check = await db.execute(select(Property).where(Property.slug == property_slug))
+    # Create Business
+    business_slug = _slugify(hotel_name)
+    prop_slug_check = await db.execute(select(Business).where(Business.slug == business_slug))
     if prop_slug_check.scalar_one_or_none():
-        property_slug = f"{property_slug}-{uuid.uuid4().hex[:6]}"
+        business_slug = f"{business_slug}-{uuid.uuid4().hex[:6]}"
 
-    prop = Property(
+    prop = Business(
         tenant_id=tenant.id,
         name=hotel_name,
-        slug=property_slug,
+        slug=business_slug,
         timezone="Asia/Kuala_Lumpur",
         plan_tier="pilot",
         notification_email=user.email,
@@ -364,7 +369,7 @@ async def self_provision(
     # Create OnboardingProgress (all channels skipped — set up by account manager later)
     progress = OnboardingProgress(
         tenant_id=tenant.id,
-        property_id=prop.id,
+        business_id=prop.id,
         whatsapp_status="skipped",
         email_status="skipped",
         website_status="skipped",
@@ -373,11 +378,11 @@ async def self_provision(
 
     # Seed a starter KB document
     starter_doc = KBDocument(
-        property_id=prop.id,
+        business_id=prop.id,
         doc_type="faqs",
         title="Welcome to Nocturn AI",
         content=(
-            f"Welcome to {hotel_name}! This property is powered by Nocturn AI. "
+            f"Welcome to {hotel_name}! This business is powered by Nocturn AI. "
             "Our AI concierge is available 24/7 to assist guests with room inquiries, "
             "rates, facilities, and booking information."
         ),
@@ -389,41 +394,41 @@ async def self_provision(
     logger.info(
         "Self-provisioned tenant",
         tenant_id=str(tenant.id),
-        property_id=str(prop.id),
+        business_id=str(prop.id),
         user_id=str(user.id),
         hotel_name=hotel_name,
     )
 
     return {
         "tenant_id": str(tenant.id),
-        "property_id": str(prop.id),
-        "property_name": hotel_name,
+        "business_id": str(prop.id),
+        "business_name": hotel_name,
         "is_new": True,
     }
 
 
 # ─────────────────────────────────────────────────────────────
-# Property Management
+# Business Management
 # ─────────────────────────────────────────────────────────────
 
-@router.post("/onboarding/add-property/{tenant_id}")
+@router.post("/onboarding/add-business/{tenant_id}")
 async def add_property(
     tenant_id: str,
     body: dict,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """Add a new property under an existing tenant."""
+    """Add a new business under an existing tenant."""
     # Verify access
     await check_tenant_access(tenant_id, user)
 
-    name = body.get("property_name", "New Property")
+    name = body.get("business_name", "New Business")
     slug = _slugify(name)
-    existing = await db.execute(select(Property).where(Property.slug == slug))
+    existing = await db.execute(select(Business).where(Business.slug == slug))
     if existing.scalar_one_or_none():
         slug = f"{slug}-{uuid.uuid4().hex[:6]}"
 
-    prop = Property(
+    prop = Business(
         tenant_id=uuid.UUID(tenant_id),
         name=name,
         slug=slug,
@@ -436,12 +441,12 @@ async def add_property(
     # Create onboarding progress
     progress = OnboardingProgress(
         tenant_id=uuid.UUID(tenant_id),
-        property_id=prop.id,
+        business_id=prop.id,
     )
     db.add(progress)
     await db.commit()
 
-    return {"property_id": str(prop.id), "slug": slug, "message": f"Property '{name}' created."}
+    return {"business_id": str(prop.id), "slug": slug, "message": f"Business '{name}' created."}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -562,7 +567,7 @@ async def get_onboarding_progress(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """Get the gamified onboarding progress for a tenant's primary property."""
+    """Get the gamified onboarding progress for a tenant's primary business."""
     await check_tenant_access(tenant_id, user)
 
     stmt = select(OnboardingProgress).where(
@@ -578,7 +583,7 @@ async def get_onboarding_progress(
 
     return OnboardingProgressResponse(
         tenant_id=progress.tenant_id,
-        property_id=progress.property_id,
+        business_id=progress.business_id,
         whatsapp_status=progress.whatsapp_status,
         email_status=progress.email_status,
         website_status=progress.website_status,
@@ -643,12 +648,12 @@ async def get_onboarding_checklist(
         {
             "id": "kb_populated",
             "title": "Knowledge Base Ready",
-            "description": "Your property info (rates, rooms, FAQs) is loaded into the AI.",
+            "description": "Your business info (rates, rooms, FAQs) is loaded into the AI.",
             "icon": "📚",
             "points": 20,
             "completed": progress.kb_populated,
             "status": "complete" if progress.kb_populated else ("locked" if not channels_ok else "pending"),
-            "cta": "Upload your property info" if not progress.kb_populated else None,
+            "cta": "Upload your business info" if not progress.kb_populated else None,
         },
         {
             "id": "first_inquiry",
@@ -694,3 +699,98 @@ async def get_onboarding_checklist(
         "milestones": milestones,
         "channel_errors": progress.channel_errors,
     }
+
+
+# ─────────────────────────────────────────────────────────────
+# Solopreneur "Paste URL" Flow
+# ─────────────────────────────────────────────────────────────
+
+@router.post("/onboarding/scrape-url", response_model=ScrapeUrlResponse)
+async def scrape_url_flow(
+    body: ScrapeUrlRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Frictionless onboarding. Takes a URL, scrapes it using Jina Reader, 
+    and instantly provisions a trial Business and KB document.
+    """
+    url = body.url
+    if not url.startswith("http"):
+        url = "https://" + url
+
+    # 1. Scrape using Jina Reader (free public API for clean markdown)
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.get(f"https://r.jina.ai/{url}")
+            if resp.status_code >= 400:
+                raise HTTPException(status_code=400, detail="Failed to scrape URL.")
+            markdown_content = resp.text
+    except Exception as e:
+        logger.error("Scraping failed", error=str(e))
+        raise HTTPException(status_code=400, detail="Failed to read website content.")
+
+    # 2. Extract Business Name from title or URL
+    # We could use an LLM here, but for MVP we parse the URL or first Header
+    business_name = "My Business"
+    first_line = markdown_content.split("\n")[0] if markdown_content else ""
+    if first_line.startswith("#"):
+        business_name = first_line.replace("#", "").strip()
+    else:
+        # Fallback to domain name
+        domain = url.split("//")[-1].split("/")[0]
+        business_name = domain.replace("www.", "").split(".")[0].title()
+
+    if len(business_name) < 2:
+        business_name = "My Business"
+
+    # 3. Create Tenant
+    tenant_slug = _slugify(business_name)
+    slug_check = await db.execute(select(Tenant).where(Tenant.slug == tenant_slug))
+    if slug_check.scalar_one_or_none():
+        tenant_slug = f"{tenant_slug}-{uuid.uuid4().hex[:6]}"
+
+    tenant = Tenant(
+        name=business_name,
+        slug=tenant_slug,
+        subscription_tier="trial",
+        subscription_status="trialing",
+    )
+    db.add(tenant)
+    await db.flush()
+
+    # 4. Create Business
+    business_slug = _slugify(business_name)
+    prop_slug_check = await db.execute(select(Business).where(Business.slug == business_slug))
+    if prop_slug_check.scalar_one_or_none():
+        business_slug = f"{business_slug}-{uuid.uuid4().hex[:6]}"
+
+    prop = Business(
+        tenant_id=tenant.id,
+        name=business_name,
+        slug=business_slug,
+        timezone="Asia/Kuala_Lumpur",
+        plan_tier="trial",
+        website_url=url,
+    )
+    db.add(prop)
+    await db.flush()
+
+    # 5. Save Knowledge Base Document
+    doc = KBDocument(
+        business_id=prop.id,
+        doc_type="faqs",
+        title="Website Content",
+        content=markdown_content[:30000], # Cap size
+    )
+    db.add(doc)
+    await db.commit()
+
+    logger.info("URL Scraped and Business Provisioned", url=url, business_id=str(prop.id))
+
+    return ScrapeUrlResponse(
+        tenant_id=tenant.id,
+        business_id=prop.id,
+        business_name=business_name,
+        message="Website ingested successfully. AI is ready to test."
+    )
+

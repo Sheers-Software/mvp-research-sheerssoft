@@ -54,7 +54,7 @@ async def generate_embedding(text_content: str) -> list[float]:
 
 async def ingest_document(
     db: AsyncSession,
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     doc_type: str,
     title: str,
     content: str,
@@ -64,7 +64,7 @@ async def ingest_document(
 
     Args:
         db: Database session
-        property_id: The property this document belongs to
+        business_id: The business this document belongs to
         doc_type: One of: rates, rooms, facilities, faqs, directions, policies
         title: Short descriptive title
         content: The full text content of the document chunk
@@ -72,7 +72,7 @@ async def ingest_document(
     embedding = await generate_embedding(f"{title}\n{content}")
 
     doc = KBDocument(
-        property_id=property_id,
+        business_id=business_id,
         doc_type=doc_type,
         title=title,
         content=content,
@@ -85,11 +85,11 @@ async def ingest_document(
 
 async def ingest_knowledge_base(
     db: AsyncSession,
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     documents: list[dict],
 ) -> int:
     """
-    Bulk ingest a property's knowledge base.
+    Bulk ingest a business's knowledge base.
 
     Args:
         documents: List of dicts with keys: doc_type, title, content
@@ -97,17 +97,17 @@ async def ingest_knowledge_base(
     Returns:
         Number of documents ingested
     """
-    # Clear existing KB for this property (full refresh)
+    # Clear existing KB for this business (full refresh)
     await db.execute(
-        text("DELETE FROM kb_documents WHERE property_id = :pid"),
-        {"pid": property_id},
+        text("DELETE FROM kb_documents WHERE business_id = :pid"),
+        {"pid": business_id},
     )
 
     count = 0
     for doc in documents:
         await ingest_document(
             db=db,
-            property_id=property_id,
+            business_id=business_id,
             doc_type=doc["doc_type"],
             title=doc["title"],
             content=doc["content"],
@@ -119,12 +119,12 @@ async def ingest_knowledge_base(
 
 async def search_knowledge_base(
     db: AsyncSession,
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     query: str,
     limit: int = 5,
 ) -> list[KBDocument]:
     """
-    Semantic search over a property's knowledge base using pgvector.
+    Semantic search over a business's knowledge base using pgvector.
 
     Uses cosine distance for similarity ranking.
     Returns the top `limit` most relevant documents.
@@ -135,7 +135,7 @@ async def search_knowledge_base(
         # pgvector cosine distance operator: <=>
         result = await db.execute(
             select(KBDocument)
-            .where(KBDocument.property_id == property_id)
+            .where(KBDocument.business_id == business_id)
             # Filter low-relevance results (cosine distance < 0.8 — generous threshold for
             # gemini-embedding-001 which produces distances in the 0.4-0.7 range for related content)
             .where(KBDocument.embedding.cosine_distance(query_embedding) < 0.8)

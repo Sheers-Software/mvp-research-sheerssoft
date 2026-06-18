@@ -5,16 +5,16 @@ import { useRouter } from 'next/navigation';
 import { useTenant } from '@/lib/tenant-context';
 
 export default function PortalKBIndexPage() {
-    const { properties, loading } = useTenant();
+    const { businesses, loading } = useTenant();
     const router = useRouter();
 
     useEffect(() => {
         if (!loading) {
-            if (properties.length > 0) {
-                router.replace(`/portal/kb/${properties[0].id}`);
+            if (businesses.length > 0) {
+                router.replace(`/portal/kb/${businesses[0].id}`);
             }
         }
-    }, [properties, loading, router]);
+    }, [businesses, loading, router]);
 
     return (
         <div className="flex justify-center" style={{ padding: 80 }}>

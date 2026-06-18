@@ -5,11 +5,11 @@ import { apiGet, apiPatch } from '@/lib/api';
 
 interface Application {
     id: string;
-    hotel_name: string;
+    business_name: string;
     contact_name: string;
     email: string;
     phone: string | null;
-    room_count: number | null;
+    monthly_inquiries: number | null;
     status: string;
     notes: string | null;
     converted_to_tenant_id: string | null;
@@ -64,7 +64,7 @@ export default function ApplicationsPage() {
                     <table>
                         <thead>
                             <tr>
-                                <th>Hotel</th>
+                                <th>Business</th>
                                 <th>Contact</th>
                                 <th>Rooms</th>
                                 <th>Status</th>
@@ -76,14 +76,14 @@ export default function ApplicationsPage() {
                             {apps.map((a) => (
                                 <tr key={a.id}>
                                     <td>
-                                        <strong>{a.hotel_name}</strong>
+                                        <strong>{a.business_name}</strong>
                                     </td>
                                     <td>
                                         <div>{a.contact_name}</div>
                                         <div className="text-sm text-muted">{a.email}</div>
                                         {a.phone && <div className="text-sm text-muted">{a.phone}</div>}
                                     </td>
-                                    <td>{a.room_count || '—'}</td>
+                                    <td>{a.monthly_inquiries || '—'}</td>
                                     <td>
                                         <span className={`badge ${statusBadge[a.status] || 'badge-neutral'}`}>{a.status}</span>
                                     </td>

@@ -4,7 +4,7 @@ AI Conversation Engine — the brain of the system.
 Handles:
 - Multi-turn conversation context
 - Three behavioral modes: Concierge, Lead Capture, Handoff
-- RAG-augmented responses using property knowledge base
+- RAG-augmented responses using business knowledge base
 - Bilingual support (EN/BM)
 """
 
@@ -19,7 +19,7 @@ from sqlalchemy.orm import selectinload
 from openai import AsyncOpenAI
 from google import genai
 
-from app.models import Conversation, Message, Lead, Property
+from app.models import Conversation, Message, Lead, Business
 from app.services import search_knowledge_base
 from app.services.sanitizer import sanitize_guest_message
 from app.config import get_settings
@@ -146,7 +146,7 @@ async def _call_llm(messages: list[dict], max_tokens: int = 512, temperature: fl
 # System Prompts — The personality and rules of the AI
 # ─────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT_BASE = """You are the AI Concierge for {property_name}. You are NOT a generic chatbot — you are a knowledgeable, proactive hotel professional powered by advanced AI. You should respond the way a skilled reservations manager would: warmly, efficiently, and with contextual intelligence.
+SYSTEM_PROMPT_BASE = """You are the AI Concierge for {business_name}. You are NOT a generic chatbot — you are a knowledgeable, proactive hotel professional powered by advanced AI. You should respond the way a skilled reservations manager would: warmly, efficiently, and with contextual intelligence.
 
 ### CURRENT DATE & TIME:
 {current_datetime}
@@ -239,7 +239,7 @@ HANDOFF_ADDENDUM = """
 ### HANDOFF MODE
 The guest needs a human. Handle this gracefully:
 1. **Acknowledge**: "I completely understand, and I want to make sure you're taken care of."
-2. **Assure**: "I'm flagging this conversation for our Property Manager right now, with all the details."
+2. **Assure**: "I'm flagging this conversation for our Business Manager right now, with all the details."
 3. **Set expectations**: "They will reach out to you within [timeframe based on operating hours]. In the meantime, is there anything else I can note down for them?"
 """
 
@@ -285,19 +285,19 @@ def _detect_intent(message_text: str) -> str | None:
     return None
 
 
-def _is_after_hours(property: Property) -> bool:
-    """Check if current time is outside the property's operating hours."""
-    if not property.operating_hours:
+def _is_after_hours(business: Business) -> bool:
+    """Check if current time is outside the business's operating hours."""
+    if not business.operating_hours:
         return False
 
     try:
         import zoneinfo
         tz = zoneinfo.ZoneInfo(
-            property.operating_hours.get("timezone", "Asia/Kuala_Lumpur")
+            business.operating_hours.get("timezone", "Asia/Kuala_Lumpur")
         )
         now = datetime.now(tz)
-        start_hour = int(property.operating_hours.get("start", "09:00").split(":")[0])
-        end_hour = int(property.operating_hours.get("end", "18:00").split(":")[0])
+        start_hour = int(business.operating_hours.get("start", "09:00").split(":")[0])
+        end_hour = int(business.operating_hours.get("end", "18:00").split(":")[0])
         return now.hour < start_hour or now.hour >= end_hour
     except Exception:
         return False
@@ -305,7 +305,7 @@ def _is_after_hours(property: Property) -> bool:
 
 async def get_or_create_conversation(
     db: AsyncSession,
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     guest_identifier: str,
     channel: str,
 ) -> Conversation:
@@ -316,7 +316,7 @@ async def get_or_create_conversation(
     result = await db.execute(
         select(Conversation)
         .where(
-            Conversation.property_id == property_id,
+            Conversation.business_id == business_id,
             Conversation.guest_identifier == guest_identifier,
             Conversation.status == "active",
         )
@@ -332,16 +332,16 @@ async def get_or_create_conversation(
     if conversation:
         return conversation
 
-    # Get property to check after-hours
+    # Get business to check after-hours
     prop_result = await db.execute(
-        select(Property).where(Property.id == property_id)
+        select(Business).where(Business.id == business_id)
     )
     prop = prop_result.scalar_one_or_none()
     if not prop:
-        raise ValueError(f"Property {property_id} not found")
+        raise ValueError(f"Business {business_id} not found")
 
     conversation = Conversation(
-        property_id=property_id,
+        business_id=business_id,
         guest_identifier=guest_identifier,
         channel=channel,
         is_after_hours=_is_after_hours(prop),
@@ -355,7 +355,7 @@ async def get_or_create_conversation(
 
 async def process_guest_message(
     db: AsyncSession,
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     guest_identifier: str,
     channel: str,
     message_text: str,
@@ -375,7 +375,7 @@ async def process_guest_message(
 
     # 2. Get or create conversation
     conversation = await get_or_create_conversation(
-        db, property_id, guest_identifier, channel
+        db, business_id, guest_identifier, channel
     )
 
     # Update conversation stats (Audit M1)
@@ -406,9 +406,9 @@ async def process_guest_message(
     if detected_intent:
         conversation.ai_mode = detected_intent
 
-    # 4. Get property info
+    # 4. Get business info
     prop_result = await db.execute(
-        select(Property).where(Property.id == property_id)
+        select(Business).where(Business.id == business_id)
     )
     prop = prop_result.scalar_one()
 
@@ -419,7 +419,7 @@ async def process_guest_message(
         await db.flush()
         logger.info(
             "audit_only_mode: message logged, AI response suppressed",
-            property_id=str(property_id),
+            business_id=str(business_id),
             conversation_id=str(conversation.id),
         )
         return {
@@ -433,11 +433,11 @@ async def process_guest_message(
         }
 
     # 5. RAG: Search knowledge base for relevant context
-    kb_docs = await search_knowledge_base(db, property_id, message_text, limit=5)
+    kb_docs = await search_knowledge_base(db, business_id, message_text, limit=5)
     kb_context = "\n\n".join(
         f"[{doc.doc_type.upper()}] {doc.title}:\n{doc.content}"
         for doc in kb_docs
-    ) if kb_docs else "No property information available yet."
+    ) if kb_docs else "No business information available yet."
 
     # 6. Build conversation history for LLM context
     # Use explicit select to avoid MissingGreenlet / lazy load issues
@@ -540,7 +540,7 @@ async def process_guest_message(
     lead_progress_str = "\n".join(lead_progress_parts)
 
     system_prompt = SYSTEM_PROMPT_BASE.format(
-        property_name=prop.name,
+        business_name=prop.name,
         current_datetime=current_dt_str,
         guest_context=guest_context_str,
         lead_progress=lead_progress_str,
@@ -629,7 +629,7 @@ async def process_guest_message(
 async def _try_extract_lead(
     db: AsyncSession,
     conversation: Conversation,
-    prop: Property,
+    prop: Business,
     message_text: str,
     guest_identifier: str,
     channel: str,
@@ -727,9 +727,9 @@ async def _try_extract_lead(
     if not guest_name and not guest_phone and not guest_email:
         return None
 
-    # Estimate value based on intent and property ADR
+    # Estimate value based on intent and business ADR
     estimated_nights = extracted.get("estimated_nights") or 1
-    estimated_value = Decimal(str(estimated_nights)) * prop.adr
+    estimated_value = Decimal(str(estimated_nights)) * Decimal("0")
 
     # Rule-based Lead Scoring
     intent = extracted.get("intent", "general")
@@ -748,7 +748,7 @@ async def _try_extract_lead(
         flag_reason = "Long stay (>5 nights)"
         
     # 3. Calculated Value
-    elif estimated_value > (prop.adr * 3):
+    elif estimated_value > (Decimal("0") * 3):
         # Allow override if value is significantly high even if short stay (e.g. multiple rooms implied? 
         # For now, simplistic check: if raw estimate is > 3x ADR. 
         # Actually logic is nights * ADR, so >3 nights is > 3x ADR.
@@ -758,7 +758,7 @@ async def _try_extract_lead(
 
     lead = Lead(
         conversation_id=conversation.id,
-        property_id=conversation.property_id,
+        business_id=conversation.business_id,
         guest_name=guest_name,
         guest_phone=guest_phone,
         guest_email=guest_email,

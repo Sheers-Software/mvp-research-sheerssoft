@@ -9,10 +9,10 @@ interface ChannelStatus {
     embed_slug?: string;
 }
 
-interface PropertyChannels {
-    property_id: string;
-    property_name: string;
-    property_slug: string;
+interface BusinessChannels {
+    business_id: string;
+    business_name: string;
+    business_slug: string;
     channels: {
         whatsapp: ChannelStatus;
         email: ChannelStatus;
@@ -45,7 +45,7 @@ interface ChannelCardProps {
 function ChannelCard({ name, icon, channelKey, status, slug }: ChannelCardProps) {
     const [copied, setCopied] = useState(false);
 
-    const embedCode = `<script src="https://cdn.sheerssoft.com/widget.js" data-property="${slug}" async></script>`;
+    const embedCode = `<script src="https://cdn.sheerssoft.com/widget.js" data-business="${slug}" async></script>`;
 
     const handleCopy = () => {
         navigator.clipboard.writeText(embedCode).then(() => {
@@ -101,11 +101,11 @@ function ChannelCard({ name, icon, channelKey, status, slug }: ChannelCardProps)
 }
 
 export default function PortalChannelsPage() {
-    const [channels, setChannels] = useState<PropertyChannels[]>([]);
+    const [channels, setChannels] = useState<BusinessChannels[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        apiGet<PropertyChannels[]>('/portal/channels')
+        apiGet<BusinessChannels[]>('/portal/channels')
             .then((data) => setChannels(data || []))
             .catch(() => setChannels([]))
             .finally(() => setLoading(false));
@@ -124,7 +124,7 @@ export default function PortalChannelsPage() {
             <div style={{ marginBottom: 28 }}>
                 <h1>Channels</h1>
                 <p className="text-muted text-sm" style={{ marginTop: 4 }}>
-                    View the status of your AI concierge channels across all properties
+                    View the status of your AI concierge channels across all businesses
                 </p>
             </div>
 
@@ -144,9 +144,9 @@ export default function PortalChannelsPage() {
             ) : (
                 <div style={{ display: 'grid', gap: 32 }}>
                     {channels.map((prop) => (
-                        <div key={prop.property_id}>
+                        <div key={prop.business_id}>
                             <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                {prop.property_name}
+                                {prop.business_name}
                             </h3>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
                                 <ChannelCard
@@ -154,21 +154,21 @@ export default function PortalChannelsPage() {
                                     icon="💬"
                                     channelKey="whatsapp"
                                     status={prop.channels?.whatsapp ?? { status: 'pending' }}
-                                    slug={prop.property_slug}
+                                    slug={prop.business_slug}
                                 />
                                 <ChannelCard
                                     name="Email"
                                     icon="✉️"
                                     channelKey="email"
                                     status={prop.channels?.email ?? { status: 'pending' }}
-                                    slug={prop.property_slug}
+                                    slug={prop.business_slug}
                                 />
                                 <ChannelCard
                                     name="Website Widget"
                                     icon="🌐"
                                     channelKey="website"
                                     status={prop.channels?.website ?? { status: 'pending' }}
-                                    slug={prop.property_slug}
+                                    slug={prop.business_slug}
                                 />
                             </div>
                         </div>

@@ -6,7 +6,7 @@ import { apiGet } from '@/lib/api';
 interface Metrics {
     total_tenants: number;
     active_tenants: number;
-    total_properties: number;
+    total_businesses: number;
     total_conversations_alltime: number;
     total_conversations_mtd: number;
     total_leads_mtd: number;
@@ -16,7 +16,7 @@ interface Metrics {
 
 const statCards = [
     { key: 'active_tenants', label: 'Active Tenants', icon: '🏨', color: 'var(--success)' },
-    { key: 'total_properties', label: 'Properties', icon: '🏢', color: 'var(--info)' },
+    { key: 'total_businesses', label: 'Businesses', icon: '🏢', color: 'var(--info)' },
     { key: 'total_conversations_mtd', label: 'Conversations (MTD)', icon: '💬', color: 'var(--accent)' },
     { key: 'total_leads_mtd', label: 'Leads (MTD)', icon: '🎯', color: 'var(--warning)' },
     { key: 'open_support_tickets', label: 'Open Tickets', icon: '🎫', color: 'var(--danger)' },

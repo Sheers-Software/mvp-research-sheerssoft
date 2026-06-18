@@ -28,7 +28,7 @@ const statusBadge: Record<string, string> = {
 
 const intentBadge: Record<string, string> = {
     // values from lead extraction LLM
-    room_booking: 'badge-success',
+    service_booking: 'badge-success',
     event: 'badge-warning',
     fb_inquiry: 'badge-info',
     general: 'badge-neutral',
@@ -44,34 +44,34 @@ export default function LeadsPage() {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('');
-    const [propertyId, setPropertyId] = useState<string | null>(null);
+    const [businessId, setBusinessId] = useState<string | null>(null);
     const [convertingId, setConvertingId] = useState<string | null>(null);
     const [revenue, setRevenue] = useState('');
 
     useEffect(() => {
         apiGet<any>('/analytics/dashboard')
             .then((data) => {
-                if (data?.property_id) setPropertyId(data.property_id);
+                if (data?.business_id) setBusinessId(data.business_id);
             })
             .catch(() => { });
     }, []);
 
     useEffect(() => {
-        if (!propertyId) return;
+        if (!businessId) return;
         setLoading(true);
         const params = filter ? `?status=${filter}` : '';
-        apiGet<Lead[]>(`/properties/${propertyId}/leads${params}`)
+        apiGet<Lead[]>(`/businesses/${businessId}/leads${params}`)
             .then(setLeads)
             .catch(() => { })
             .finally(() => setLoading(false));
-    }, [propertyId, filter]);
+    }, [businessId, filter]);
 
     const exportCSV = () => {
-        if (!propertyId) return;
+        if (!businessId) return;
         const token = localStorage.getItem('nocturn_token');
         const params = filter ? `?status=${filter}` : '';
         window.open(
-            `/api/v1/properties/${propertyId}/leads/export${params}${params ? '&' : '?'}token=${token}`,
+            `/api/v1/businesses/${businessId}/leads/export${params}${params ? '&' : '?'}token=${token}`,
             '_blank'
         );
     };

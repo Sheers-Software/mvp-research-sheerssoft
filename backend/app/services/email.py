@@ -134,7 +134,7 @@ async def send_email_reply(
 
 
 async def notify_staff_handoff(
-    property_id: str,
+    business_id: str,
     conversation_id: str,
     guest_identifier: str,
     channel: str,
@@ -169,7 +169,7 @@ async def notify_staff_handoff(
     try:
         from app.services.realtime import realtime_service
         await realtime_service.publish_handoff(
-            property_id=property_id,
+            business_id=business_id,
             conversation_id=conversation_id,
             guest_name=guest_name or "Guest",
             channel=channel,

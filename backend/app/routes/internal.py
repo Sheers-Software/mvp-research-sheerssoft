@@ -145,7 +145,7 @@ async def cleanup_leads(
 
 class ShadowEventPayload(BaseModel):
     event_type: str  # "message.received" | "message.sent"
-    property_slug: str
+    business_slug: str
     sender_jid: str
     message_id: str
     content_preview: Optional[str] = None
@@ -154,13 +154,13 @@ class ShadowEventPayload(BaseModel):
 
 
 class ShadowSessionStatusPayload(BaseModel):
-    property_slug: str
+    business_slug: str
     status: str
     qr_base64: Optional[str] = None
 
 
 class ShadowHeartbeatPayload(BaseModel):
-    property_slug: str
+    business_slug: str
 
 
 @router.post("/shadow-event", include_in_schema=False)
@@ -174,7 +174,7 @@ async def shadow_event_endpoint(
     if payload.event_type == "message.received":
         await handle_message_received(
             db=db,
-            property_slug=payload.property_slug,
+            business_slug=payload.business_slug,
             sender_jid=payload.sender_jid,
             message_id=payload.message_id,
             content_preview=payload.content_preview,
@@ -184,7 +184,7 @@ async def shadow_event_endpoint(
     elif payload.event_type == "message.sent":
         await handle_message_sent(
             db=db,
-            property_slug=payload.property_slug,
+            business_slug=payload.business_slug,
             recipient_jid=payload.sender_jid,
             message_id=payload.message_id,
             timestamp_ms=payload.timestamp_unix,
@@ -198,10 +198,10 @@ async def shadow_session_status(
     x_internal_secret: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db),
 ):
-    """Updates Baileys session connection status for a property."""
+    """Updates Baileys session connection status for a business."""
     _verify(x_internal_secret)
-    from app.models import Property
-    prop = await db.scalar(select(Property).where(Property.slug == payload.property_slug))
+    from app.models import Business
+    prop = await db.scalar(select(Business).where(Business.slug == payload.business_slug))
     if prop:
         prop.shadow_pilot_session_active = (payload.status == "connected")
         prop.shadow_pilot_session_last_seen = datetime.now(timezone.utc)
@@ -217,27 +217,27 @@ async def shadow_heartbeat(
 ):
     """Receives periodic heartbeat from Baileys bridge to confirm session is alive."""
     _verify(x_internal_secret)
-    from app.models import Property
-    prop = await db.scalar(select(Property).where(Property.slug == payload.property_slug))
+    from app.models import Business
+    prop = await db.scalar(select(Business).where(Business.slug == payload.business_slug))
     if prop:
         prop.shadow_pilot_session_last_seen = datetime.now(timezone.utc)
         await db.commit()
     return {"status": "ok"}
 
 
-@router.get("/shadow-active-properties", include_in_schema=False)
+@router.get("/shadow-active-businesses", include_in_schema=False)
 async def shadow_active_properties(
     x_internal_secret: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db),
 ):
-    """Returns all properties currently in shadow_pilot_mode for bridge discovery."""
+    """Returns all businesses currently in shadow_pilot_mode for bridge discovery."""
     _verify(x_internal_secret)
-    from app.models import Property
+    from app.models import Business
     props = list(await db.scalars(
-        select(Property).where(Property.shadow_pilot_mode == True)
+        select(Business).where(Business.shadow_pilot_mode == True)
     ))
     return {
-        "properties": [
+        "businesses": [
             {"slug": p.slug, "shadow_pilot_phone": p.shadow_pilot_phone}
             for p in props if p.slug
         ]

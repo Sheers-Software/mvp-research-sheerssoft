@@ -17,7 +17,7 @@ function genId(prefix: string) {
 }
 
 // A KB response that satisfies both consumers: an array (portal) that also
-// carries a `.documents` property (admin tenant-detail).
+// carries a `.documents` business (admin tenant-detail).
 function kbResponse() {
     const arr = [...D.kbState];
     (arr as any).documents = D.kbState;
@@ -36,7 +36,7 @@ export async function resolveDemo<T = any>(
     // Small artificial latency so loading states are visible (feels real).
     await new Promise((r) => setTimeout(r, 180));
 
-    const seg = path.split('/').filter(Boolean); // e.g. ['properties','id','analytics']
+    const seg = path.split('/').filter(Boolean); // e.g. ['businesses','id','analytics']
 
     // ── Auth ──────────────────────────────────────────────────────────────
     if (path === '/auth/me') return D.demoUser() as T;
@@ -55,8 +55,8 @@ export async function resolveDemo<T = any>(
     if (path === '/system/info') return D.systemInfo() as T;
     if (path === '/announcements/active') return D.activeAnnouncements() as T;
 
-    // ── Property-scoped ─────────────────────────────────────────────────────
-    if (seg[0] === 'properties' && seg.length >= 3) {
+    // ── Business-scoped ─────────────────────────────────────────────────────
+    if (seg[0] === 'businesses' && seg.length >= 3) {
         const pid = seg[1];
         const sub = seg[2];
         if (sub === 'analytics')
@@ -64,10 +64,10 @@ export async function resolveDemo<T = any>(
         if (sub === 'insights') return D.insights(pid) as T;
         if (sub === 'settings') {
             if (method === 'PUT') {
-                D.settingsState[pid] = { ...(D.settingsState[pid] || D.settingsState[D.PROPERTY_ID]), ...body, id: pid };
+                D.settingsState[pid] = { ...(D.settingsState[pid] || D.settingsState[D.BUSINESS_ID]), ...body, id: pid };
                 return D.settingsState[pid] as T;
             }
-            return (D.settingsState[pid] || D.settingsState[D.PROPERTY_ID]) as T;
+            return (D.settingsState[pid] || D.settingsState[D.BUSINESS_ID]) as T;
         }
         if (sub === 'leads') return D.leadsState as T;
         if (sub === 'kb') {
@@ -138,7 +138,7 @@ export async function resolveDemo<T = any>(
 
     // ── Audit (revenue calculator) ──────────────────────────────────────────
     if (path === '/audit/calculate' && method === 'POST') {
-        const rooms = body?.room_count || 40;
+        const rooms = body?.monthly_inquiries || 40;
         const adr = body?.adr || 350;
         const daily = body?.daily_msgs || 15;
         const afterHours = Math.round(daily * 0.55);
@@ -148,7 +148,7 @@ export async function resolveDemo<T = any>(
         const ota = revLost * (body?.ota_commission_rate || 0.18);
         const leakage = revLost + ota;
         return {
-            room_count: rooms, adr, daily_msgs_used: daily, after_hours_msgs_per_day: afterHours,
+            monthly_inquiries: rooms, adr, daily_msgs_used: daily, after_hours_msgs_per_day: afterHours,
             monthly_after_hours_msgs: monthly, lost_bookings_per_month: lost, avg_stay_nights: 2.1,
             revenue_lost_monthly: Math.round(revLost), ota_commission_monthly: Math.round(ota),
             total_monthly_leakage: Math.round(leakage), annual_leakage: Math.round(leakage * 12),
@@ -169,8 +169,8 @@ export async function resolveDemo<T = any>(
         return arr as T;
     }
     if (seg[0] === 'superadmin' && seg[1] === 'tenants' && seg[2]) {
-        // tenantDetail already carries `.properties`, satisfying both the
-        // tenant-detail page (TenantDetails) and kb-ingestion ({ properties }).
+        // tenantDetail already carries `.businesses`, satisfying both the
+        // tenant-detail page (TenantDetails) and kb-ingestion ({ businesses }).
         return D.tenantDetail(seg[2]) as T;
     }
     if (path === '/superadmin/pipeline') return D.pipeline() as T;
@@ -203,7 +203,7 @@ export async function resolveDemo<T = any>(
         return D.maintenanceState as T;
     }
     if (path === '/superadmin/shadow-pilots') {
-        if (method === 'POST') return { property_id: genId('prop') } as T;
+        if (method === 'POST') return { business_id: genId('prop') } as T;
         return [] as T;
     }
     if (seg[0] === 'superadmin' && seg[1] === 'shadow-pilots') return {} as T;

@@ -125,7 +125,7 @@ async def get_current_user(
 
 
 # ─────────────────────────────────────────────────────────────
-# Tenant & Property Access Control
+# Tenant & Business Access Control
 # ─────────────────────────────────────────────────────────────
 
 async def check_tenant_access(
@@ -160,13 +160,13 @@ async def check_tenant_access(
 
 
 async def check_property_access(
-    property_id: str,
+    business_id: str,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict | object:
     """
-    Verify the authenticated user has access to the specified property.
-    Checks via the Tenant → Property → TenantMembership chain.
+    Verify the authenticated user has access to the specified business.
+    Checks via the Tenant → Business → TenantMembership chain.
     """
     # Legacy admin bypass
     if isinstance(user, dict) and user.get("_legacy"):
@@ -175,32 +175,32 @@ async def check_property_access(
     if user.is_superadmin:
         return user
 
-    # Resolve property's tenant
-    from app.models import Property
-    stmt = select(Property.tenant_id).where(Property.id == property_id)
+    # Resolve business's tenant
+    from app.models import Business
+    stmt = select(Business.tenant_id).where(Business.id == business_id)
     result = await db.execute(stmt)
     prop_tenant_id = result.scalar_one_or_none()
 
     if not prop_tenant_id:
-        raise HTTPException(status_code=404, detail="Property not found")
+        raise HTTPException(status_code=404, detail="Business not found")
 
     # Check user has membership for this tenant
     for membership in user.memberships:
         if str(membership.tenant_id) == str(prop_tenant_id):
-            # Check property-level scope
+            # Check business-level scope
             if membership.accessible_property_ids is None:
-                return user  # null = all properties
-            if str(property_id) in [str(pid) for pid in membership.accessible_property_ids]:
+                return user  # null = all businesses
+            if str(business_id) in [str(pid) for pid in membership.accessible_property_ids]:
                 return user
 
     logger.warning(
-        "Unauthorized property access attempt",
+        "Unauthorized business access attempt",
         user_id=str(user.id),
-        target_property=property_id,
+        target_property=business_id,
     )
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="You do not have access to this property"
+        detail="You do not have access to this business"
     )
 
 

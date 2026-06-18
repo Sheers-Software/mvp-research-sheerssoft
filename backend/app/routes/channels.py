@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Property, Conversation
+from app.models import Business, Conversation
 from app.schemas import (
     MessageRequest,
     ConversationResponse,
@@ -54,20 +54,20 @@ async def whatsapp_webhook(
     if not normalized_data:
         return {"status": "ignored"}
 
-    # Prefer display_phone_number (e.g. +15557220306) for property lookup as it
-    # matches the human-readable sender number stored in Property.whatsapp_number.
+    # Prefer display_phone_number (e.g. +15557220306) for business lookup as it
+    # matches the human-readable sender number stored in Business.whatsapp_number.
     # Fall back to phone_number_id (Meta's internal ID) for backwards compatibility.
     display_phone_number = normalized_data["metadata"].get("display_phone_number")
     phone_number_id = normalized_data["metadata"].get("phone_number_id")
     lookup_number = display_phone_number or phone_number_id
     prop_result = await db.execute(
-        select(Property).where(Property.whatsapp_number == lookup_number)
+        select(Business).where(Business.whatsapp_number == lookup_number)
     )
     prop = prop_result.scalar_one_or_none()
 
     if not prop:
         logger.warning(
-            "WhatsApp webhook: Property not found",
+            "WhatsApp webhook: Business not found",
             display_phone_number=display_phone_number,
             phone_number_id=phone_number_id,
         )
@@ -85,7 +85,7 @@ async def whatsapp_webhook(
 
     background_tasks.add_task(
         _handle_whatsapp_message_async,
-        property_id=prop.id,
+        business_id=prop.id,
         from_number=normalized_data["guest_identifier"],
         text=normalized_data["content"],
         guest_name=normalized_data["guest_name"],
@@ -120,7 +120,7 @@ async def _handle_unsupported_media_async(
 
 
 async def _handle_whatsapp_message_async(
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     from_number: str,
     text: str,
     guest_name: str | None,
@@ -132,11 +132,11 @@ async def _handle_whatsapp_message_async(
 
     async with async_session() as db:
         try:
-            await set_db_context(db, str(property_id))
+            await set_db_context(db, str(business_id))
 
             result = await process_guest_message(
                 db=db,
-                property_id=property_id,
+                business_id=business_id,
                 guest_identifier=from_number,
                 channel="whatsapp",
                 message_text=text,
@@ -151,7 +151,7 @@ async def _handle_whatsapp_message_async(
 
             response_text = result["response"]
 
-            # Route reply based on property configuration
+            # Route reply based on business configuration
             if whatsapp_provider == "twilio":
                 await send_twilio_message(
                     to_number=from_number,
@@ -163,7 +163,7 @@ async def _handle_whatsapp_message_async(
 
             if result.get("mode") == "handoff":
                 await notify_staff_handoff(
-                    property_id=str(property_id),
+                    business_id=str(business_id),
                     conversation_id=result["conversation_id"],
                     guest_identifier=from_number,
                     channel="whatsapp",
@@ -175,7 +175,7 @@ async def _handle_whatsapp_message_async(
             logger.error(
                 "Error processing WhatsApp message",
                 error=str(e),
-                property_id=str(property_id),
+                business_id=str(business_id),
                 from_number=from_number,
                 exc_info=True,
             )
@@ -231,14 +231,14 @@ async def twilio_whatsapp_webhook(
         return {"status": "ignored"}
 
     to_number = normalized_data["metadata"].get("twilio_to_number")
-    # Lookup the property by the Twilio Phone Number
+    # Lookup the business by the Twilio Phone Number
     prop_result = await db.execute(
-        select(Property).where(Property.twilio_phone_number == to_number)
+        select(Business).where(Business.twilio_phone_number == to_number)
     )
     prop = prop_result.scalar_one_or_none()
 
     if not prop:
-        logger.warning("Twilio webhook: Property not found", to_number=to_number)
+        logger.warning("Twilio webhook: Business not found", to_number=to_number)
         return {"status": "property_not_found"}
 
     # Non-text messages (images, audio, etc.) — send canned reply, skip AI
@@ -253,7 +253,7 @@ async def twilio_whatsapp_webhook(
 
     background_tasks.add_task(
         _handle_whatsapp_message_async,
-        property_id=prop.id,
+        business_id=prop.id,
         from_number=normalized_data["guest_identifier"],
         text=normalized_data["content"],
         guest_name=normalized_data["guest_name"],
@@ -290,17 +290,17 @@ async def email_webhook(
 
     to_address = normalized_data["metadata"].get("to_address")
     prop_result = await db.execute(
-        select(Property).where(Property.notification_email == to_address)
+        select(Business).where(Business.notification_email == to_address)
     )
     prop = prop_result.scalar_one_or_none()
 
     if not prop:
-        logger.warning("Email webhook: Property not found", to_address=to_address)
+        logger.warning("Email webhook: Business not found", to_address=to_address)
         return {"status": "no_property"}
 
     background_tasks.add_task(
         _handle_email_message_async,
-        property_id=prop.id,
+        business_id=prop.id,
         from_address=normalized_data["guest_identifier"],
         subject=normalized_data["metadata"].get("subject"),
         text=normalized_data["content"],
@@ -311,7 +311,7 @@ async def email_webhook(
 
 
 async def _handle_email_message_async(
-    property_id: uuid.UUID,
+    business_id: uuid.UUID,
     from_address: str,
     subject: str,
     text: str,
@@ -322,11 +322,11 @@ async def _handle_email_message_async(
 
     async with async_session() as db:
         try:
-            await set_db_context(db, str(property_id))
+            await set_db_context(db, str(business_id))
 
             result = await process_guest_message(
                 db=db,
-                property_id=property_id,
+                business_id=business_id,
                 guest_identifier=from_address,
                 channel="email",
                 message_text=text,
@@ -344,7 +344,7 @@ async def _handle_email_message_async(
 
             if result.get("mode") == "handoff":
                 await notify_staff_handoff(
-                    property_id=str(property_id),
+                    business_id=str(business_id),
                     conversation_id=result["conversation_id"],
                     guest_identifier=from_address,
                     channel="email",
@@ -356,7 +356,7 @@ async def _handle_email_message_async(
             logger.error(
                 "Error processing email message",
                 error=str(e),
-                property_id=str(property_id),
+                business_id=str(business_id),
                 guest_email=from_address
             )
 
@@ -376,12 +376,12 @@ async def web_chat_message(
     Web chat widget endpoint.
     Handles both new conversations and follow-up messages.
     """
-    property_id = uuid.UUID(body.property_id)
+    business_id = uuid.UUID(body.business_id)
     session_id = body.session_id or str(uuid.uuid4())
 
     result = await process_guest_message(
         db=db,
-        property_id=property_id,
+        business_id=business_id,
         guest_identifier=f"web:{session_id}",
         channel="web",
         message_text=body.message,
@@ -412,7 +412,7 @@ async def web_chat_follow_up(
 
     result = await process_guest_message(
         db=db,
-        property_id=conv.property_id,
+        business_id=conv.business_id,
         guest_identifier=conv.guest_identifier,
         channel=conv.channel,
         message_text=body.message,

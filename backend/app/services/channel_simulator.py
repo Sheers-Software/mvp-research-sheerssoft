@@ -24,7 +24,7 @@ async def simulate_channel_send(
     channel: str,
     to: str,
     message: str,
-    property_id: str = None,
+    business_id: str = None,
     guest_name: str = None,
 ) -> dict:
     """
@@ -42,7 +42,7 @@ async def simulate_channel_send(
         "channel": channel,
         "to": to,
         "message": message[:500],  # Truncate for storage
-        "property_id": property_id,
+        "business_id": business_id,
         "guest_name": guest_name,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "status": "simulated",

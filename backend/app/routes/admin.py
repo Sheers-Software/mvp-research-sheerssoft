@@ -1,5 +1,5 @@
 """
-Admin routes — Property CRUD, knowledge base, onboarding, settings.
+Admin routes — Business CRUD, knowledge base, onboarding, settings.
 """
 
 import uuid
@@ -12,10 +12,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Property, Announcement, TenantMembership
+from app.models import Business, Announcement, TenantMembership
 from app.schemas import (
-    PropertyResponse,
-    PropertyCreateRequest,
+    BusinessResponse,
+    BusinessCreateRequest,
     KBIngestRequest,
     KBIngestResponse,
 )
@@ -26,72 +26,64 @@ logger = structlog.get_logger()
 router = APIRouter()
 
 
-@router.get("/properties", response_model=List[PropertyResponse])
+@router.get("/businesses", response_model=List[BusinessResponse])
 async def list_properties(
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(verify_jwt),
 ):
-    """List all properties (for dashboard selection)."""
-    result = await db.execute(select(Property))
+    """List all businesses (for dashboard selection)."""
+    result = await db.execute(select(Business))
     return result.scalars().all()
 
 
-@router.post("/properties", response_model=PropertyResponse, status_code=201)
+@router.post("/businesses", response_model=BusinessResponse, status_code=201)
 async def create_property(
-    body: PropertyCreateRequest,
+    body: BusinessCreateRequest,
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(verify_jwt),
 ):
-    """Create a new property (tenant)."""
-    prop = Property(
+    """Create a new business (tenant)."""
+    prop = Business(
         name=body.name,
         whatsapp_number=body.whatsapp_number,
         website_url=body.website_url,
         operating_hours=body.operating_hours,
-        adr=Decimal(str(body.adr)),
-        ota_commission_pct=Decimal(str(body.ota_commission_pct)),
-        hourly_rate=Decimal(str(body.hourly_rate)),
         brand_vocabulary=body.brand_vocabulary,
         required_questions=body.required_questions,
     )
     db.add(prop)
     await db.flush()
 
-    return PropertyResponse(
+    return BusinessResponse(
         id=str(prop.id),
         name=prop.name,
         whatsapp_number=prop.whatsapp_number,
         website_url=prop.website_url,
-        adr=float(prop.adr),
-        ota_commission_pct=float(prop.ota_commission_pct),
-        hourly_rate=float(prop.hourly_rate),
         brand_vocabulary=prop.brand_vocabulary,
         required_questions=prop.required_questions,
         created_at=prop.created_at,
     )
 
 
-@router.get("/properties/{property_id}", response_model=PropertyResponse)
+@router.get("/businesses/{business_id}", response_model=BusinessResponse)
 async def get_property(
-    property_id: str,
+    business_id: str,
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(verify_jwt),
 ):
-    """Get property details."""
+    """Get business details."""
     result = await db.execute(
-        select(Property).where(Property.id == uuid.UUID(property_id))
+        select(Business).where(Business.id == uuid.UUID(business_id))
     )
     prop = result.scalar_one_or_none()
     if not prop:
-        raise HTTPException(status_code=404, detail="Property not found")
+        raise HTTPException(status_code=404, detail="Business not found")
 
-    return PropertyResponse(
+    return BusinessResponse(
         id=str(prop.id),
         name=prop.name,
         whatsapp_number=prop.whatsapp_number,
         website_url=prop.website_url,
-        adr=float(prop.adr),
-        ota_commission_pct=float(prop.ota_commission_pct),
         hourly_rate=float(prop.hourly_rate) if prop.hourly_rate else 25.0,
         brand_vocabulary=prop.brand_vocabulary,
         required_questions=prop.required_questions,
@@ -99,19 +91,19 @@ async def get_property(
     )
 
 
-@router.get("/properties/{property_id}/settings")
+@router.get("/businesses/{business_id}/settings")
 async def get_property_settings(
-    property_id: str,
+    business_id: str,
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(check_property_access),
 ):
-    """Get property configuration."""
+    """Get business configuration."""
     result = await db.execute(
-        select(Property).where(Property.id == uuid.UUID(property_id))
+        select(Business).where(Business.id == uuid.UUID(business_id))
     )
     prop = result.scalar_one_or_none()
     if not prop:
-        raise HTTPException(status_code=404, detail="Property not found")
+        raise HTTPException(status_code=404, detail="Business not found")
 
     return {
         "id": str(prop.id),
@@ -121,7 +113,6 @@ async def get_property_settings(
         "timezone": prop.timezone,
         "plan_tier": prop.plan_tier,
         "is_active": prop.is_active,
-        "adr": float(prop.adr) if prop.adr else 230.0,
         "hourly_rate": float(prop.hourly_rate) if prop.hourly_rate else 25.00,
         "brand_vocabulary": prop.brand_vocabulary,
         "required_questions": prop.required_questions,
@@ -129,22 +120,22 @@ async def get_property_settings(
         "website_url": prop.website_url,
     }
 
-from app.schemas import PropertySettingsUpdateRequest
+from app.schemas import BusinessSettingsUpdateRequest
 
-@router.put("/properties/{property_id}/settings")
+@router.put("/businesses/{business_id}/settings")
 async def update_property_settings(
-    property_id: str,
-    body: PropertySettingsUpdateRequest,
+    business_id: str,
+    body: BusinessSettingsUpdateRequest,
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(check_property_access),
 ):
-    """Update property configuration via the Settings page."""
+    """Update business configuration via the Settings page."""
     result = await db.execute(
-        select(Property).where(Property.id == uuid.UUID(property_id))
+        select(Business).where(Business.id == uuid.UUID(business_id))
     )
     prop = result.scalar_one_or_none()
     if not prop:
-        raise HTTPException(status_code=404, detail="Property not found")
+        raise HTTPException(status_code=404, detail="Business not found")
 
     if body.notification_email is not None:
         prop.notification_email = body.notification_email
@@ -152,10 +143,6 @@ async def update_property_settings(
         prop.operating_hours = body.operating_hours
     if body.timezone is not None:
         prop.timezone = body.timezone
-    if body.adr is not None:
-        prop.adr = Decimal(str(body.adr))
-    if body.hourly_rate is not None:
-        prop.hourly_rate = Decimal(str(body.hourly_rate))
     if body.brand_vocabulary is not None:
         prop.brand_vocabulary = body.brand_vocabulary
     if body.required_questions is not None:
@@ -165,37 +152,37 @@ async def update_property_settings(
     return {"status": "success"}
 
 
-@router.put("/properties/{property_id}/knowledge-base", response_model=KBIngestResponse)
+@router.put("/businesses/{business_id}/knowledge-base", response_model=KBIngestResponse)
 async def upload_knowledge_base(
-    property_id: str,
+    business_id: str,
     body: KBIngestRequest,
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(check_property_access),
 ):
-    """Upload or replace a property's knowledge base."""
-    pid = uuid.UUID(property_id)
+    """Upload or replace a business's knowledge base."""
+    pid = uuid.UUID(business_id)
 
-    result = await db.execute(select(Property).where(Property.id == pid))
+    result = await db.execute(select(Business).where(Business.id == pid))
     if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Property not found")
+        raise HTTPException(status_code=404, detail="Business not found")
 
     count = await ingest_knowledge_base(
         db=db,
-        property_id=pid,
+        business_id=pid,
         documents=[doc.model_dump() for doc in body.documents],
     )
 
-    return KBIngestResponse(documents_ingested=count, property_id=property_id)
+    return KBIngestResponse(documents_ingested=count, business_id=business_id)
 
 
-@router.post("/properties/{property_id}/onboard")
+@router.post("/businesses/{business_id}/onboard")
 async def onboard_property(
-    property_id: str,
+    business_id: str,
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(check_property_access),
 ):
     """Trigger onboarding."""
-    return {"status": "onboarded", "property_id": property_id}
+    return {"status": "onboarded", "business_id": business_id}
 
 
 @router.get("/system/integrations")
@@ -225,9 +212,9 @@ async def get_system_info(
     }
 
 
-@router.delete("/gdpr/delete-guest/{property_id}/{guest_identifier}")
+@router.delete("/gdpr/delete-guest/{business_id}/{guest_identifier}")
 async def delete_guest_data(
-    property_id: str,
+    business_id: str,
     guest_identifier: str,
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(check_property_access),
@@ -235,7 +222,7 @@ async def delete_guest_data(
     """
     PDPA Right-to-Delete (PDPA 2010, Section 7(2)).
 
-    Anonymizes all guest data for a given identifier within a property:
+    Anonymizes all guest data for a given identifier within a business:
     - Conversations: guest_name, guest_identifier replaced
     - Messages: content redacted
     - Leads: PII fields cleared
@@ -243,12 +230,12 @@ async def delete_guest_data(
     from sqlalchemy import update, delete
     from app.models import Conversation, Message, Lead
 
-    pid = uuid.UUID(property_id)
+    pid = uuid.UUID(business_id)
 
     # 1. Find all conversations for this guest
     result = await db.execute(
         select(Conversation.id).where(
-            Conversation.property_id == pid,
+            Conversation.business_id == pid,
             Conversation.guest_identifier == guest_identifier,
         )
     )
@@ -290,7 +277,7 @@ async def delete_guest_data(
 
     logger.info(
         "PDPA_DELETE",
-        property_id=property_id,
+        business_id=business_id,
         guest_identifier=guest_identifier,
         conversations_affected=len(conv_ids),
     )

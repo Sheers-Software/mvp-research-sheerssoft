@@ -148,7 +148,7 @@ def normalize_twilio_webhook(form_data: dict) -> dict:
             "content": text_body,
             "metadata": {
                 "twilio_message_sid": message_sid,
-                "twilio_to_number": to_number,  # Useful for Property lookup
+                "twilio_to_number": to_number,  # Useful for Business lookup
             },
         }
 

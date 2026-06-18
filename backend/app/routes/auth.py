@@ -318,7 +318,7 @@ async def get_my_profile(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Get current user's profile including tenant memberships and accessible properties.
+    Get current user's profile including tenant memberships and accessible businesses.
     """
     # Legacy admin support
     if isinstance(user, dict) and user.get("_legacy"):

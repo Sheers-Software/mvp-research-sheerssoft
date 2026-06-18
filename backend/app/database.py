@@ -44,10 +44,10 @@ async_session_factory = async_session
 from sqlalchemy import text
 
 
-async def set_db_context(session: AsyncSession, property_id: str):
+async def set_db_context(session: AsyncSession, business_id: str):
     """Sets the RLS context for the current session."""
     await session.execute(
-        text(f"select set_config('app.current_property_id', '{property_id}', false)")
+        text(f"select set_config('app.current_property_id', '{business_id}', false)")
     )
 
 
